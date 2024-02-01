@@ -88,20 +88,48 @@ fn test_parse_binexp() {
 
 #[test]
 fn test_multi_part_binexpr() {
-	let tokens: Vec<_> = Lexer::new("4 + 3 - 2").collect();
+	let tokens: Vec<_> = Lexer::new("1 + 2 * 3").collect();
 	let mut tokens = TokenIter::new(&tokens);
-	// TODO(sbdchd): pretty sure this should be (4 + 3) - 2
-	// instead of 4 + (3 - 2)
 	assert_eq!(
 		parse_expr(&mut tokens),
 		Ok(Expr::BinExp(BinExp {
 			op: BinOp::Plus,
-			lhs: Box::new(Expr::Num(4.0)),
+			lhs: Box::new(Expr::Num(1.0)),
 			rhs: Box::new(Expr::BinExp(BinExp {
-				op: BinOp::Minus,
-				lhs: Box::new(Expr::Num(3.0)),
+				op: BinOp::Mul,
+				lhs: Box::new(Expr::Num(2.0)),
+				rhs: Box::new(Expr::Num(3.0)),
+			})),
+		}))
+	);
+
+	let tokens: Vec<_> = Lexer::new("1 * 2 + 3").collect();
+	let mut tokens = TokenIter::new(&tokens);
+	assert_eq!(
+		parse_expr(&mut tokens),
+		Ok(Expr::BinExp(BinExp {
+			op: BinOp::Plus,
+			lhs: Box::new(Expr::BinExp(BinExp {
+				op: BinOp::Mul,
+				lhs: Box::new(Expr::Num(1.0)),
 				rhs: Box::new(Expr::Num(2.0)),
 			})),
+			rhs: Box::new(Expr::Num(3.0)),
+		}))
+	);
+
+	let tokens: Vec<_> = Lexer::new("1 + 2 + 3").collect();
+	let mut tokens = TokenIter::new(&tokens);
+	assert_eq!(
+		parse_expr(&mut tokens),
+		Ok(Expr::BinExp(BinExp {
+			op: BinOp::Plus,
+			lhs: Box::new(Expr::BinExp(BinExp {
+				op: BinOp::Plus,
+				lhs: Box::new(Expr::Num(1.0)),
+				rhs: Box::new(Expr::Num(2.0)),
+			})),
+			rhs: Box::new(Expr::Num(3.0)),
 		}))
 	);
 }

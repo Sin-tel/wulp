@@ -20,7 +20,7 @@ pub fn parse(text: &str) -> Result<Block> {
 			_ => true,
 		})
 		.collect();
-	dbg!(&tokens);
+	// dbg!(&tokens);
 	let mut tokens = TokenIter::new(&tokens);
 	parse_block(&mut tokens)
 }
@@ -98,7 +98,7 @@ pub fn bin_priority(op: &Option<TokenKind>) -> i32 {
 		| Some(TokenKind::Eq) | Some(TokenKind::Neq) => 3,
 		Some(TokenKind::And) => 2,
 		Some(TokenKind::Or) => 1,
-		_ => 0,
+		_ => panic!("No priority defined for {:?}", op),
 	}
 }
 
@@ -178,7 +178,7 @@ pub fn parse_sub_expr(tokens: &mut TokenIter<Token>, min_priority: i32) -> Resul
 			_ => break,
 		};
 
-		let prority = bin_priority(&tokens.peek().map(to_kind));
+		let prority = bin_priority(&tokens.cur().map(to_kind));
 
 		let rhs = match parse_sub_expr(tokens, prority) {
 			Err(_) => break,
