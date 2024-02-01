@@ -2,3 +2,5 @@
 **/*.rs.bk
 Cargo.lock
 .vscode
+better_lua.sublime-project
+better_lua.sublime-workspace
