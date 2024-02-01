@@ -1,14 +1,10 @@
 mod ast;
 mod iter;
-mod lex;
-mod parse;
+mod lexer;
+mod parser;
 
 #[cfg(test)]
-mod lex_test;
-#[cfg(test)]
-mod parse_test;
-
-use parse::parse;
+mod tests;
 
 fn main() {
 	let input = r#"
@@ -19,7 +15,7 @@ fn main() {
 
 	// let input = " print('hello world')";
 
-	let ast = parse(&input);
+	let ast = parser::parse(&input);
 	println!("{:?}", ast);
 }
 

@@ -1,4 +1,4 @@
-use crate::lex::{Token, TokenKind};
+use crate::lexer::{Token, TokenKind};
 use std::cmp::max;
 
 pub trait PeekableIterator: Iterator {

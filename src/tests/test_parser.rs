@@ -1,7 +1,7 @@
-use super::ast::*;
-use super::iter::*;
-use super::lex::*;
-use super::parse::*;
+use crate::ast::*;
+use crate::iter::*;
+use crate::lexer::*;
+use crate::parser::*;
 
 use pretty_assertions::assert_eq;
 
@@ -73,12 +73,12 @@ fn test_parse_binexp() {
         (">>", BinOp::BitShr),
         ("<<", BinOp::BitShl),
         ("..", BinOp::Concat),
-        ("<", BinOp::LT),
-        ("<=", BinOp::LTE),
-        (">", BinOp::GT),
-        (">=", BinOp::GTE),
-        ("==", BinOp::EQ),
-        ("~=", BinOp::NEQ),
+        ("<", BinOp::Lt),
+        ("<=", BinOp::Lte),
+        (">", BinOp::Gt),
+        (">=", BinOp::Gte),
+        ("==", BinOp::Eq),
+        ("~=", BinOp::Neq),
         ("and", BinOp::And),
         ("or", BinOp::Or),
     ] {

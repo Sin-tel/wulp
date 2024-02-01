@@ -1,4 +1,4 @@
-use super::lex::*;
+use crate::lexer::*;
 
 #[test]
 fn whitespace() {

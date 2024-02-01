@@ -1,6 +1,6 @@
 use crate::ast::*;
 use crate::iter::{ForwardBackwardIterator, PeekableIterator, TokenIter};
-use crate::lex::{Lexer, Token, TokenKind};
+use crate::lexer::{Lexer, Token, TokenKind};
 use std;
 
 type Result<T> = std::result::Result<T, ()>;
