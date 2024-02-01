@@ -25,22 +25,6 @@ pub fn parse(text: &str) -> Result<Block> {
     parse_block(&mut tokens)
 }
 
-/// label ::= ‘::’ Name ‘::’
-pub fn parse_label(tokens: &mut TokenIter<Token>) -> Result<Name> {
-    tokens.assert_next(&TokenKind::DBColon)?;
-    if let Some(Token {
-        kind: TokenKind::Ident(ident),
-        ..
-    }) = tokens.next()
-    {
-        tokens.assert_next(&TokenKind::DBColon)?;
-
-        Ok(Name(ident.to_string()))
-    } else {
-        Err(())
-    }
-}
-
 /// funcname ::= Name {‘.’ Name} [‘:’ Name]
 pub fn parse_funcname(tokens: &mut TokenIter<Token>) -> Result<FuncName> {
     let first_name = tokens.next();
@@ -505,22 +489,12 @@ pub fn parse_stat(tokens: &mut TokenIter<Token>) -> Result<Stat> {
             tokens.next();
             Ok(Stat::SemiColon)
         }
-        Some(TokenKind::DBColon) => parse_label(tokens).map(Stat::Label),
         Some(TokenKind::Break) => {
             tokens.next();
             Ok(Stat::Break)
         }
-        Some(TokenKind::Goto) => {
-            tokens.next();
-            if let Some(TokenKind::Ident(name)) = tokens.next().map(to_kind) {
-                Ok(Stat::Goto(Name(name.to_string())))
-            } else {
-                Err(())
-            }
-        }
         Some(TokenKind::Do) => parse_do_block(tokens).map(Stat::DoBlock),
         Some(TokenKind::While) => parse_while_block(tokens).map(Stat::WhileBlock),
-        Some(TokenKind::Repeat) => parse_repeat_block(tokens).map(Stat::RepeatBlock),
         Some(TokenKind::If) => parse_if_block(tokens).map(|f| Stat::IfBlock(Box::new(f))),
         Some(TokenKind::For) => {
             tokens.next();
@@ -772,26 +746,6 @@ pub fn parse_if_block(tokens: &mut TokenIter<Token>) -> Result<IfBlock> {
     })
 }
 
-/// repeat block until exp
-pub fn parse_repeat_block(tokens: &mut TokenIter<Token>) -> Result<RepeatBlock> {
-    if let Some(TokenKind::Repeat) = tokens.peek().map(to_kind) {
-        tokens.next();
-    } else {
-        return Err(());
-    }
-
-    let block = parse_block(tokens)?;
-
-    if let Some(TokenKind::Until) = tokens.peek().map(to_kind) {
-        tokens.next();
-    } else {
-        return Err(());
-    }
-
-    let expr = parse_expr(tokens)?;
-
-    Ok(RepeatBlock { block, expr })
-}
 
 /// while exp do block end
 pub fn parse_while_block(tokens: &mut TokenIter<Token>) -> Result<WhileBlock> {

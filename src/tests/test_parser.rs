@@ -3,8 +3,6 @@ use crate::iter::*;
 use crate::lexer::*;
 use crate::parser::*;
 
-use pretty_assertions::assert_eq;
-
 #[test]
 fn test_parse_expr() {
     let p = r#"..."#;
@@ -573,26 +571,11 @@ fn test_parse_stat() {
     let mut tokens = TokenIter::new(&tokens);
     assert_eq!(parse_stat(&mut tokens), Ok(Stat::SemiColon));
 
-    let p = r#"::foo::"#;
-    let tokens: Vec<_> = Lexer::new(p).collect();
-    let mut tokens = TokenIter::new(&tokens);
-    assert_eq!(
-        parse_stat(&mut tokens),
-        Ok(Stat::Label(Name(String::from("foo"))))
-    );
-
     let p = r#"break"#;
     let tokens: Vec<_> = Lexer::new(p).collect();
     let mut tokens = TokenIter::new(&tokens);
     assert_eq!(parse_stat(&mut tokens), Ok(Stat::Break));
 
-    let p = r#"goto foo"#;
-    let tokens: Vec<_> = Lexer::new(p).collect();
-    let mut tokens = TokenIter::new(&tokens);
-    assert_eq!(
-        parse_stat(&mut tokens),
-        Ok(Stat::Goto(Name(String::from("foo"))))
-    );
     let p = r#"do end"#;
     let tokens: Vec<_> = Lexer::new(p).collect();
     let mut tokens = TokenIter::new(&tokens);
@@ -618,21 +601,7 @@ fn test_parse_stat() {
         }))
     );
 
-    let p = r#"repeat until false"#;
-    let tokens: Vec<_> = Lexer::new(p).collect();
-    let mut tokens = TokenIter::new(&tokens);
-    assert_eq!(
-        parse_stat(&mut tokens),
-        Ok(Stat::RepeatBlock(RepeatBlock {
-            expr: Expr::Bool(false),
-            block: Block {
-                stats: vec![],
-                retstat: None
-            }
-        }))
-    );
-
-    let p = r#"if foo then goto foo elseif bar then else end"#;
+    let p = r#"if foo then elseif bar then else end"#;
     let tokens: Vec<_> = Lexer::new(p).collect();
     let mut tokens = TokenIter::new(&tokens);
     assert_eq!(
@@ -642,7 +611,7 @@ fn test_parse_stat() {
                 "foo"
             )))))),
             block: Block {
-                stats: vec![Stat::Goto(Name(String::from("foo")))],
+                stats: vec![],
                 retstat: None
             },
             elseif: vec![ElseIf {
@@ -844,17 +813,4 @@ fn test_parse_funcname() {
     );
 }
 
-#[test]
-fn test_parse_label() {
-    let p = r#"::jump_point::"#;
-    let tokens: Vec<_> = Lexer::new(p).collect();
-    let mut tokens = TokenIter::new(&tokens);
 
-    assert_eq!(parse_label(&mut tokens), Ok(Name("jump_point".to_string())));
-
-    let p = r#"::jump_point"#;
-    let tokens: Vec<_> = Lexer::new(p).collect();
-    let mut tokens = TokenIter::new(&tokens);
-
-    assert_eq!(parse_label(&mut tokens), Err(()));
-}

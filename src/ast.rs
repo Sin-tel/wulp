@@ -213,12 +213,9 @@ pub enum Stat {
     SemiColon,
     Assignment(Assignment), // varlist '=' explist
     FunctionCall(FunctionCall),
-    Label(Name),
     Break,
-    Goto(Name),
     DoBlock(Block),
     WhileBlock(WhileBlock),
-    RepeatBlock(RepeatBlock),
     IfBlock(Box<IfBlock>),
     ForRange(Box<ForRange>),
     ForIn(ForIn),

@@ -23,19 +23,16 @@ pub enum TokenKind {
     End,
     For,
     Function,
-    Goto,
     If,
     In,
     Local,
     Nil,
     Not,
     Or,
-    Repeat,
     Return,
     Then,
     True,
     False,
-    Until,
     While,
     IntDiv,
     Concat,
@@ -68,7 +65,6 @@ pub enum TokenKind {
     Shr,
     Hash,
     SemiColon,
-    DBColon,
     Colon,
     String(String),
     Number(f64),
@@ -274,11 +270,8 @@ impl Lexer {
             "break" => TokenKind::Break,
             "return" => TokenKind::Return,
             "while" => TokenKind::While,
-            "repeat" => TokenKind::Repeat,
-            "until" => TokenKind::Until,
             "or" => TokenKind::Or,
             "and" => TokenKind::And,
-            "goto" => TokenKind::Goto,
             "end" => TokenKind::End,
             "if" => TokenKind::If,
             "then" => TokenKind::Then,
@@ -464,14 +457,6 @@ impl Iterator for Lexer {
                     let end = self.cursor;
                     Some(Token {
                         kind: TokenKind::Period,
-                        span: Span { start, end },
-                    })
-                }
-                ':' if next == Some(':') => {
-                    self.eat_chars(2);
-                    let end = self.cursor;
-                    Some(Token {
-                        kind: TokenKind::DBColon,
                         span: Span { start, end },
                     })
                 }
