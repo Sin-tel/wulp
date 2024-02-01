@@ -1,5 +1,5 @@
 use crate::ast::*;
-use crate::iter::{ForwardBackwardIterator, PeekableIterator, TokenIter};
+use crate::iter::{PeekableIterator, TokenIter};
 use crate::lexer::{Lexer, Token, TokenKind};
 use std;
 
@@ -94,11 +94,11 @@ pub fn parse_simple_exp(tokens: &mut TokenIter<Token>) -> Result<Expr> {
         Some(TokenKind::Number(n)) => Ok(Expr::Num(n)),
         Some(TokenKind::Dots) => Ok(Expr::Dots),
         Some(TokenKind::Function) => {
-            tokens.prev();
+            tokens.next_back();
             parse_functiondef(tokens).map(Expr::FuncDef)
         }
         Some(TokenKind::LCurly) => {
-            tokens.prev();
+            tokens.next_back();
             parse_table_constructor(tokens).map(Expr::Table)
         }
         _ => Err(()),
@@ -190,7 +190,7 @@ pub fn parse_sub_expr(tokens: &mut TokenIter<Token>, min_priority: i32) -> Resul
     let mut expression = parse_unexp(tokens)
         .or_else(|_| parse_simple_exp(tokens))
         .or_else(|_| {
-            tokens.prev();
+            tokens.next_back();
             parse_prefix_exp(tokens).map(|x| Expr::PrefixExp(Box::new(x)))
         })?;
 
@@ -310,7 +310,7 @@ pub fn parse_varlist(tokens: &mut TokenIter<Token>) -> Result<Vec<Var>> {
                 varlist.push(v);
             }
             Err(_) => {
-                tokens.prev();
+                tokens.next_back();
                 break;
             }
         }
@@ -334,7 +334,7 @@ pub fn parse_exprlist(tokens: &mut TokenIter<Token>) -> Result<Vec<Expr>> {
                 exprs.push(expr);
             }
             Err(_) => {
-                tokens.prev();
+                tokens.next_back();
                 break;
             }
         }
@@ -356,7 +356,7 @@ pub fn parse_args(tokens: &mut TokenIter<Token>) -> Result<Args> {
         }
         Some(TokenKind::LCurly) => {
             // parse_table_constructor() expects a first token of LCurly
-            tokens.prev();
+            tokens.next_back();
             parse_table_constructor(tokens).map(Args::TableConstructor)
         }
         _ => Err(()),
@@ -526,12 +526,12 @@ pub fn parse_stat(tokens: &mut TokenIter<Token>) -> Result<Stat> {
             tokens.next();
             tokens.next();
             if let Some(TokenKind::Assign) = tokens.peek().map(to_kind) {
-                tokens.prev();
-                tokens.prev();
+                tokens.next_back();
+                tokens.next_back();
                 parse_for_range(tokens).map(|f| Stat::ForRange(Box::new(f)))
             } else {
-                tokens.prev();
-                tokens.prev();
+                tokens.next_back();
+                tokens.next_back();
                 parse_for_in(tokens).map(Stat::ForIn)
             }
         }
@@ -539,10 +539,10 @@ pub fn parse_stat(tokens: &mut TokenIter<Token>) -> Result<Stat> {
         Some(TokenKind::Local) => {
             tokens.next();
             if let Some(TokenKind::Function) = tokens.peek().map(to_kind) {
-                tokens.prev();
+                tokens.next_back();
                 parse_local_function_def(tokens).map(Stat::LocalFunctionDef)
             } else {
-                tokens.prev();
+                tokens.next_back();
                 parse_local_assignment(tokens).map(Stat::LocalAssignment)
             }
         }
@@ -554,7 +554,7 @@ pub fn parse_stat(tokens: &mut TokenIter<Token>) -> Result<Stat> {
                     args: parse_args(tokens)?,
                 }))
             } else {
-                tokens.prev();
+                tokens.next_back();
                 parse_assignment(tokens).map(Stat::Assignment)
             }
         }
@@ -895,8 +895,8 @@ pub fn parse_namelist(tokens: &mut TokenIter<Token>) -> Result<Vec<Name>> {
             }
             Some(TokenKind::Dots) => {
                 // put back Dots and the previous Comma tokens
-                tokens.prev();
-                tokens.prev();
+                tokens.next_back();
+                tokens.next_back();
                 break;
             }
             _ => return Err(()),

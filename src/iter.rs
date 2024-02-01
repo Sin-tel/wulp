@@ -5,10 +5,6 @@ pub trait PeekableIterator: Iterator {
     fn peek(&mut self) -> Option<Self::Item>;
 }
 
-pub trait ForwardBackwardIterator: Iterator {
-    fn prev(&mut self) -> Option<Self::Item>;
-}
-
 #[derive(Debug)]
 pub struct TokenIter<'a, Item>
 where
@@ -61,11 +57,11 @@ where
     }
 }
 
-impl<'a, Item> ForwardBackwardIterator for TokenIter<'a, Item>
+impl<'a, Item> DoubleEndedIterator for TokenIter<'a, Item>
 where
     Item: PartialEq,
 {
-    fn prev(&mut self) -> Option<&'a Item> {
+    fn next_back(&mut self) -> Option<&'a Item> {
         let index = match self.index {
             None => return None,
             Some(0) => {
