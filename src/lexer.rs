@@ -35,7 +35,6 @@ pub enum TokenKind {
 	False,
 	While,
 	Concat,
-	Dots,
 	Period,
 	LParen,
 	RParen,
@@ -430,21 +429,11 @@ impl Iterator for Lexer {
 					})
 				},
 				'.' if next == Some('.') => {
-					self.eat_chars(2);
-					if self.cur_char() == Some('.') {
-						self.eat_char();
-						let end = self.cursor;
-						Some(Token {
-							kind: TokenKind::Dots,
-							span: Span { start, end },
-						})
-					} else {
-						let end = self.cursor;
-						Some(Token {
-							kind: TokenKind::Concat,
-							span: Span { start, end },
-						})
-					}
+					let end = self.cursor;
+					Some(Token {
+						kind: TokenKind::Concat,
+						span: Span { start, end },
+					})
 				},
 				'.' => {
 					self.eat_char();

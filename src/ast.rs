@@ -54,7 +54,6 @@ pub enum Expr {
 	Bool(bool),
 	Num(f64),
 	Str(String),
-	Dots,
 	FuncDef(FunctionDef),
 	PrefixExp(Box<PrefixExpr>),
 	Table(TableConstructor),
@@ -191,10 +190,8 @@ pub struct ForIn {
 ///         functioncall |
 ///         label |
 ///         break |
-///         goto Name |
 ///         do block end |
 ///         while exp do block end |
-///         repeat block until exp |
 ///         if exp then block {elseif exp then block} [else block] end |
 ///         for Name ‘=’ exp ‘,’ exp [‘,’ exp] do block end |
 ///         for namelist in explist do block end |
@@ -238,11 +235,10 @@ pub struct FunctionDef {
 	pub body: FuncBody,
 }
 
-/// parlist ::= namelist [‘,’ ‘...’] | ‘...’
+/// parlist ::= namelist [‘,’]
 #[derive(Debug, PartialEq)]
 pub struct Params {
 	pub names: Vec<Name>,
-	pub variadic: bool,
 }
 
 /// unop ::= ‘-’ | not | ‘#’ | ‘~’

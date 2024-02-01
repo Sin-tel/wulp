@@ -20,7 +20,7 @@ pub fn parse(text: &str) -> Result<Block> {
 			_ => true,
 		})
 		.collect();
-	// dbg!(&tokens);
+	dbg!(&tokens);
 	let mut tokens = TokenIter::new(&tokens);
 	parse_block(&mut tokens)
 }
@@ -75,7 +75,6 @@ pub fn parse_simple_exp(tokens: &mut TokenIter<Token>) -> Result<Expr> {
 		Some(TokenKind::False) => Ok(Expr::Bool(false)),
 		Some(TokenKind::String(s)) => Ok(Expr::Str(s.to_string())),
 		Some(TokenKind::Number(n)) => Ok(Expr::Num(n)),
-		Some(TokenKind::Dots) => Ok(Expr::Dots),
 		Some(TokenKind::Function) => {
 			tokens.next_back();
 			parse_functiondef(tokens).map(Expr::FuncDef)
@@ -816,12 +815,6 @@ pub fn parse_namelist(tokens: &mut TokenIter<Token>) -> Result<Vec<Name>> {
 			Some(TokenKind::Ident(name)) => {
 				names.push(Name(name.clone()));
 			},
-			Some(TokenKind::Dots) => {
-				// put back Dots and the previous Comma tokens
-				tokens.next_back();
-				tokens.next_back();
-				break;
-			},
 			_ => return Err(()),
 		}
 	}
@@ -832,36 +825,21 @@ pub fn parse_namelist(tokens: &mut TokenIter<Token>) -> Result<Vec<Name>> {
 /// parlist ::= namelist [‘,’ ‘...’] | ‘...’
 pub fn parse_parlist(tokens: &mut TokenIter<Token>) -> Result<Params> {
 	match tokens.peek().map(to_kind) {
-		// | '...'
-		Some(TokenKind::Dots) => {
-			tokens.next();
-			Ok(Params {
-				names: vec![],
-				variadic: true,
-			})
-		},
 		// namelist
 		Some(TokenKind::Ident(_)) => {
 			let names = parse_namelist(tokens).unwrap_or_default();
 
-			// [',' '...']
-			let variadic = match tokens.peek().map(to_kind) {
+			// [',']
+			match tokens.peek().map(to_kind) {
 				Some(TokenKind::Comma) => {
 					tokens.next();
-					match tokens.next().map(to_kind) {
-						Some(TokenKind::Dots) => true,
-						_ => false,
-					}
 				},
-				_ => false,
+				_ => (),
 			};
 
-			Ok(Params { names, variadic })
+			Ok(Params { names })
 		},
-		_ => Ok(Params {
-			names: vec![],
-			variadic: false,
-		}),
+		_ => Ok(Params { names: vec![] }),
 	}
 }
 
