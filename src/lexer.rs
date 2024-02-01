@@ -51,9 +51,6 @@ pub enum TokenKind {
     Div,
     Mod,
     Pow,
-    BitAnd,
-    BitOr,
-    BitXor,
     Assign,
     Eq,
     Neq,
@@ -61,8 +58,6 @@ pub enum TokenKind {
     Lte,
     Lt,
     Gt,
-    Shl,
-    Shr,
     Hash,
     SemiColon,
     Colon,
@@ -468,14 +463,6 @@ impl Iterator for Lexer {
                         span: Span { start, end },
                     })
                 }
-                '<' if next == Some('<') => {
-                    self.eat_chars(2);
-                    let end = self.cursor;
-                    Some(Token {
-                        kind: TokenKind::Shl,
-                        span: Span { start, end },
-                    })
-                }
                 '<' if next == Some('=') => {
                     self.eat_chars(2);
                     let end = self.cursor;
@@ -489,14 +476,6 @@ impl Iterator for Lexer {
                     let end = self.cursor;
                     Some(Token {
                         kind: TokenKind::Lt,
-                        span: Span { start, end },
-                    })
-                }
-                '>' if next == Some('>') => {
-                    self.eat_chars(2);
-                    let end = self.cursor;
-                    Some(Token {
-                        kind: TokenKind::Shr,
                         span: Span { start, end },
                     })
                 }
@@ -572,35 +551,11 @@ impl Iterator for Lexer {
                         span: Span { start, end },
                     })
                 }
-                '&' => {
-                    self.eat_char();
-                    let end = self.cursor;
-                    Some(Token {
-                        kind: TokenKind::BitAnd,
-                        span: Span { start, end },
-                    })
-                }
-                '|' => {
-                    self.eat_char();
-                    let end = self.cursor;
-                    Some(Token {
-                        kind: TokenKind::BitOr,
-                        span: Span { start, end },
-                    })
-                }
                 '~' if next == Some('=') => {
                     self.eat_chars(2);
                     let end = self.cursor;
                     Some(Token {
                         kind: TokenKind::Neq,
-                        span: Span { start, end },
-                    })
-                }
-                '~' => {
-                    self.eat_char();
-                    let end = self.cursor;
-                    Some(Token {
-                        kind: TokenKind::BitXor,
                         span: Span { start, end },
                     })
                 }

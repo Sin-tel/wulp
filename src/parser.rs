@@ -91,17 +91,13 @@ pub fn parse_simple_exp(tokens: &mut TokenIter<Token>) -> Result<Expr> {
 
 pub fn bin_priority(op: &Option<TokenKind>) -> i32 {
     match op {
-        Some(TokenKind::Pow) => 12,
+        Some(TokenKind::Pow) => 7,
         Some(TokenKind::Mul)
         | Some(TokenKind::Div)
         | Some(TokenKind::IntDiv)
-        | Some(TokenKind::Mod) => 10,
-        Some(TokenKind::Plus) | Some(TokenKind::Minus) => 9,
-        Some(TokenKind::Concat) => 8,
-        Some(TokenKind::Shl) | Some(TokenKind::Shr) => 7,
-        Some(TokenKind::BitAnd) => 6,
-        Some(TokenKind::BitXor) => 5,
-        Some(TokenKind::BitOr) => 4,
+        | Some(TokenKind::Mod) => 6,
+        Some(TokenKind::Plus) | Some(TokenKind::Minus) => 5,
+        Some(TokenKind::Concat) => 4,
         Some(TokenKind::Lt) | Some(TokenKind::Gt) | Some(TokenKind::Lte) | Some(TokenKind::Gte)
         | Some(TokenKind::Eq) | Some(TokenKind::Neq) => 3,
         Some(TokenKind::Or) | Some(TokenKind::And) => 1,
@@ -109,19 +105,17 @@ pub fn bin_priority(op: &Option<TokenKind>) -> i32 {
     }
 }
 
-const UNARY_PRIORITY: i32 = 12;
+const UNARY_PRIORITY: i32 = 7;
 
 pub fn parse_unexp(tokens: &mut TokenIter<Token>) -> Result<Expr> {
     match tokens.next().map(to_kind) {
         tk @ Some(TokenKind::Minus)
         | tk @ Some(TokenKind::Not)
-        | tk @ Some(TokenKind::Hash)
-        | tk @ Some(TokenKind::BitXor) => {
+        | tk @ Some(TokenKind::Hash) => {
             let op = match tk {
                 Some(TokenKind::Minus) => Unop::Minus,
                 Some(TokenKind::Not) => Unop::Not,
                 Some(TokenKind::Hash) => Unop::Len,
-                Some(TokenKind::BitXor) => Unop::BitNot,
                 _ => return Err(()),
             };
 
@@ -150,11 +144,6 @@ pub fn is_bin_op(token: &Option<TokenKind>) -> bool {
         | Some(TokenKind::IntDiv)
         | Some(TokenKind::Pow)
         | Some(TokenKind::Mod)
-        | Some(TokenKind::BitAnd)
-        | Some(TokenKind::BitXor)
-        | Some(TokenKind::BitOr)
-        | Some(TokenKind::Shr)
-        | Some(TokenKind::Shl)
         | Some(TokenKind::Concat)
         | Some(TokenKind::Lt)
         | Some(TokenKind::Lte)
@@ -191,11 +180,6 @@ pub fn parse_sub_expr(tokens: &mut TokenIter<Token>, min_priority: i32) -> Resul
             Some(TokenKind::IntDiv) => BinOp::IntDiv,
             Some(TokenKind::Pow) => BinOp::Pow,
             Some(TokenKind::Mod) => BinOp::Mod,
-            Some(TokenKind::BitAnd) => BinOp::BitAnd,
-            Some(TokenKind::BitXor) => BinOp::BitXor,
-            Some(TokenKind::BitOr) => BinOp::BitOr,
-            Some(TokenKind::Shr) => BinOp::BitShr,
-            Some(TokenKind::Shl) => BinOp::BitShl,
             Some(TokenKind::Concat) => BinOp::Concat,
             Some(TokenKind::Lt) => BinOp::Lt,
             Some(TokenKind::Lte) => BinOp::Lte,

@@ -38,7 +38,6 @@ fn test_parse_unexp() {
         ("-", Unop::Minus),
         ("not ", Unop::Not),
         ("#", Unop::Len),
-        ("~", Unop::BitNot),
     ] {
         let p = format!("{}foo", s);
         let tokens: Vec<_> = Lexer::new(&p).collect();
@@ -65,11 +64,6 @@ fn test_parse_binexp() {
         ("//", BinOp::IntDiv),
         ("^", BinOp::Pow),
         ("%", BinOp::Mod),
-        ("&", BinOp::BitAnd),
-        ("~", BinOp::BitXor),
-        ("|", BinOp::BitOr),
-        (">>", BinOp::BitShr),
-        ("<<", BinOp::BitShl),
         ("..", BinOp::Concat),
         ("<", BinOp::Lt),
         ("<=", BinOp::Lte),

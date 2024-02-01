@@ -22,11 +22,6 @@ pub enum BinOp {
     IntDiv,
     Pow,
     Mod,
-    BitAnd,
-    BitXor,
-    BitOr,
-    BitShr,
-    BitShl,
     Concat,
     Lt,
     Lte,
@@ -258,5 +253,4 @@ pub enum Unop {
     Minus,
     Not,
     Len,
-    BitNot,
 }
