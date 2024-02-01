@@ -2,98 +2,95 @@ use crate::lexer::{Token, TokenKind};
 use std::cmp::max;
 
 pub trait PeekableIterator: Iterator {
-    fn peek(&mut self) -> Option<Self::Item>;
+	fn peek(&mut self) -> Option<Self::Item>;
 }
 
 #[derive(Debug)]
 pub struct TokenIter<'a, Item>
 where
-    Item: 'a + PartialEq,
+	Item: 'a + PartialEq,
 {
-    index: Option<usize>,
-    vector: &'a [Item],
+	index: Option<usize>,
+	vector: &'a [Item],
 }
 
 impl<'a, Item> TokenIter<'a, Item>
 where
-    Item: PartialEq,
+	Item: PartialEq,
 {
-    pub fn new(vector: &'a [Item]) -> TokenIter<'a, Item> {
-        TokenIter {
-            index: None,
-            vector,
-        }
-    }
+	pub fn new(vector: &'a [Item]) -> TokenIter<'a, Item> {
+		TokenIter { index: None, vector }
+	}
 }
 
 impl<'a, Item> PeekableIterator for TokenIter<'a, Item>
 where
-    Item: PartialEq,
+	Item: PartialEq,
 {
-    fn peek(&mut self) -> Option<&'a Item> {
-        let index = match self.index {
-            Some(i) => i + 1,
-            None => 0,
-        };
+	fn peek(&mut self) -> Option<&'a Item> {
+		let index = match self.index {
+			Some(i) => i + 1,
+			None => 0,
+		};
 
-        self.vector.get(index)
-    }
+		self.vector.get(index)
+	}
 }
 
 impl<'a, Item> Iterator for TokenIter<'a, Item>
 where
-    Item: PartialEq,
+	Item: PartialEq,
 {
-    type Item = &'a Item;
+	type Item = &'a Item;
 
-    fn next(&mut self) -> Option<&'a Item> {
-        let index = match self.index {
-            Some(i) => i + 1,
-            None => 0,
-        };
+	fn next(&mut self) -> Option<&'a Item> {
+		let index = match self.index {
+			Some(i) => i + 1,
+			None => 0,
+		};
 
-        self.index = Some(index);
-        self.vector.get(index)
-    }
+		self.index = Some(index);
+		self.vector.get(index)
+	}
 }
 
 impl<'a, Item> DoubleEndedIterator for TokenIter<'a, Item>
 where
-    Item: PartialEq,
+	Item: PartialEq,
 {
-    fn next_back(&mut self) -> Option<&'a Item> {
-        let index = match self.index {
-            None => return None,
-            Some(0) => {
-                self.index = None;
-                return None;
-            }
-            Some(i) => max(i - 1, 0),
-        };
+	fn next_back(&mut self) -> Option<&'a Item> {
+		let index = match self.index {
+			None => return None,
+			Some(0) => {
+				self.index = None;
+				return None;
+			},
+			Some(i) => max(i - 1, 0),
+		};
 
-        self.index = Some(index);
-        self.vector.get(index)
-    }
+		self.index = Some(index);
+		self.vector.get(index)
+	}
 }
 
 impl<'a> TokenIter<'a, Token> {
-    pub fn assert_next(&mut self, knd: &TokenKind) -> Result<(), ()> {
-        match self.next() {
-            Some(Token { kind, .. }) => {
-                if kind == knd {
-                    Ok(())
-                } else {
-                    Err(())
-                }
-            }
-            None => Err(()),
-        }
-    }
-    pub fn cur(&mut self) -> Option<&'a Token> {
-        let index = match self.index {
-            None => return None,
-            Some(i) => i,
-        };
-        self.vector.get(index)
-    }
+	pub fn assert_next(&mut self, knd: &TokenKind) -> Result<(), ()> {
+		match self.next() {
+			Some(Token { kind, .. }) => {
+				if kind == knd {
+					Ok(())
+				} else {
+					Err(())
+				}
+			},
+			None => Err(()),
+		}
+	}
+	pub fn cur(&mut self) -> Option<&'a Token> {
+		let index = match self.index {
+			None => return None,
+			Some(i) => i,
+		};
+		self.vector.get(index)
+	}
 }

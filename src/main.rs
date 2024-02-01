@@ -18,4 +18,3 @@ fn main() {
 	let ast = parser::parse(&input);
 	println!("{:?}", ast);
 }
-
