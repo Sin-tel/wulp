@@ -34,7 +34,6 @@ pub enum TokenKind {
 	True,
 	False,
 	While,
-	IntDiv,
 	Concat,
 	Dots,
 	Period,
@@ -516,14 +515,6 @@ impl Iterator for Lexer {
 					let end = self.cursor;
 					Some(Token {
 						kind: TokenKind::Mul,
-						span: Span { start, end },
-					})
-				},
-				'/' if next == Some('/') => {
-					self.eat_chars(2);
-					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::IntDiv,
 						span: Span { start, end },
 					})
 				},

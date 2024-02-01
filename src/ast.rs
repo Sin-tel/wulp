@@ -9,17 +9,15 @@ pub struct FuncName {
 	pub method: Option<Name>,
 }
 
-/// binop ::=  ‘+’ | ‘-’ | ‘*’ | ‘/’ | ‘//’ | ‘^’ | ‘%’ |
-///         ‘&’ | ‘~’ | ‘|’ | ‘>>’ | ‘<<’ | ‘..’ |
-///         ‘<’ | ‘<=’ | ‘>’ | ‘>=’ | ‘==’ | ‘~=’ |
-///         and | or
+/// binop ::= `+´ | `-´ | `*´ | `/´ | `^´ | `%´ | `..´ |
+/// 	 `<´ | `<=´ | `>´ | `>=´ | `==´ | `~=´ |
+/// 	 and | or
 #[derive(Debug, PartialEq)]
 pub enum BinOp {
 	Plus,
 	Minus,
 	Mul,
 	Div,
-	IntDiv,
 	Pow,
 	Mod,
 	Concat,

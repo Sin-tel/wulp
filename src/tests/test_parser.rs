@@ -56,7 +56,6 @@ fn test_parse_binexp() {
 		("-", BinOp::Minus),
 		("*", BinOp::Mul),
 		("/", BinOp::Div),
-		("//", BinOp::IntDiv),
 		("^", BinOp::Pow),
 		("%", BinOp::Mod),
 		("..", BinOp::Concat),
