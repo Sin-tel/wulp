@@ -73,13 +73,9 @@ pub enum Field {
 #[derive(Debug, PartialEq)]
 pub struct TableConstructor(pub Vec<Field>);
 
-/// args ::=  `(` [explist] `)` | tableconstructor | LiteralString
+/// args ::=  `(` [explist] `)`
 #[derive(Debug, PartialEq)]
-pub enum Args {
-	ExprList(Vec<Expr>),
-	TableConstructor(TableConstructor),
-	String(String),
-}
+pub struct Args(pub Vec<Expr>);
 
 /// functioncall ::=  prefixexp args | prefixexp `:` Name args
 #[derive(Debug, PartialEq)]

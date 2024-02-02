@@ -5,3 +5,5 @@ Cargo.lock
 better_lua.sublime-project
 better_lua.sublime-workspace
 todo.md
+
+tarpaulin-report.html

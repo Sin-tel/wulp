@@ -224,7 +224,7 @@ fn test_parse_args() {
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = TokenIter::new(&tokens);
 
-	assert_eq!(parse_args(&mut tokens), Ok(Args::ExprList(vec![])));
+	assert_eq!(parse_args(&mut tokens), Ok(Args(vec![])));
 
 	let p = r#"(foo, nil, false, 10)"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
@@ -232,7 +232,7 @@ fn test_parse_args() {
 
 	assert_eq!(
 		parse_args(&mut tokens),
-		Ok(Args::ExprList(vec![
+		Ok(Args(vec![
 			Expr::PrefixExp(Box::new(PrefixExpr::Var(Var::Name(Name(String::from("foo")))))),
 			Expr::Nil,
 			Expr::Bool(false),
@@ -366,7 +366,7 @@ fn test_parse_block() {
 		Ok(Block {
 			stats: vec![Stat::FunctionCall(FunctionCall {
 				expr: Box::new(PrefixExpr::Var(Var::Name(Name(String::from("print"))))),
-				args: Args::ExprList(vec![Expr::PrefixExp(Box::new(PrefixExpr::Var(Var::Name(Name(
+				args: Args(vec![Expr::PrefixExp(Box::new(PrefixExpr::Var(Var::Name(Name(
 					String::from("foo")
 				)))))])
 			})],
@@ -457,7 +457,7 @@ fn test_parse_prefix_exp() {
 		parse_prefix_exp(&mut tokens),
 		Ok(PrefixExpr::FunctionCall(FunctionCall {
 			expr: Box::new(PrefixExpr::Var(Var::Name(Name(String::from("foo"))))),
-			args: Args::ExprList(vec![Expr::Bool(false), Expr::Bool(true), Expr::Nil])
+			args: Args(vec![Expr::Bool(false), Expr::Bool(true), Expr::Nil])
 		}))
 	)
 }
@@ -667,7 +667,7 @@ fn test_parse_stat() {
 		parse_stat(&mut tokens),
 		Ok(Stat::FunctionCall(FunctionCall {
 			expr: Box::new(PrefixExpr::Var(Var::Name(Name(String::from("foo"))))),
-			args: Args::ExprList(vec![Expr::Str(String::from("bar"))])
+			args: Args(vec![Expr::Str(String::from("bar"))])
 		}))
 	);
 }

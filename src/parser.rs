@@ -301,23 +301,17 @@ pub fn parse_exprlist(tokens: &mut TokenIter<Token>) -> Result<Vec<Expr>> {
 	Ok(exprs)
 }
 
-/// args ::=  `(` [explist] `)` | tableconstructor | LiteralString
+/// args ::=  `(` [explist] `)`
 pub fn parse_args(tokens: &mut TokenIter<Token>) -> Result<Args> {
 	match tokens.next().map(to_kind) {
-		Some(TokenKind::String(s)) => Ok(Args::String(s.to_string())),
 		Some(TokenKind::LParen) => {
 			if let Some(TokenKind::RParen) = tokens.peek().map(to_kind) {
 				tokens.next();
-				return Ok(Args::ExprList(vec![]));
+				return Ok(Args(vec![]));
 			}
-			let explist = parse_exprlist(tokens).map(Args::ExprList);
+			let explist = parse_exprlist(tokens)?;
 			tokens.assert_next(&TokenKind::RParen)?;
-			explist
-		},
-		Some(TokenKind::LCurly) => {
-			// parse_table_constructor() expects a first token of LCurly
-			tokens.next_back();
-			parse_table_constructor(tokens).map(Args::TableConstructor)
+			Ok(Args(explist))
 		},
 		_ => Err(()),
 	}
