@@ -1,6 +1,3 @@
-// for specifics on syntax, see:
-// https://www.lua.org/manual/5.3/manual.html
-
 #[derive(PartialEq, Debug, Clone)]
 pub struct Span {
 	pub start: usize,

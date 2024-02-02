@@ -9,7 +9,6 @@ pub fn to_kind(tk: &Token) -> TokenKind {
 	tk.kind.clone()
 }
 
-/// parse a given blob of lua text
 pub fn parse(text: &str) -> Result<Block> {
 	let tokens: Vec<_> = Lexer::new(text)
 		.filter(|t| match t {
@@ -31,7 +30,7 @@ pub fn parse(text: &str) -> Result<Block> {
 	ast
 }
 
-/// funcname ::= Name {‘.’ Name} [‘:’ Name]
+/// funcname ::= Name {`.` Name} [`:` Name]
 pub fn parse_funcname(tokens: &mut TokenIter<Token>) -> Result<FuncName> {
 	let first_name = tokens.next();
 	let first_name = match first_name {
@@ -126,7 +125,7 @@ pub fn parse_unexp(tokens: &mut TokenIter<Token>) -> Result<Expr> {
 	}
 }
 
-/// exp ::= nil | false | true | Numeral | LiteralString | ‘...’ | functiondef |
+/// exp ::= nil | false | true | Numeral | LiteralString | `...` | functiondef |
 ///         prefixexp | tableconstructor | exp binop exp | unop exp
 pub fn parse_expr(tokens: &mut TokenIter<Token>) -> Result<Expr> {
 	parse_sub_expr(tokens, 0)
@@ -155,7 +154,9 @@ pub fn is_bin_op(token: &Option<TokenKind>) -> bool {
 
 // subexpr ::= (simpleexp | unop subexpr ) { binop subexpr }
 // see: https://github.com/lua/lua/blob/2c32bff60987d38a60a58d4f0123f3783da60a63/lparser.c#L1120-L1156
+// TODO: left / right priority
 pub fn parse_sub_expr(tokens: &mut TokenIter<Token>, min_priority: i32) -> Result<Expr> {
+	// TODO: fix whatever this is
 	let mut expression = parse_unexp(tokens).or_else(|_| parse_simple_exp(tokens)).or_else(|_| {
 		tokens.next_back();
 		parse_prefix_exp(tokens).map(|x| Expr::PrefixExp(Box::new(x)))
@@ -200,19 +201,14 @@ pub fn parse_sub_expr(tokens: &mut TokenIter<Token>, min_priority: i32) -> Resul
 	Ok(expression)
 }
 
-/// field ::= ‘[’ exp ‘]’ ‘=’ exp | Name ‘=’ exp | exp
+/// field ::= `[` exp `]` `=` exp | Name `=` exp | exp
 pub fn parse_field(tokens: &mut TokenIter<Token>) -> Result<Field> {
 	match tokens.next().map(to_kind) {
 		// Name '=' exp
 		Some(TokenKind::Ident(name)) => {
 			tokens.assert_next(&TokenKind::Assign)?;
 
-			let expr = match parse_expr(tokens) {
-				Ok(expr) => expr,
-				Err(_) => {
-					return Err(());
-				},
-			};
+			let expr = parse_expr(tokens)?;
 
 			Ok(Field::NameAssign(Name(name.clone()), expr))
 		},
@@ -236,7 +232,7 @@ pub fn parse_field(tokens: &mut TokenIter<Token>) -> Result<Field> {
 	}
 }
 
-/// tableconstructor ::= ‘{’ [fieldlist] ‘}’
+/// tableconstructor ::= `{` [fieldlist] `}`
 pub fn parse_table_constructor(tokens: &mut TokenIter<Token>) -> Result<TableConstructor> {
 	match tokens.next().map(to_kind) {
 		Some(TokenKind::LCurly) => {
@@ -254,7 +250,7 @@ pub fn parse_table_constructor(tokens: &mut TokenIter<Token>) -> Result<TableCon
 	}
 }
 
-/// varlist ::= var {‘,’ var}
+/// varlist ::= var {`,` var}
 pub fn parse_varlist(tokens: &mut TokenIter<Token>) -> Result<Vec<Var>> {
 	let mut varlist = vec![];
 
@@ -268,6 +264,8 @@ pub fn parse_varlist(tokens: &mut TokenIter<Token>) -> Result<Vec<Var>> {
 			Ok(v) => {
 				varlist.push(v);
 			},
+
+			// TODO: fix err
 			Err(_) => {
 				tokens.next_back();
 				break;
@@ -278,7 +276,7 @@ pub fn parse_varlist(tokens: &mut TokenIter<Token>) -> Result<Vec<Var>> {
 	Ok(varlist)
 }
 
-/// explist ::= exp {‘,’ exp}
+/// explist ::= exp {`,` exp}
 pub fn parse_exprlist(tokens: &mut TokenIter<Token>) -> Result<Vec<Expr>> {
 	let mut exprs = vec![];
 
@@ -292,6 +290,7 @@ pub fn parse_exprlist(tokens: &mut TokenIter<Token>) -> Result<Vec<Expr>> {
 			Ok(expr) => {
 				exprs.push(expr);
 			},
+			// TODO: fix err
 			Err(_) => {
 				tokens.next_back();
 				break;
@@ -302,7 +301,7 @@ pub fn parse_exprlist(tokens: &mut TokenIter<Token>) -> Result<Vec<Expr>> {
 	Ok(exprs)
 }
 
-/// args ::=  ‘(’ [explist] ‘)’ | tableconstructor | LiteralString
+/// args ::=  `(` [explist] `)` | tableconstructor | LiteralString
 pub fn parse_args(tokens: &mut TokenIter<Token>) -> Result<Args> {
 	match tokens.next().map(to_kind) {
 		Some(TokenKind::String(s)) => Ok(Args::String(s.to_string())),
@@ -324,7 +323,7 @@ pub fn parse_args(tokens: &mut TokenIter<Token>) -> Result<Args> {
 	}
 }
 
-/// var ::=  Name | prefixexp ‘[’ exp ‘]’ | prefixexp ‘.’ Name
+/// var ::=  Name | prefixexp `[` exp `]` | prefixexp `.` Name
 /// e.g.:
 /// foo
 /// bar[0]
@@ -396,9 +395,9 @@ pub fn parse_var(tokens: &mut TokenIter<Token>) -> Result<Var> {
 	}
 }
 
-/// prefixexp ::= var | functioncall | ‘(’ exp ‘)’
-// functioncall ::=  prefixexp args | prefixexp ‘:’ Name args
-// var ::=  Name | prefixexp ‘[’ exp ‘]’ | prefixexp ‘.’ Name
+/// prefixexp ::= var | functioncall | `(` exp `)`
+// functioncall ::=  prefixexp args | prefixexp `:` Name args
+// var ::=  Name | prefixexp `[` exp `]` | prefixexp `.` Name
 pub fn parse_prefix_exp(tokens: &mut TokenIter<Token>) -> Result<PrefixExpr> {
 	match tokens.peek().map(to_kind) {
 		Some(TokenKind::LParen) => {
@@ -445,8 +444,8 @@ pub fn parse_prefix_exp(tokens: &mut TokenIter<Token>) -> Result<PrefixExpr> {
 	}
 }
 
-/// stat ::=  ‘;’ |
-///         varlist ‘=’ explist |
+/// stat ::=  `;` |
+///         varlist `=` explist |
 ///         functioncall |
 ///         label |
 ///         break |
@@ -455,11 +454,11 @@ pub fn parse_prefix_exp(tokens: &mut TokenIter<Token>) -> Result<PrefixExpr> {
 ///         while exp do block end |
 ///         repeat block until exp |
 ///         if exp then block {elseif exp then block} [else block] end |
-///         for Name ‘=’ exp ‘,’ exp [‘,’ exp] do block end |
+///         for Name `=` exp `,` exp [`,` exp] do block end |
 ///         for namelist in explist do block end |
 ///         function funcname funcbody |
 ///         local function Name funcbody |
-///         local namelist [‘=’ explist]
+///         local namelist [`=` explist]
 pub fn parse_stat(tokens: &mut TokenIter<Token>) -> Result<Stat> {
 	match tokens.peek().map(to_kind) {
 		Some(TokenKind::SemiColon) => {
@@ -509,12 +508,11 @@ pub fn parse_stat(tokens: &mut TokenIter<Token>) -> Result<Stat> {
 				parse_assignment(tokens).map(Stat::Assignment)
 			}
 		},
-		// None => Err(()), // TODO should be handled properly
 		other => panic!("not a valid statement: {:?}", other),
 	}
 }
 
-/// varlist ‘=’ explist
+/// varlist `=` explist
 pub fn parse_assignment(tokens: &mut TokenIter<Token>) -> Result<Assignment> {
 	let varlist = parse_varlist(tokens)?;
 
@@ -529,7 +527,7 @@ pub fn parse_assignment(tokens: &mut TokenIter<Token>) -> Result<Assignment> {
 	Ok(Assignment { varlist, exprlist })
 }
 
-/// local namelist [‘=’ explist]
+/// local namelist [`=` explist]
 pub fn parse_local_assignment(tokens: &mut TokenIter<Token>) -> Result<LocalAssignment> {
 	if let Some(TokenKind::Local) = tokens.peek().map(to_kind) {
 		tokens.next();
@@ -614,7 +612,7 @@ pub fn parse_for_in(tokens: &mut TokenIter<Token>) -> Result<ForIn> {
 	})
 }
 
-/// for Name ‘=’ exp ‘,’ exp [‘,’ exp] do block end
+/// for Name `=` exp `,` exp [`,` exp] do block end
 pub fn parse_for_range(tokens: &mut TokenIter<Token>) -> Result<ForRange> {
 	if let Some(TokenKind::For) = tokens.peek().map(to_kind) {
 		tokens.next();
@@ -754,7 +752,7 @@ pub fn parse_block(tokens: &mut TokenIter<Token>) -> Result<Block> {
 	Ok(Block { stats, retstat: None })
 }
 
-/// retstat ::= return [explist] [‘;’]
+/// retstat ::= return [explist] [`;`]
 pub fn parse_retstat(tokens: &mut TokenIter<Token>) -> Result<Vec<Expr>> {
 	tokens.assert_next(&TokenKind::Return)?;
 
@@ -766,7 +764,7 @@ pub fn parse_retstat(tokens: &mut TokenIter<Token>) -> Result<Vec<Expr>> {
 	Ok(exprlist)
 }
 
-/// funcbody ::= ‘(’ [parlist] ‘)’ block end
+/// funcbody ::= `(` [parlist] `)` block end
 pub fn parse_funcbody(tokens: &mut TokenIter<Token>) -> Result<FuncBody> {
 	tokens.assert_next(&TokenKind::LParen)?;
 	let params = parse_parlist(tokens)?;
@@ -791,7 +789,7 @@ pub fn parse_functiondef(tokens: &mut TokenIter<Token>) -> Result<FunctionDef> {
 	}
 }
 
-/// namelist ::= Name {‘,’ Name}
+/// namelist ::= Name {`,` Name}
 pub fn parse_namelist(tokens: &mut TokenIter<Token>) -> Result<Vec<Name>> {
 	let first_name = match tokens.next().map(to_kind) {
 		Some(TokenKind::Ident(name)) => name,
@@ -813,12 +811,12 @@ pub fn parse_namelist(tokens: &mut TokenIter<Token>) -> Result<Vec<Name>> {
 	Ok(names)
 }
 
-/// parlist ::= namelist [‘,’]
+/// parlist ::= namelist [`,`]
 pub fn parse_parlist(tokens: &mut TokenIter<Token>) -> Result<Params> {
 	match tokens.peek().map(to_kind) {
 		// namelist
 		Some(TokenKind::Ident(_)) => {
-			let names = parse_namelist(tokens).unwrap_or_default();
+			let names = parse_namelist(tokens)?;
 
 			// [',']
 			match tokens.peek().map(to_kind) {
@@ -834,7 +832,7 @@ pub fn parse_parlist(tokens: &mut TokenIter<Token>) -> Result<Params> {
 }
 
 /// fieldlist ::= field {fieldsep field} [fieldsep]
-/// fieldsep ::= ‘,’ | ‘;’
+/// fieldsep ::= `,` | `;`
 pub fn parse_fieldlist(tokens: &mut TokenIter<Token>) -> Result<Vec<Field>> {
 	let mut fields = vec![];
 

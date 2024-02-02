@@ -2,15 +2,15 @@
 #[derive(PartialEq, Debug)]
 pub struct Name(pub String);
 
-/// funcname ::= Name {‘.’ Name} [‘:’ Name]
+/// funcname ::= Name {`.` Name} [`:` Name]
 #[derive(Debug, PartialEq)]
 pub struct FuncName {
 	pub path: Vec<Name>,
 	pub method: Option<Name>,
 }
 
-/// binop ::= `+´ | `-´ | `*´ | `/´ | `^´ | `%´ | `..´ |
-/// 	 `<´ | `<=´ | `>´ | `>=´ | `==´ | `~=´ |
+/// binop ::= `+` | `-` | `*` | `/` | `^` | `%` | `..` |
+/// 	 `<` | `<=` | `>` | `>=` | `==` | `~=` |
 /// 	 and | or
 #[derive(Debug, PartialEq)]
 pub enum BinOp {
@@ -61,7 +61,7 @@ pub enum Expr {
 	UnExp(UnExp),
 }
 
-/// field ::= ‘[’ exp ‘]’ ‘=’ exp | Name ‘=’ exp | exp
+/// field ::= `[` exp `]` `=` exp | Name `=` exp | exp
 #[derive(Debug, PartialEq)]
 pub enum Field {
 	NameAssign(Name, Expr),
@@ -69,11 +69,11 @@ pub enum Field {
 	PosAssign(Expr),
 }
 
-/// tableconstructor ::= ‘{’ [fieldlist] ‘}’
+/// tableconstructor ::= `{` [fieldlist] `}`
 #[derive(Debug, PartialEq)]
 pub struct TableConstructor(pub Vec<Field>);
 
-/// args ::=  ‘(’ [explist] ‘)’ | tableconstructor | LiteralString
+/// args ::=  `(` [explist] `)` | tableconstructor | LiteralString
 #[derive(Debug, PartialEq)]
 pub enum Args {
 	ExprList(Vec<Expr>),
@@ -81,28 +81,28 @@ pub enum Args {
 	String(String),
 }
 
-/// functioncall ::=  prefixexp args | prefixexp ‘:’ Name args
+/// functioncall ::=  prefixexp args | prefixexp `:` Name args
 #[derive(Debug, PartialEq)]
 pub struct FunctionCall {
 	pub expr: Box<PrefixExpr>,
 	pub args: Args,
 }
 
-/// prefixexp ‘[’ exp ‘]’
+/// prefixexp `[` exp `]`
 #[derive(Debug, PartialEq)]
 pub struct IndexExpr {
 	pub expr: Box<PrefixExpr>,
 	pub arg: Expr,
 }
 
-/// prefixexp ‘.’ Name
+/// prefixexp `.` Name
 #[derive(Debug, PartialEq)]
 pub struct PropertyAccess {
 	pub expr: Box<PrefixExpr>,
 	pub name: Name,
 }
 
-/// var ::=  Name | prefixexp ‘[’ exp ‘]’ | prefixexp ‘.’ Name
+/// var ::=  Name | prefixexp `[` exp `]` | prefixexp `.` Name
 #[derive(Debug, PartialEq)]
 pub enum Var {
 	Name(Name),
@@ -110,7 +110,7 @@ pub enum Var {
 	PropertyAccess(PropertyAccess),
 }
 
-/// prefixexp ::= var | functioncall | ‘(’ exp ‘)’
+/// prefixexp ::= var | functioncall | `(` exp `)`
 #[derive(Debug, PartialEq)]
 pub enum PrefixExpr {
 	Var(Var),
@@ -132,7 +132,7 @@ pub struct Assignment {
 	pub exprlist: Vec<Expr>,
 }
 
-/// local namelist [‘=’ explist]
+/// local namelist [`=` explist]
 #[derive(Debug, PartialEq)]
 pub struct LocalAssignment {
 	pub namelist: Vec<Name>,
@@ -169,7 +169,7 @@ pub struct IfBlock {
 	pub else_blk: Option<Block>,
 }
 
-/// for Name ‘=’ exp ‘,’ exp [‘,’ exp] do block end
+/// for Name `=` exp `,` exp [`,` exp] do block end
 #[derive(Debug, PartialEq)]
 pub struct ForRange {
 	pub name: Name,
@@ -185,19 +185,19 @@ pub struct ForIn {
 	pub block: Block,
 }
 
-/// stat ::=  ‘;’ |
-///         varlist ‘=’ explist |
+/// stat ::=  `;` |
+///         varlist `=` explist |
 ///         functioncall |
 ///         label |
 ///         break |
 ///         do block end |
 ///         while exp do block end |
 ///         if exp then block {elseif exp then block} [else block] end |
-///         for Name ‘=’ exp ‘,’ exp [‘,’ exp] do block end |
+///         for Name `=` exp `,` exp [`,` exp] do block end |
 ///         for namelist in explist do block end |
 ///         function funcname funcbody |
 ///         local function Name funcbody |
-///         local namelist [‘=’ explist]
+///         local namelist [`=` explist]
 #[derive(Debug, PartialEq)]
 pub enum Stat {
 	SemiColon,
@@ -214,7 +214,7 @@ pub enum Stat {
 	LocalAssignment(LocalAssignment),
 }
 
-/// funcbody ::= ‘(’ [parlist] ‘)’ block end
+/// funcbody ::= `(` [parlist] `)` block end
 #[derive(Debug, PartialEq)]
 pub struct FuncBody {
 	pub params: Params,
@@ -235,13 +235,13 @@ pub struct FunctionDef {
 	pub body: FuncBody,
 }
 
-/// parlist ::= namelist [‘,’]
+/// parlist ::= namelist [`,`]
 #[derive(Debug, PartialEq)]
 pub struct Params {
 	pub names: Vec<Name>,
 }
 
-/// unop ::= ‘-’ | not | ‘#’ | ‘~’
+/// unop ::= `-` | not | `#` | `~`
 #[derive(Debug, PartialEq)]
 pub enum Unop {
 	Minus,
