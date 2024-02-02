@@ -1,3 +1,4 @@
+use crate::span::format_err;
 use crate::span::Span;
 use std::iter::zip;
 
@@ -57,6 +58,7 @@ pub enum TokenKind {
 	Number,
 	Ident,
 	Comment(Comment),
+	Eof,
 }
 
 #[derive(PartialEq, Debug, Copy, Clone)]
@@ -528,8 +530,8 @@ impl Iterator for Lexer<'_> {
 						span: Span { start, end },
 					})
 				},
-				unknown => {
-					panic!("Unexpected token: {:?}", unknown); // TODO: handle properly
+				_ => {
+					format_err("Unexpected token: {}", Span::at(self.cursor), self.input);
 				},
 			}
 		} else {

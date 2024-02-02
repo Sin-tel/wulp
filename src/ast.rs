@@ -93,7 +93,7 @@ pub struct IndexExpr {
 
 /// prefixexp `.` Name
 #[derive(Debug, PartialEq)]
-pub struct PropertyAccess {
+pub struct Property {
 	pub expr: Box<PrefixExpr>,
 	pub name: Name,
 }
@@ -103,7 +103,7 @@ pub struct PropertyAccess {
 pub enum Var {
 	Name(Name),
 	IndexExpr(IndexExpr),
-	PropertyAccess(PropertyAccess),
+	Property(Property),
 }
 
 /// prefixexp ::= var | functioncall | `(` exp `)`

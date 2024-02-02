@@ -5,9 +5,9 @@ pub struct Span {
 }
 
 impl Span {
-	// pub fn empty() -> Self {
-	// 	Self { start: 0, end: 0 }
-	// }
+	pub fn at(c: usize) -> Self {
+		Self { start: c, end: c + 1 }
+	}
 
 	pub fn line_col(&self, input: &str) -> (usize, usize, usize, usize) {
 		let (l1, c1) = line_col(input, self.start);
@@ -37,4 +37,50 @@ fn line_col(input: &str, pos: usize) -> (usize, usize) {
 	} else {
 		(1, slice.chars().count() + 1)
 	}
+}
+
+pub fn format_err(message: &str, span: Span, input: &str) -> ! {
+	// TODO: this only works properly if the span is one line
+
+	// lmao
+	let message = message.replace("{}", &["`", span.as_str(input), "`"].concat());
+
+	let (startl, startc, endl, endc) = span.line_col(input);
+
+	let mut linepos = startl;
+
+	let mut spaces = String::new();
+
+	for _ in linepos.to_string().chars().take(startc - 1) {
+		spaces.push(' ');
+	}
+
+	// TODO fix the filename
+	eprintln!("error: src\\main.rs:{}: {}", startl + 10, message);
+	eprintln!("{} |", spaces);
+
+	for l in input.lines().skip(startl - 1) {
+		let mut underline = String::new();
+		for c in l.chars().take(startc - 1) {
+			match c {
+				'\t' => underline.push('\t'),
+				_ => underline.push(' '),
+			}
+		}
+
+		for _ in 0..(endc - startc) {
+			underline.push('^');
+		}
+
+		eprintln!("{} | {}", linepos, l);
+		eprintln!("{} | {}", spaces, underline);
+		linepos += 1;
+		if linepos >= endl {
+			break;
+		}
+	}
+	// eprintln!("{} |", spaces);
+	eprintln!();
+
+	panic!("{}", message);
 }

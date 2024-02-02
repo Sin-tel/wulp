@@ -1,4 +1,5 @@
 use crate::lexer::{Token, TokenKind};
+use crate::span::Span;
 
 #[derive(Debug)]
 pub struct TokenIter {
@@ -7,17 +8,21 @@ pub struct TokenIter {
 }
 
 impl TokenIter {
-	pub fn new(tokens: Vec<Token>) -> TokenIter {
+	pub fn new(mut tokens: Vec<Token>) -> TokenIter {
+		tokens.push(Token {
+			span: Span::at(0),
+			kind: TokenKind::Eof,
+		});
 		TokenIter { index: 0, tokens }
 	}
-	pub fn peek(&mut self) -> Option<Token> {
-		self.tokens.get(self.index).copied()
+	pub fn peek(&mut self) -> Token {
+		*self.tokens.get(self.index).unwrap()
 	}
 	// pub fn peek_n(&mut self, n: usize) -> Option<Token> {
 	// 	self.tokens.get(self.index + n).copied()
 	// }
-	pub fn next(&mut self) -> Option<Token> {
-		let tk = self.tokens.get(self.index).copied();
+	pub fn next(&mut self) -> Token {
+		let tk = *self.tokens.get(self.index).unwrap();
 		self.index += 1;
 		tk
 	}
@@ -31,18 +36,17 @@ impl TokenIter {
 		}
 	}
 	pub fn assert_next(&mut self, knd: TokenKind) {
-		match self.next() {
-			Some(Token { kind, .. }) => {
-				if kind == knd {
-					()
-				} else {
-					panic!("Expected: {:?}", knd)
-				}
-			},
-			None => panic!("Expected: {:?}", knd),
+		if self.next().kind == knd {
+			()
+		} else {
+			panic!("Expected: {:?}", knd)
 		}
 	}
 	pub fn cur(&mut self) -> Option<Token> {
-		self.tokens.get(self.index - 1).copied()
+		if self.index == 0 {
+			return None;
+		} else {
+			self.tokens.get(self.index - 1).copied()
+		}
 	}
 }
