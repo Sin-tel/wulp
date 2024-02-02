@@ -1,5 +1,4 @@
 use crate::lexer::{Token, TokenKind};
-use std::cmp::max;
 
 pub trait PeekableIterator: Iterator {
 	fn peek(&mut self) -> Option<Self::Item>;
@@ -10,7 +9,7 @@ pub struct TokenIter<'a, Item>
 where
 	Item: 'a + PartialEq,
 {
-	index: Option<usize>,
+	index: Option<usize>, //TODO: remove option? (currently needed for next_back)
 	vector: &'a [Item],
 }
 
@@ -65,7 +64,7 @@ where
 				self.index = None;
 				return None;
 			},
-			Some(i) => max(i - 1, 0),
+			Some(i) => i - 1,
 		};
 
 		self.index = Some(index);

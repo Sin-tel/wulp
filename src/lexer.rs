@@ -77,7 +77,7 @@ pub struct Lexer {
 impl Lexer {
 	pub fn new(input: &str) -> Self {
 		Lexer {
-			input: String::from(input),
+			input: String::from(input), //TODO: no copy
 			cursor: 0,
 		}
 	}

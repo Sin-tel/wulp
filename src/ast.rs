@@ -132,7 +132,7 @@ pub struct Assignment {
 #[derive(Debug, PartialEq)]
 pub struct LocalAssignment {
 	pub namelist: Vec<Name>,
-	pub exprlist: Option<Vec<Expr>>,
+	pub exprlist: Option<Vec<Expr>>, //TODO: do we need option here?
 }
 
 /// while exp do block end
@@ -140,13 +140,6 @@ pub struct LocalAssignment {
 pub struct WhileBlock {
 	pub expr: Expr,
 	pub block: Block,
-}
-
-/// repeat block until exp
-#[derive(Debug, PartialEq)]
-pub struct RepeatBlock {
-	pub block: Block,
-	pub expr: Expr,
 }
 
 /// elseif exp then block
