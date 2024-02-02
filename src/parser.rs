@@ -22,7 +22,13 @@ pub fn parse(text: &str) -> Result<Block> {
 		.collect();
 	dbg!(&tokens);
 	let mut tokens = TokenIter::new(&tokens);
-	parse_block(&mut tokens)
+	let ast = parse_block(&mut tokens);
+
+	// make sure we are done
+	if tokens.next() != None {
+		panic!("Expected end of file at {:?}", tokens.cur());
+	}
+	ast
 }
 
 /// funcname ::= Name {‘.’ Name} [‘:’ Name]
@@ -305,7 +311,9 @@ pub fn parse_args(tokens: &mut TokenIter<Token>) -> Result<Args> {
 				tokens.next();
 				return Ok(Args::ExprList(vec![]));
 			}
-			parse_exprlist(tokens).map(Args::ExprList)
+			let explist = parse_exprlist(tokens).map(Args::ExprList);
+			tokens.assert_next(&TokenKind::RParen)?;
+			explist
 		},
 		Some(TokenKind::LCurly) => {
 			// parse_table_constructor() expects a first token of LCurly
@@ -501,7 +509,8 @@ pub fn parse_stat(tokens: &mut TokenIter<Token>) -> Result<Stat> {
 				parse_assignment(tokens).map(Stat::Assignment)
 			}
 		},
-		_ => Err(()),
+		// None => Err(()), // TODO should be handled properly
+		other => panic!("not a valid statement: {:?}", other),
 	}
 }
 
@@ -588,7 +597,7 @@ pub fn parse_for_in(tokens: &mut TokenIter<Token>) -> Result<ForIn> {
 
 	let namelist = parse_namelist(tokens)?;
 
-	if let Some(TokenKind::In) = tokens.peek().map(to_kind) {
+	if tokens.peek().map(to_kind) == Some(TokenKind::In) {
 		tokens.next();
 	} else {
 		return Err(());
@@ -652,20 +661,9 @@ pub fn parse_for_range(tokens: &mut TokenIter<Token>) -> Result<ForRange> {
 
 /// elseif exp then block
 pub fn parse_elseif(tokens: &mut TokenIter<Token>) -> Result<ElseIf> {
-	if let Some(TokenKind::ElseIf) = tokens.peek().map(to_kind) {
-		tokens.next();
-	} else {
-		return Err(());
-	}
-
+	tokens.assert_next(&TokenKind::ElseIf)?;
 	let expr = parse_expr(tokens)?;
-
-	if let Some(TokenKind::Then) = tokens.peek().map(to_kind) {
-		tokens.next();
-	} else {
-		return Err(());
-	}
-
+	tokens.assert_next(&TokenKind::Then)?;
 	let block = parse_block(tokens)?;
 
 	Ok(ElseIf { block, expr })
@@ -683,29 +681,26 @@ pub fn parse_else_block(tokens: &mut TokenIter<Token>) -> Result<Option<Block>> 
 
 /// if exp then block {elseif exp then block} [else block] end
 pub fn parse_if_block(tokens: &mut TokenIter<Token>) -> Result<IfBlock> {
-	if let Some(TokenKind::If) = tokens.peek().map(to_kind) {
-		tokens.next();
-	} else {
-		return Err(());
-	}
+	tokens.assert_next(&TokenKind::If)?;
 
 	let expr = parse_expr(tokens)?;
 
-	if let Some(TokenKind::Then) = tokens.peek().map(to_kind) {
-		tokens.next();
-	} else {
-		return Err(());
-	}
+	tokens.assert_next(&TokenKind::Then)?;
 
 	let block = parse_block(tokens)?;
 
 	let mut elseif = vec![];
 
-	while let Ok(elif) = parse_elseif(tokens) {
-		elseif.push(elif);
+	while tokens.peek().map(to_kind) == Some(TokenKind::ElseIf) {
+		match parse_elseif(tokens) {
+			Ok(elif) => elseif.push(elif),
+			Err(e) => return Err(e),
+		};
 	}
 
 	let else_blk = parse_else_block(tokens)?;
+
+	tokens.assert_next(&TokenKind::End)?;
 
 	Ok(IfBlock {
 		expr,
@@ -717,14 +712,9 @@ pub fn parse_if_block(tokens: &mut TokenIter<Token>) -> Result<IfBlock> {
 
 /// while exp do block end
 pub fn parse_while_block(tokens: &mut TokenIter<Token>) -> Result<WhileBlock> {
-	if let Some(TokenKind::While) = tokens.peek().map(to_kind) {
-		tokens.next();
-	} else {
-		return Err(());
-	}
+	tokens.assert_next(&TokenKind::While)?;
 
 	let expr = parse_expr(tokens)?;
-
 	let block = parse_do_block(tokens)?;
 
 	Ok(WhileBlock { block, expr })
@@ -732,46 +722,48 @@ pub fn parse_while_block(tokens: &mut TokenIter<Token>) -> Result<WhileBlock> {
 
 /// do block end
 pub fn parse_do_block(tokens: &mut TokenIter<Token>) -> Result<Block> {
-	if let Some(TokenKind::Do) = tokens.peek().map(to_kind) {
-		tokens.next();
-	} else {
-		return Err(());
-	}
-
+	tokens.assert_next(&TokenKind::Do)?;
 	let blk = parse_block(tokens)?;
+	tokens.assert_next(&TokenKind::End)?;
 
-	if let Some(TokenKind::End) = tokens.next().map(to_kind) {
-		Ok(blk)
-	} else {
-		Err(())
-	}
+	Ok(blk)
 }
 
 /// block ::= {stat} [retstat]
 pub fn parse_block(tokens: &mut TokenIter<Token>) -> Result<Block> {
 	let mut stats = vec![];
-	while let Ok(stat) = parse_stat(tokens) {
-		stats.push(stat);
+
+	loop {
+		match tokens.peek().map(to_kind) {
+			Some(TokenKind::End) | Some(TokenKind::Else) | Some(TokenKind::ElseIf) | None => break,
+			other => {
+				if other == Some(TokenKind::Return) {
+					let retstat = parse_retstat(tokens)?;
+					return Ok(Block {
+						stats,
+						retstat: Some(retstat),
+					});
+				} else if let Ok(stat) = parse_stat(tokens) {
+					stats.push(stat);
+				} else {
+					panic!("Expected statement at {:?}", other);
+				}
+			},
+		}
 	}
-	let retstat = parse_retstat(tokens).unwrap_or_default();
-	Ok(Block { stats, retstat })
+	Ok(Block { stats, retstat: None })
 }
 
 /// retstat ::= return [explist] [‘;’]
-pub fn parse_retstat(tokens: &mut TokenIter<Token>) -> Result<Option<Vec<Expr>>> {
-	match tokens.peek().map(to_kind) {
-		Some(TokenKind::Return) => {
-			tokens.next();
-		},
-		_ => return Ok(None),
-	}
+pub fn parse_retstat(tokens: &mut TokenIter<Token>) -> Result<Vec<Expr>> {
+	tokens.assert_next(&TokenKind::Return)?;
 
 	let exprlist = parse_exprlist(tokens)?;
 
 	if let Some(TokenKind::SemiColon) = tokens.peek().map(to_kind) {
 		tokens.next();
 	}
-	Ok(Some(exprlist))
+	Ok(exprlist)
 }
 
 /// funcbody ::= ‘(’ [parlist] ‘)’ block end
@@ -779,11 +771,10 @@ pub fn parse_funcbody(tokens: &mut TokenIter<Token>) -> Result<FuncBody> {
 	tokens.assert_next(&TokenKind::LParen)?;
 	let params = parse_parlist(tokens)?;
 	tokens.assert_next(&TokenKind::RParen)?;
+	let body = parse_block(tokens)?;
+	tokens.assert_next(&TokenKind::End)?;
 
-	Ok(FuncBody {
-		params,
-		body: parse_block(tokens)?,
-	})
+	Ok(FuncBody { params, body })
 }
 
 /// functiondef ::= function funcbody
@@ -802,8 +793,8 @@ pub fn parse_functiondef(tokens: &mut TokenIter<Token>) -> Result<FunctionDef> {
 
 /// namelist ::= Name {‘,’ Name}
 pub fn parse_namelist(tokens: &mut TokenIter<Token>) -> Result<Vec<Name>> {
-	let first_name = match tokens.next().map(to_kind).ok_or_else(|| ())? {
-		TokenKind::Ident(name) => name,
+	let first_name = match tokens.next().map(to_kind) {
+		Some(TokenKind::Ident(name)) => name,
 		_ => return Err(()),
 	};
 
@@ -822,7 +813,7 @@ pub fn parse_namelist(tokens: &mut TokenIter<Token>) -> Result<Vec<Name>> {
 	Ok(names)
 }
 
-/// parlist ::= namelist [‘,’ ‘...’] | ‘...’
+/// parlist ::= namelist [‘,’]
 pub fn parse_parlist(tokens: &mut TokenIter<Token>) -> Result<Params> {
 	match tokens.peek().map(to_kind) {
 		// namelist
@@ -836,7 +827,6 @@ pub fn parse_parlist(tokens: &mut TokenIter<Token>) -> Result<Params> {
 				},
 				_ => (),
 			};
-
 			Ok(Params { names })
 		},
 		_ => Ok(Params { names: vec![] }),
@@ -848,7 +838,8 @@ pub fn parse_parlist(tokens: &mut TokenIter<Token>) -> Result<Params> {
 pub fn parse_fieldlist(tokens: &mut TokenIter<Token>) -> Result<Vec<Field>> {
 	let mut fields = vec![];
 
-	while let Ok(f) = parse_field(tokens) {
+	loop {
+		let f = parse_field(tokens)?;
 		fields.push(f);
 
 		match tokens.peek().map(to_kind) {

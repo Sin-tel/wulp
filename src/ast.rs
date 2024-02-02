@@ -46,7 +46,7 @@ pub struct UnExp {
 	pub exp: Box<Expr>,
 }
 
-/// exp ::= nil | false | true | Numeral | LiteralString | ‘...’ | functiondef |
+/// exp ::= nil | false | true | Numeral | LiteralString | functiondef |
 ///         prefixexp | tableconstructor | exp binop exp | unop exp
 #[derive(Debug, PartialEq)]
 pub enum Expr {

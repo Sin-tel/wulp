@@ -429,6 +429,7 @@ impl Iterator for Lexer {
 					})
 				},
 				'.' if next == Some('.') => {
+					self.eat_chars(2);
 					let end = self.cursor;
 					Some(Token {
 						kind: TokenKind::Concat,
