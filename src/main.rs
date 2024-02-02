@@ -1,20 +1,19 @@
 mod ast;
-mod iter;
 mod lexer;
 mod parser;
+mod span;
+mod token_iter;
 
 #[cfg(test)]
 mod tests;
 
 fn main() {
 	let input = r#"
-	print('hello world')
-	a = a + 14
-	bbb
+	while a do end
 	"#;
 
 	// let input = " print('hello world')";
 
-	let ast = parser::parse(&input);
-	println!("{:?}", ast);
+	let ast = parser::parse(&input).unwrap();
+	dbg!(ast);
 }

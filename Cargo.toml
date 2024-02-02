@@ -5,4 +5,5 @@ description = "better lua"
 edition = "2021"
 
 [dependencies]
-
+memchr = "2.5"
+bytecount = "0.6"

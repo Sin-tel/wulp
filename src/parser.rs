@@ -1,16 +1,16 @@
 use crate::ast::*;
-use crate::iter::{PeekableIterator, TokenIter};
 use crate::lexer::{Lexer, Token, TokenKind};
+use crate::token_iter::TokenIter;
 use std;
 
 type Result<T> = std::result::Result<T, ()>;
 
-pub fn to_kind(tk: &Token) -> TokenKind {
-	tk.kind.clone()
+pub fn to_kind(tk: Token) -> TokenKind {
+	tk.kind
 }
 
-pub fn parse(text: &str) -> Result<Block> {
-	let tokens: Vec<_> = Lexer::new(text)
+pub fn parse(input: &str) -> Result<Block> {
+	let tokens: Vec<_> = Lexer::new(input)
 		.filter(|t| match t {
 			Token {
 				kind: TokenKind::Comment(_),
@@ -20,8 +20,8 @@ pub fn parse(text: &str) -> Result<Block> {
 		})
 		.collect();
 	dbg!(&tokens);
-	let mut tokens = TokenIter::new(&tokens);
-	let ast = parse_block(&mut tokens);
+	let mut tokens = TokenIter::new(tokens);
+	let ast = parse_block(&input, &mut tokens);
 
 	// make sure we are done
 	if tokens.next() != None {
@@ -31,25 +31,18 @@ pub fn parse(text: &str) -> Result<Block> {
 }
 
 /// funcname ::= Name {`.` Name} [`:` Name]
-pub fn parse_funcname(tokens: &mut TokenIter<Token>) -> Result<FuncName> {
-	let first_name = tokens.next();
-	let first_name = match first_name {
-		Some(Token {
-			kind: TokenKind::Ident(first_name),
-			..
-		}) => first_name,
-		_ => return Err(()),
-	};
-	let mut path = vec![Name(first_name.clone())];
+pub fn parse_funcname(input: &str, tokens: &mut TokenIter) -> Result<FuncName> {
+	tokens.assert_next(TokenKind::Ident);
+
+	let mut path = vec![Name(tokens.cur().unwrap().span.as_str(input).to_string())];
 	// if next token is period then loop
 	while tokens.peek().map(to_kind) == Some(TokenKind::Period) {
 		tokens.next();
 		match tokens.next() {
 			Some(Token {
-				kind: TokenKind::Ident(ref content),
-				..
+				kind: TokenKind::Ident, ..
 			}) => {
-				path.push(Name(content.clone()));
+				path.push(Name(tokens.cur().unwrap().span.as_str(input).to_string()));
 			},
 			_ => return Err(()),
 		}
@@ -62,10 +55,9 @@ pub fn parse_funcname(tokens: &mut TokenIter<Token>) -> Result<FuncName> {
 		tokens.next();
 		match tokens.next() {
 			Some(Token {
-				kind: TokenKind::Ident(ref name),
-				..
+				kind: TokenKind::Ident, ..
 			}) => {
-				method = Some(Name(name.clone()));
+				method = Some(Name(tokens.cur().unwrap().span.as_str(input).to_string()));
 			},
 			_ => return Err(()),
 		}
@@ -73,20 +65,28 @@ pub fn parse_funcname(tokens: &mut TokenIter<Token>) -> Result<FuncName> {
 	Ok(FuncName { path, method })
 }
 
-pub fn parse_simple_exp(tokens: &mut TokenIter<Token>) -> Result<Expr> {
+pub fn parse_simple_exp(input: &str, tokens: &mut TokenIter) -> Result<Expr> {
 	match tokens.cur().map(to_kind) {
 		Some(TokenKind::Nil) => Ok(Expr::Nil),
 		Some(TokenKind::True) => Ok(Expr::Bool(true)),
 		Some(TokenKind::False) => Ok(Expr::Bool(false)),
-		Some(TokenKind::String(s)) => Ok(Expr::Str(s.to_string())),
-		Some(TokenKind::Number(n)) => Ok(Expr::Num(n)),
+		Some(TokenKind::String) => Ok(Expr::Str(
+			parse_string(tokens.cur().unwrap().span.as_str(input)).to_string(),
+		)),
+		Some(TokenKind::Number) => {
+			let s = tokens.cur().unwrap().span.as_str(input).to_string();
+			match s.parse() {
+				Ok(num) => Ok(Expr::Num(num)),
+				_ => panic!("Malformed number"), // TODO: handle properly
+			}
+		},
 		Some(TokenKind::Function) => {
-			tokens.next_back();
-			parse_functiondef(tokens).map(Expr::FuncDef)
+			tokens.prev();
+			parse_functiondef(&input, tokens).map(Expr::FuncDef)
 		},
 		Some(TokenKind::LCurly) => {
-			tokens.next_back();
-			parse_table_constructor(tokens).map(Expr::Table)
+			tokens.prev();
+			parse_table_constructor(&input, tokens).map(Expr::Table)
 		},
 		_ => Err(()),
 	}
@@ -108,7 +108,7 @@ pub fn bin_priority(op: &Option<TokenKind>) -> i32 {
 
 const UNARY_PRIORITY: i32 = 7;
 
-pub fn parse_unexp(tokens: &mut TokenIter<Token>) -> Result<Expr> {
+pub fn parse_unexp(input: &str, tokens: &mut TokenIter) -> Result<Expr> {
 	match tokens.next().map(to_kind) {
 		tk @ Some(TokenKind::Minus) | tk @ Some(TokenKind::Not) | tk @ Some(TokenKind::Hash) => {
 			let op = match tk {
@@ -118,7 +118,7 @@ pub fn parse_unexp(tokens: &mut TokenIter<Token>) -> Result<Expr> {
 				_ => return Err(()),
 			};
 
-			let exp = parse_sub_expr(tokens, UNARY_PRIORITY)?;
+			let exp = parse_sub_expr(&input, tokens, UNARY_PRIORITY)?;
 			Ok(Expr::UnExp(UnExp { op, exp: Box::new(exp) }))
 		},
 		_ => Err(()),
@@ -127,8 +127,8 @@ pub fn parse_unexp(tokens: &mut TokenIter<Token>) -> Result<Expr> {
 
 /// exp ::= nil | false | true | Numeral | LiteralString | `...` | functiondef |
 ///         prefixexp | tableconstructor | exp binop exp | unop exp
-pub fn parse_expr(tokens: &mut TokenIter<Token>) -> Result<Expr> {
-	parse_sub_expr(tokens, 0)
+pub fn parse_expr(input: &str, tokens: &mut TokenIter) -> Result<Expr> {
+	parse_sub_expr(&input, tokens, 0)
 }
 
 pub fn is_bin_op(token: &Option<TokenKind>) -> bool {
@@ -155,12 +155,14 @@ pub fn is_bin_op(token: &Option<TokenKind>) -> bool {
 // subexpr ::= (simpleexp | unop subexpr ) { binop subexpr }
 // see: https://github.com/lua/lua/blob/2c32bff60987d38a60a58d4f0123f3783da60a63/lparser.c#L1120-L1156
 // TODO: left / right priority
-pub fn parse_sub_expr(tokens: &mut TokenIter<Token>, min_priority: i32) -> Result<Expr> {
+pub fn parse_sub_expr(input: &str, tokens: &mut TokenIter, min_priority: i32) -> Result<Expr> {
 	// TODO: fix whatever this is
-	let mut expression = parse_unexp(tokens).or_else(|_| parse_simple_exp(tokens)).or_else(|_| {
-		tokens.next_back();
-		parse_prefix_exp(tokens).map(|x| Expr::PrefixExp(Box::new(x)))
-	})?;
+	let mut expression = parse_unexp(&input, tokens)
+		.or_else(|_| parse_simple_exp(&input, tokens))
+		.or_else(|_| {
+			tokens.prev();
+			parse_prefix_exp(&input, tokens).map(|x| Expr::PrefixExp(Box::new(x)))
+		})?;
 
 	while is_bin_op(&tokens.peek().map(to_kind)) && bin_priority(&tokens.peek().map(to_kind)) > min_priority {
 		tokens.next();
@@ -186,7 +188,7 @@ pub fn parse_sub_expr(tokens: &mut TokenIter<Token>, min_priority: i32) -> Resul
 
 		let prority = bin_priority(&tokens.cur().map(to_kind));
 
-		let rhs = match parse_sub_expr(tokens, prority) {
+		let rhs = match parse_sub_expr(&input, tokens, prority) {
 			Err(_) => break,
 			Ok(rhs) => rhs,
 		};
@@ -202,30 +204,34 @@ pub fn parse_sub_expr(tokens: &mut TokenIter<Token>, min_priority: i32) -> Resul
 }
 
 /// field ::= `[` exp `]` `=` exp | Name `=` exp | exp
-pub fn parse_field(tokens: &mut TokenIter<Token>) -> Result<Field> {
-	match tokens.next().map(to_kind) {
+pub fn parse_field(input: &str, tokens: &mut TokenIter) -> Result<Field> {
+	let name_token = tokens.next();
+	match name_token.map(to_kind) {
 		// Name '=' exp
-		Some(TokenKind::Ident(name)) => {
-			tokens.assert_next(&TokenKind::Assign)?;
+		Some(TokenKind::Ident) => {
+			tokens.assert_next(TokenKind::Assign);
 
-			let expr = parse_expr(tokens)?;
+			let expr = parse_expr(&input, tokens)?;
 
-			Ok(Field::NameAssign(Name(name.clone()), expr))
+			Ok(Field::NameAssign(
+				Name(name_token.unwrap().span.as_str(input).to_string()),
+				expr,
+			))
 		},
 		// '[' exp ']' '=' exp
 		Some(TokenKind::LBracket) => {
-			let lexpr = parse_expr(tokens)?;
+			let lexpr = parse_expr(&input, tokens)?;
 
-			tokens.assert_next(&TokenKind::RBracket)?;
+			tokens.assert_next(TokenKind::RBracket);
 
-			tokens.assert_next(&TokenKind::Assign)?;
+			tokens.assert_next(TokenKind::Assign);
 
-			let rexpr = parse_expr(tokens)?;
+			let rexpr = parse_expr(&input, tokens)?;
 
 			Ok(Field::ExprAssign(lexpr, rexpr))
 		},
 		// exp
-		_ => match parse_expr(tokens) {
+		_ => match parse_expr(&input, tokens) {
 			Ok(e) => Ok(Field::PosAssign(e)),
 			_ => Err(()),
 		},
@@ -233,14 +239,14 @@ pub fn parse_field(tokens: &mut TokenIter<Token>) -> Result<Field> {
 }
 
 /// tableconstructor ::= `{` [fieldlist] `}`
-pub fn parse_table_constructor(tokens: &mut TokenIter<Token>) -> Result<TableConstructor> {
+pub fn parse_table_constructor(input: &str, tokens: &mut TokenIter) -> Result<TableConstructor> {
 	match tokens.next().map(to_kind) {
 		Some(TokenKind::LCurly) => {
 			if let Some(TokenKind::RCurly) = tokens.peek().map(to_kind) {
 				tokens.next();
 				return Ok(TableConstructor(vec![]));
 			};
-			let fieldlist = parse_fieldlist(tokens)?;
+			let fieldlist = parse_fieldlist(&input, tokens)?;
 			match tokens.next().map(to_kind) {
 				Some(TokenKind::RCurly) => Ok(TableConstructor(fieldlist)),
 				_ => Err(()),
@@ -251,23 +257,23 @@ pub fn parse_table_constructor(tokens: &mut TokenIter<Token>) -> Result<TableCon
 }
 
 /// varlist ::= var {`,` var}
-pub fn parse_varlist(tokens: &mut TokenIter<Token>) -> Result<Vec<Var>> {
+pub fn parse_varlist(input: &str, tokens: &mut TokenIter) -> Result<Vec<Var>> {
 	let mut varlist = vec![];
 
-	if let Ok(var) = parse_var(tokens) {
+	if let Ok(var) = parse_var(&input, tokens) {
 		varlist.push(var);
 	}
 
 	while let Some(TokenKind::Comma) = tokens.peek().map(to_kind) {
 		tokens.next();
-		match parse_var(tokens) {
+		match parse_var(&input, tokens) {
 			Ok(v) => {
 				varlist.push(v);
 			},
 
 			// TODO: fix err
 			Err(_) => {
-				tokens.next_back();
+				tokens.prev();
 				break;
 			},
 		}
@@ -277,22 +283,22 @@ pub fn parse_varlist(tokens: &mut TokenIter<Token>) -> Result<Vec<Var>> {
 }
 
 /// explist ::= exp {`,` exp}
-pub fn parse_exprlist(tokens: &mut TokenIter<Token>) -> Result<Vec<Expr>> {
+pub fn parse_exprlist(input: &str, tokens: &mut TokenIter) -> Result<Vec<Expr>> {
 	let mut exprs = vec![];
 
-	if let Ok(expr) = parse_expr(tokens) {
+	if let Ok(expr) = parse_expr(&input, tokens) {
 		exprs.push(expr);
 	}
 
 	while let Some(TokenKind::Comma) = tokens.peek().map(to_kind) {
 		tokens.next();
-		match parse_expr(tokens) {
+		match parse_expr(&input, tokens) {
 			Ok(expr) => {
 				exprs.push(expr);
 			},
 			// TODO: fix err
 			Err(_) => {
-				tokens.next_back();
+				tokens.prev();
 				break;
 			},
 		}
@@ -302,15 +308,15 @@ pub fn parse_exprlist(tokens: &mut TokenIter<Token>) -> Result<Vec<Expr>> {
 }
 
 /// args ::=  `(` [explist] `)`
-pub fn parse_args(tokens: &mut TokenIter<Token>) -> Result<Args> {
+pub fn parse_args(input: &str, tokens: &mut TokenIter) -> Result<Args> {
 	match tokens.next().map(to_kind) {
 		Some(TokenKind::LParen) => {
 			if let Some(TokenKind::RParen) = tokens.peek().map(to_kind) {
 				tokens.next();
 				return Ok(Args(vec![]));
 			}
-			let explist = parse_exprlist(tokens)?;
-			tokens.assert_next(&TokenKind::RParen)?;
+			let explist = parse_exprlist(&input, tokens)?;
+			tokens.assert_next(TokenKind::RParen);
 			Ok(Args(explist))
 		},
 		_ => Err(()),
@@ -322,48 +328,54 @@ pub fn parse_args(tokens: &mut TokenIter<Token>) -> Result<Args> {
 /// foo
 /// bar[0]
 /// bar.bizz
-pub fn parse_var(tokens: &mut TokenIter<Token>) -> Result<Var> {
+pub fn parse_var(input: &str, tokens: &mut TokenIter) -> Result<Var> {
 	match tokens.peek().map(to_kind) {
-		Some(TokenKind::Ident(ident)) => {
-			tokens.next();
+		Some(TokenKind::Ident) => {
+			let name_token = tokens.next();
+
+			// TODO: these are completely incomprehensible, fix it
 			match tokens.peek().map(to_kind) {
 				Some(TokenKind::LBracket) => {
 					tokens.next();
 
-					let expr = parse_expr(tokens)?;
+					let expr = parse_expr(&input, tokens)?;
 
-					tokens.assert_next(&TokenKind::RBracket)?;
+					tokens.assert_next(TokenKind::RBracket);
 
 					Ok(Var::IndexExpr(IndexExpr {
-						expr: Box::new(PrefixExpr::Var(Var::Name(Name(ident.to_string())))),
+						expr: Box::new(PrefixExpr::Var(Var::Name(Name(
+							name_token.unwrap().span.as_str(input).to_string(),
+						)))),
 						arg: expr,
 					}))
 				},
 				Some(TokenKind::Period) => {
 					tokens.next();
 
-					if let Some(TokenKind::Ident(name)) = tokens.next().map(to_kind) {
+					if let Some(TokenKind::Ident) = tokens.next().map(to_kind) {
 						Ok(Var::PropertyAccess(PropertyAccess {
-							expr: Box::new(PrefixExpr::Var(Var::Name(Name(ident.to_string())))),
-							name: Name(name.to_string()),
+							expr: Box::new(PrefixExpr::Var(Var::Name(Name(
+								name_token.unwrap().span.as_str(input).to_string(),
+							)))),
+							name: Name(tokens.cur().unwrap().span.as_str(input).to_string()),
 						}))
 					} else {
 						Err(())
 					}
 				},
-				_ => Ok(Var::Name(Name(ident.to_string()))),
+				_ => Ok(Var::Name(Name(tokens.cur().unwrap().span.as_str(input).to_string()))),
 			}
 		},
 		Some(_) => {
-			let prefixexp = parse_prefix_exp(tokens)?;
+			let prefixexp = parse_prefix_exp(&input, tokens)?;
 
 			match tokens.peek().map(to_kind) {
 				Some(TokenKind::LBracket) => {
 					tokens.next();
 
-					let expr = parse_expr(tokens)?;
+					let expr = parse_expr(&input, tokens)?;
 
-					tokens.assert_next(&TokenKind::RBracket)?;
+					tokens.assert_next(TokenKind::RBracket);
 
 					Ok(Var::IndexExpr(IndexExpr {
 						expr: Box::new(prefixexp),
@@ -373,10 +385,10 @@ pub fn parse_var(tokens: &mut TokenIter<Token>) -> Result<Var> {
 				Some(TokenKind::Period) => {
 					tokens.next();
 
-					if let Some(TokenKind::Ident(name)) = tokens.next().map(to_kind) {
+					if let Some(TokenKind::Ident) = tokens.next().map(to_kind) {
 						Ok(Var::PropertyAccess(PropertyAccess {
 							expr: Box::new(prefixexp),
-							name: Name(name.to_string()),
+							name: Name(tokens.cur().unwrap().span.as_str(input).to_string()),
 						}))
 					} else {
 						Err(())
@@ -392,46 +404,54 @@ pub fn parse_var(tokens: &mut TokenIter<Token>) -> Result<Var> {
 /// prefixexp ::= var | functioncall | `(` exp `)`
 // functioncall ::=  prefixexp args | prefixexp `:` Name args
 // var ::=  Name | prefixexp `[` exp `]` | prefixexp `.` Name
-pub fn parse_prefix_exp(tokens: &mut TokenIter<Token>) -> Result<PrefixExpr> {
+pub fn parse_prefix_exp(input: &str, tokens: &mut TokenIter) -> Result<PrefixExpr> {
 	match tokens.peek().map(to_kind) {
 		Some(TokenKind::LParen) => {
 			tokens.next();
-			let expr = parse_expr(tokens).map(PrefixExpr::Expr);
-			tokens.assert_next(&TokenKind::RParen)?;
+			let expr = parse_expr(&input, tokens).map(PrefixExpr::Expr);
+			tokens.assert_next(TokenKind::RParen);
 			expr
 		},
-		Some(TokenKind::Ident(ident)) => {
+		Some(TokenKind::Ident) => {
 			tokens.next();
 			match tokens.peek().map(to_kind) {
 				Some(TokenKind::LBracket) => {
 					tokens.next();
 
-					let expr = parse_expr(tokens)?;
+					let expr = parse_expr(&input, tokens)?;
 
-					tokens.assert_next(&TokenKind::RBracket)?;
+					tokens.assert_next(TokenKind::RBracket);
 
 					Ok(PrefixExpr::Var(Var::IndexExpr(IndexExpr {
-						expr: Box::new(PrefixExpr::Var(Var::Name(Name(ident.to_string())))),
+						expr: Box::new(PrefixExpr::Var(Var::Name(Name(
+							tokens.cur().unwrap().span.as_str(input).to_string(),
+						)))),
 						arg: expr,
 					})))
 				},
 				Some(TokenKind::Period) => {
 					tokens.next();
 
-					if let Some(TokenKind::Ident(name)) = tokens.next().map(to_kind) {
+					if let Some(TokenKind::Ident) = tokens.next().map(to_kind) {
 						Ok(PrefixExpr::Var(Var::PropertyAccess(PropertyAccess {
-							expr: Box::new(PrefixExpr::Var(Var::Name(Name(ident.to_string())))),
-							name: Name(name.to_string()),
+							expr: Box::new(PrefixExpr::Var(Var::Name(Name(
+								tokens.cur().unwrap().span.as_str(input).to_string(),
+							)))),
+							name: Name(tokens.cur().unwrap().span.as_str(input).to_string()),
 						})))
 					} else {
 						Err(())
 					}
 				},
 				Some(TokenKind::LParen) => Ok(PrefixExpr::FunctionCall(FunctionCall {
-					expr: Box::new(PrefixExpr::Var(Var::Name(Name(ident.to_string())))),
-					args: parse_args(tokens)?,
+					expr: Box::new(PrefixExpr::Var(Var::Name(Name(
+						tokens.cur().unwrap().span.as_str(input).to_string(),
+					)))),
+					args: parse_args(&input, tokens)?,
 				})),
-				_ => Ok(PrefixExpr::Var(Var::Name(Name(ident.to_string())))),
+				_ => Ok(PrefixExpr::Var(Var::Name(Name(
+					tokens.cur().unwrap().span.as_str(input).to_string(),
+				)))),
 			}
 		},
 		_ => Err(()),
@@ -453,7 +473,7 @@ pub fn parse_prefix_exp(tokens: &mut TokenIter<Token>) -> Result<PrefixExpr> {
 ///         function funcname funcbody |
 ///         local function Name funcbody |
 ///         local namelist [`=` explist]
-pub fn parse_stat(tokens: &mut TokenIter<Token>) -> Result<Stat> {
+pub fn parse_stat(input: &str, tokens: &mut TokenIter) -> Result<Stat> {
 	match tokens.peek().map(to_kind) {
 		Some(TokenKind::SemiColon) => {
 			tokens.next();
@@ -463,43 +483,45 @@ pub fn parse_stat(tokens: &mut TokenIter<Token>) -> Result<Stat> {
 			tokens.next();
 			Ok(Stat::Break)
 		},
-		Some(TokenKind::Do) => parse_do_block(tokens).map(Stat::DoBlock),
-		Some(TokenKind::While) => parse_while_block(tokens).map(Stat::WhileBlock),
-		Some(TokenKind::If) => parse_if_block(tokens).map(|f| Stat::IfBlock(Box::new(f))),
+		Some(TokenKind::Do) => parse_do_block(&input, tokens).map(Stat::DoBlock),
+		Some(TokenKind::While) => parse_while_block(&input, tokens).map(Stat::WhileBlock),
+		Some(TokenKind::If) => parse_if_block(&input, tokens).map(|f| Stat::IfBlock(Box::new(f))),
 		Some(TokenKind::For) => {
 			tokens.next();
 			tokens.next();
 			if let Some(TokenKind::Assign) = tokens.peek().map(to_kind) {
-				tokens.next_back();
-				tokens.next_back();
-				parse_for_range(tokens).map(|f| Stat::ForRange(Box::new(f)))
+				tokens.prev();
+				tokens.prev();
+				parse_for_range(&input, tokens).map(|f| Stat::ForRange(Box::new(f)))
 			} else {
-				tokens.next_back();
-				tokens.next_back();
-				parse_for_in(tokens).map(Stat::ForIn)
+				tokens.prev();
+				tokens.prev();
+				parse_for_in(&input, tokens).map(Stat::ForIn)
 			}
 		},
-		Some(TokenKind::Function) => parse_function_def(tokens).map(Stat::FunctionDef),
+		Some(TokenKind::Function) => parse_function_def(&input, tokens).map(Stat::FunctionDef),
 		Some(TokenKind::Local) => {
 			tokens.next();
 			if let Some(TokenKind::Function) = tokens.peek().map(to_kind) {
-				tokens.next_back();
-				parse_local_function_def(tokens).map(Stat::LocalFunctionDef)
+				tokens.prev();
+				parse_local_function_def(&input, tokens).map(Stat::LocalFunctionDef)
 			} else {
-				tokens.next_back();
-				parse_local_assignment(tokens).map(Stat::LocalAssignment)
+				tokens.prev();
+				parse_local_assignment(&input, tokens).map(Stat::LocalAssignment)
 			}
 		},
-		Some(TokenKind::Ident(ident)) => {
+		Some(TokenKind::Ident) => {
 			tokens.next();
 			if let Some(TokenKind::LParen) = tokens.peek().map(to_kind) {
 				Ok(Stat::FunctionCall(FunctionCall {
-					expr: Box::new(PrefixExpr::Var(Var::Name(Name(ident.to_string())))),
-					args: parse_args(tokens)?,
+					expr: Box::new(PrefixExpr::Var(Var::Name(Name(
+						tokens.cur().unwrap().span.as_str(input).to_string(),
+					)))),
+					args: parse_args(&input, tokens)?,
 				}))
 			} else {
-				tokens.next_back();
-				parse_assignment(tokens).map(Stat::Assignment)
+				tokens.prev();
+				parse_assignment(&input, tokens).map(Stat::Assignment)
 			}
 		},
 		other => panic!("not a valid statement: {:?}", other),
@@ -507,8 +529,8 @@ pub fn parse_stat(tokens: &mut TokenIter<Token>) -> Result<Stat> {
 }
 
 /// varlist `=` explist
-pub fn parse_assignment(tokens: &mut TokenIter<Token>) -> Result<Assignment> {
-	let varlist = parse_varlist(tokens)?;
+pub fn parse_assignment(input: &str, tokens: &mut TokenIter) -> Result<Assignment> {
+	let varlist = parse_varlist(&input, tokens)?;
 
 	if let Some(TokenKind::Assign) = tokens.peek().map(to_kind) {
 		tokens.next();
@@ -516,24 +538,24 @@ pub fn parse_assignment(tokens: &mut TokenIter<Token>) -> Result<Assignment> {
 		return Err(());
 	}
 
-	let exprlist = parse_exprlist(tokens)?;
+	let exprlist = parse_exprlist(&input, tokens)?;
 
 	Ok(Assignment { varlist, exprlist })
 }
 
 /// local namelist [`=` explist]
-pub fn parse_local_assignment(tokens: &mut TokenIter<Token>) -> Result<LocalAssignment> {
+pub fn parse_local_assignment(input: &str, tokens: &mut TokenIter) -> Result<LocalAssignment> {
 	if let Some(TokenKind::Local) = tokens.peek().map(to_kind) {
 		tokens.next();
 	} else {
 		return Err(());
 	}
 
-	let namelist = parse_namelist(tokens)?;
+	let namelist = parse_namelist(&input, tokens)?;
 
 	let exprlist = if let Some(TokenKind::Assign) = tokens.peek().map(to_kind) {
 		tokens.next();
-		Some(parse_exprlist(tokens)?)
+		Some(parse_exprlist(&input, tokens)?)
 	} else {
 		None
 	};
@@ -542,7 +564,7 @@ pub fn parse_local_assignment(tokens: &mut TokenIter<Token>) -> Result<LocalAssi
 }
 
 /// local function Name funcbody
-pub fn parse_local_function_def(tokens: &mut TokenIter<Token>) -> Result<LocalFunctionDef> {
+pub fn parse_local_function_def(input: &str, tokens: &mut TokenIter) -> Result<LocalFunctionDef> {
 	if let Some(TokenKind::Local) = tokens.peek().map(to_kind) {
 		tokens.next();
 	} else {
@@ -555,39 +577,39 @@ pub fn parse_local_function_def(tokens: &mut TokenIter<Token>) -> Result<LocalFu
 	}
 
 	let name = match tokens.next().map(to_kind) {
-		Some(TokenKind::Ident(name)) => Name(name.to_string()),
+		Some(TokenKind::Ident) => Name(tokens.cur().unwrap().span.as_str(input).to_string()),
 		_ => return Err(()),
 	};
 
-	let body = parse_funcbody(tokens)?;
+	let body = parse_funcbody(&input, tokens)?;
 
 	Ok(LocalFunctionDef { name, body })
 }
 
 /// function funcname funcbody
-pub fn parse_function_def(tokens: &mut TokenIter<Token>) -> Result<FunctionDef> {
+pub fn parse_function_def(input: &str, tokens: &mut TokenIter) -> Result<FunctionDef> {
 	if let Some(TokenKind::Function) = tokens.peek().map(to_kind) {
 		tokens.next();
 	} else {
 		return Err(());
 	}
 
-	let name = parse_funcname(tokens)?;
+	let name = parse_funcname(&input, tokens)?;
 
-	let body = parse_funcbody(tokens)?;
+	let body = parse_funcbody(&input, tokens)?;
 
 	Ok(FunctionDef { name, body })
 }
 
 /// for namelist in explist do block end
-pub fn parse_for_in(tokens: &mut TokenIter<Token>) -> Result<ForIn> {
+pub fn parse_for_in(input: &str, tokens: &mut TokenIter) -> Result<ForIn> {
 	if let Some(TokenKind::For) = tokens.peek().map(to_kind) {
 		tokens.next();
 	} else {
 		return Err(());
 	}
 
-	let namelist = parse_namelist(tokens)?;
+	let namelist = parse_namelist(&input, tokens)?;
 
 	if tokens.peek().map(to_kind) == Some(TokenKind::In) {
 		tokens.next();
@@ -595,9 +617,9 @@ pub fn parse_for_in(tokens: &mut TokenIter<Token>) -> Result<ForIn> {
 		return Err(());
 	}
 
-	let exprlist = parse_exprlist(tokens)?;
+	let exprlist = parse_exprlist(&input, tokens)?;
 
-	let block = parse_do_block(tokens)?;
+	let block = parse_do_block(&input, tokens)?;
 
 	Ok(ForIn {
 		namelist,
@@ -607,7 +629,7 @@ pub fn parse_for_in(tokens: &mut TokenIter<Token>) -> Result<ForIn> {
 }
 
 /// for Name `=` exp `,` exp [`,` exp] do block end
-pub fn parse_for_range(tokens: &mut TokenIter<Token>) -> Result<ForRange> {
+pub fn parse_for_range(input: &str, tokens: &mut TokenIter) -> Result<ForRange> {
 	if let Some(TokenKind::For) = tokens.peek().map(to_kind) {
 		tokens.next();
 	} else {
@@ -615,7 +637,7 @@ pub fn parse_for_range(tokens: &mut TokenIter<Token>) -> Result<ForRange> {
 	}
 
 	let name = match tokens.next().map(to_kind) {
-		Some(TokenKind::Ident(name)) => Name(name.to_string()),
+		Some(TokenKind::Ident) => Name(tokens.cur().unwrap().span.as_str(input).to_string()),
 		_ => return Err(()),
 	};
 
@@ -625,7 +647,7 @@ pub fn parse_for_range(tokens: &mut TokenIter<Token>) -> Result<ForRange> {
 		return Err(());
 	}
 
-	let exp_start = parse_expr(tokens)?;
+	let exp_start = parse_expr(&input, tokens)?;
 
 	if let Some(TokenKind::Comma) = tokens.peek().map(to_kind) {
 		tokens.next();
@@ -633,16 +655,16 @@ pub fn parse_for_range(tokens: &mut TokenIter<Token>) -> Result<ForRange> {
 		return Err(());
 	}
 
-	let exp_end = parse_expr(tokens)?;
+	let exp_end = parse_expr(&input, tokens)?;
 
 	let exp_step = if let Some(TokenKind::Comma) = tokens.peek().map(to_kind) {
 		tokens.next();
-		Some(parse_expr(tokens)?)
+		Some(parse_expr(&input, tokens)?)
 	} else {
 		None
 	};
 
-	let block = parse_do_block(tokens)?;
+	let block = parse_do_block(&input, tokens)?;
 
 	Ok(ForRange {
 		name,
@@ -652,47 +674,47 @@ pub fn parse_for_range(tokens: &mut TokenIter<Token>) -> Result<ForRange> {
 }
 
 /// elseif exp then block
-pub fn parse_elseif(tokens: &mut TokenIter<Token>) -> Result<ElseIf> {
-	tokens.assert_next(&TokenKind::ElseIf)?;
-	let expr = parse_expr(tokens)?;
-	tokens.assert_next(&TokenKind::Then)?;
-	let block = parse_block(tokens)?;
+pub fn parse_elseif(input: &str, tokens: &mut TokenIter) -> Result<ElseIf> {
+	tokens.assert_next(TokenKind::ElseIf);
+	let expr = parse_expr(&input, tokens)?;
+	tokens.assert_next(TokenKind::Then);
+	let block = parse_block(&input, tokens)?;
 
 	Ok(ElseIf { block, expr })
 }
 
 /// else block
-pub fn parse_else_block(tokens: &mut TokenIter<Token>) -> Result<Option<Block>> {
+pub fn parse_else_block(input: &str, tokens: &mut TokenIter) -> Result<Option<Block>> {
 	if let Some(TokenKind::Else) = tokens.peek().map(to_kind) {
 		tokens.next();
-		Ok(Some(parse_block(tokens)?))
+		Ok(Some(parse_block(&input, tokens)?))
 	} else {
 		Ok(None)
 	}
 }
 
 /// if exp then block {elseif exp then block} [else block] end
-pub fn parse_if_block(tokens: &mut TokenIter<Token>) -> Result<IfBlock> {
-	tokens.assert_next(&TokenKind::If)?;
+pub fn parse_if_block(input: &str, tokens: &mut TokenIter) -> Result<IfBlock> {
+	tokens.assert_next(TokenKind::If);
 
-	let expr = parse_expr(tokens)?;
+	let expr = parse_expr(&input, tokens)?;
 
-	tokens.assert_next(&TokenKind::Then)?;
+	tokens.assert_next(TokenKind::Then);
 
-	let block = parse_block(tokens)?;
+	let block = parse_block(&input, tokens)?;
 
 	let mut elseif = vec![];
 
 	while tokens.peek().map(to_kind) == Some(TokenKind::ElseIf) {
-		match parse_elseif(tokens) {
+		match parse_elseif(&input, tokens) {
 			Ok(elif) => elseif.push(elif),
 			Err(e) => return Err(e),
 		};
 	}
 
-	let else_blk = parse_else_block(tokens)?;
+	let else_blk = parse_else_block(&input, tokens)?;
 
-	tokens.assert_next(&TokenKind::End)?;
+	tokens.assert_next(TokenKind::End);
 
 	Ok(IfBlock {
 		expr,
@@ -703,26 +725,26 @@ pub fn parse_if_block(tokens: &mut TokenIter<Token>) -> Result<IfBlock> {
 }
 
 /// while exp do block end
-pub fn parse_while_block(tokens: &mut TokenIter<Token>) -> Result<WhileBlock> {
-	tokens.assert_next(&TokenKind::While)?;
+pub fn parse_while_block(input: &str, tokens: &mut TokenIter) -> Result<WhileBlock> {
+	tokens.assert_next(TokenKind::While);
 
-	let expr = parse_expr(tokens)?;
-	let block = parse_do_block(tokens)?;
+	let expr = parse_expr(&input, tokens)?;
+	let block = parse_do_block(&input, tokens)?;
 
 	Ok(WhileBlock { block, expr })
 }
 
 /// do block end
-pub fn parse_do_block(tokens: &mut TokenIter<Token>) -> Result<Block> {
-	tokens.assert_next(&TokenKind::Do)?;
-	let blk = parse_block(tokens)?;
-	tokens.assert_next(&TokenKind::End)?;
+pub fn parse_do_block(input: &str, tokens: &mut TokenIter) -> Result<Block> {
+	tokens.assert_next(TokenKind::Do);
+	let blk = parse_block(&input, tokens)?;
+	tokens.assert_next(TokenKind::End);
 
 	Ok(blk)
 }
 
 /// block ::= {stat} [retstat]
-pub fn parse_block(tokens: &mut TokenIter<Token>) -> Result<Block> {
+pub fn parse_block(input: &str, tokens: &mut TokenIter) -> Result<Block> {
 	let mut stats = vec![];
 
 	loop {
@@ -730,12 +752,12 @@ pub fn parse_block(tokens: &mut TokenIter<Token>) -> Result<Block> {
 			Some(TokenKind::End) | Some(TokenKind::Else) | Some(TokenKind::ElseIf) | None => break,
 			other => {
 				if other == Some(TokenKind::Return) {
-					let retstat = parse_retstat(tokens)?;
+					let retstat = parse_retstat(&input, tokens)?;
 					return Ok(Block {
 						stats,
 						retstat: Some(retstat),
 					});
-				} else if let Ok(stat) = parse_stat(tokens) {
+				} else if let Ok(stat) = parse_stat(&input, tokens) {
 					stats.push(stat);
 				} else {
 					panic!("Expected statement at {:?}", other);
@@ -747,10 +769,10 @@ pub fn parse_block(tokens: &mut TokenIter<Token>) -> Result<Block> {
 }
 
 /// retstat ::= return [explist] [`;`]
-pub fn parse_retstat(tokens: &mut TokenIter<Token>) -> Result<Vec<Expr>> {
-	tokens.assert_next(&TokenKind::Return)?;
+pub fn parse_retstat(input: &str, tokens: &mut TokenIter) -> Result<Vec<Expr>> {
+	tokens.assert_next(TokenKind::Return);
 
-	let exprlist = parse_exprlist(tokens)?;
+	let exprlist = parse_exprlist(&input, tokens)?;
 
 	if let Some(TokenKind::SemiColon) = tokens.peek().map(to_kind) {
 		tokens.next();
@@ -759,12 +781,12 @@ pub fn parse_retstat(tokens: &mut TokenIter<Token>) -> Result<Vec<Expr>> {
 }
 
 /// funcbody ::= `(` [parlist] `)` block end
-pub fn parse_funcbody(tokens: &mut TokenIter<Token>) -> Result<FuncBody> {
-	tokens.assert_next(&TokenKind::LParen)?;
-	let params = parse_parlist(tokens)?;
-	tokens.assert_next(&TokenKind::RParen)?;
-	let body = parse_block(tokens)?;
-	tokens.assert_next(&TokenKind::End)?;
+pub fn parse_funcbody(input: &str, tokens: &mut TokenIter) -> Result<FuncBody> {
+	tokens.assert_next(TokenKind::LParen);
+	let params = parse_parlist(&input, tokens)?;
+	tokens.assert_next(TokenKind::RParen);
+	let body = parse_block(&input, tokens)?;
+	tokens.assert_next(TokenKind::End);
 
 	Ok(FuncBody { params, body })
 }
@@ -772,10 +794,10 @@ pub fn parse_funcbody(tokens: &mut TokenIter<Token>) -> Result<FuncBody> {
 /// functiondef ::= function funcbody
 /// stat ::= function funcname funcbody
 /// stat ::= local function Name funcbody
-pub fn parse_functiondef(tokens: &mut TokenIter<Token>) -> Result<FunctionDef> {
+pub fn parse_functiondef(input: &str, tokens: &mut TokenIter) -> Result<FunctionDef> {
 	if let Some(TokenKind::Function) = tokens.next().map(to_kind) {
-		let name = parse_funcname(tokens)?;
-		let body = parse_funcbody(tokens)?;
+		let name = parse_funcname(&input, tokens)?;
+		let body = parse_funcbody(&input, tokens)?;
 
 		Ok(FunctionDef { name, body })
 	} else {
@@ -784,19 +806,19 @@ pub fn parse_functiondef(tokens: &mut TokenIter<Token>) -> Result<FunctionDef> {
 }
 
 /// namelist ::= Name {`,` Name}
-pub fn parse_namelist(tokens: &mut TokenIter<Token>) -> Result<Vec<Name>> {
+pub fn parse_namelist(input: &str, tokens: &mut TokenIter) -> Result<Vec<Name>> {
 	let first_name = match tokens.next().map(to_kind) {
-		Some(TokenKind::Ident(name)) => name,
+		Some(TokenKind::Ident) => tokens.cur().unwrap().span.as_str(input).to_string(),
 		_ => return Err(()),
 	};
 
-	let mut names = vec![Name(first_name.clone())];
+	let mut names = vec![Name(first_name)];
 
 	while tokens.peek().map(to_kind) == Some(TokenKind::Comma) {
 		tokens.next();
 		match tokens.next().map(to_kind) {
-			Some(TokenKind::Ident(name)) => {
-				names.push(Name(name.clone()));
+			Some(TokenKind::Ident) => {
+				names.push(Name(tokens.cur().unwrap().span.as_str(input).to_string()));
 			},
 			_ => return Err(()),
 		}
@@ -806,11 +828,11 @@ pub fn parse_namelist(tokens: &mut TokenIter<Token>) -> Result<Vec<Name>> {
 }
 
 /// parlist ::= namelist [`,`]
-pub fn parse_parlist(tokens: &mut TokenIter<Token>) -> Result<Params> {
+pub fn parse_parlist(input: &str, tokens: &mut TokenIter) -> Result<Params> {
 	match tokens.peek().map(to_kind) {
 		// namelist
-		Some(TokenKind::Ident(_)) => {
-			let names = parse_namelist(tokens)?;
+		Some(TokenKind::Ident) => {
+			let names = parse_namelist(&input, tokens)?;
 
 			// [',']
 			match tokens.peek().map(to_kind) {
@@ -827,11 +849,11 @@ pub fn parse_parlist(tokens: &mut TokenIter<Token>) -> Result<Params> {
 
 /// fieldlist ::= field {fieldsep field} [fieldsep]
 /// fieldsep ::= `,` | `;`
-pub fn parse_fieldlist(tokens: &mut TokenIter<Token>) -> Result<Vec<Field>> {
+pub fn parse_fieldlist(input: &str, tokens: &mut TokenIter) -> Result<Vec<Field>> {
 	let mut fields = vec![];
 
 	loop {
-		let f = parse_field(tokens)?;
+		let f = parse_field(&input, tokens)?;
 		fields.push(f);
 
 		match tokens.peek().map(to_kind) {
@@ -843,4 +865,15 @@ pub fn parse_fieldlist(tokens: &mut TokenIter<Token>) -> Result<Vec<Field>> {
 		}
 	}
 	Ok(fields)
+}
+
+fn parse_string(s: &str) -> &str {
+	let mut chars = s.chars();
+	match chars.next() {
+		Some('\'') | Some('\"') => {
+			chars.next_back();
+			chars.as_str()
+		},
+		_ => panic!("Malformed string {}", s),
+	}
 }

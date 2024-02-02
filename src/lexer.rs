@@ -1,16 +1,13 @@
-#[derive(PartialEq, Debug, Clone)]
-pub struct Span {
-	pub start: usize,
-	pub end: usize,
-}
+use crate::span::Span;
+use std::iter::zip;
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub struct Token {
 	pub kind: TokenKind,
 	pub span: Span,
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub enum TokenKind {
 	And,
 	Break,
@@ -56,28 +53,30 @@ pub enum TokenKind {
 	Hash,
 	SemiColon,
 	Colon,
-	String(String),
-	Number(f64),
-	Ident(String),
+	String,
+	Number,
+	Ident,
 	Comment(Comment),
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub enum Comment {
-	SingleLine(String),
-	MultiLine(String),
+	SingleLine,
+	MultiLine,
 }
 
 #[derive(Debug)]
-pub struct Lexer {
-	input: String,
+pub struct Lexer<'a> {
+	input: &'a str,
+	bytes: &'a [u8],
 	cursor: usize,
 }
 
-impl Lexer {
-	pub fn new(input: &str) -> Self {
+impl<'a> Lexer<'a> {
+	pub fn new(input: &'a str) -> Self {
 		Lexer {
-			input: String::from(input), //TODO: no copy
+			input,
+			bytes: input.as_bytes(),
 			cursor: 0,
 		}
 	}
@@ -87,9 +86,10 @@ impl Lexer {
 	}
 
 	fn eat_char(&mut self) -> Option<char> {
-		let c = self.input.chars().nth(self.cursor);
+		let c = self.bytes.get(self.cursor);
 		self.cursor += 1;
-		c
+
+		c.map(|b| *b as char)
 	}
 
 	fn peek(&self, n: usize) -> Option<&str> {
@@ -119,19 +119,19 @@ impl Lexer {
 	}
 
 	fn cur_char(&self) -> Option<char> {
-		self.input.chars().nth(self.cursor)
+		self.bytes.get(self.cursor).map(|b| *b as char)
 	}
 
 	fn next_char(&self) -> Option<char> {
-		self.input.chars().nth(self.cursor + 1)
+		self.bytes.get(self.cursor + 1).map(|b| *b as char)
 	}
 
 	pub fn match_chars(&mut self, other: &str) -> bool {
 		if self.input.len() < other.len() {
 			return false;
 		}
-		for (i, c) in self.input.chars().skip(self.cursor).enumerate() {
-			if Some(c) != other.chars().nth(i) {
+		for (c1, c2) in zip(self.bytes[self.cursor..].iter(), other.bytes()) {
+			if c1 != &c2 {
 				return false;
 			}
 		}
@@ -151,7 +151,7 @@ impl Lexer {
 				self.eat_chars(4);
 				let end = self.cursor;
 				break Some(Token {
-					kind: TokenKind::Comment(Comment::MultiLine(comment)),
+					kind: TokenKind::Comment(Comment::MultiLine),
 					span: Span { start, end },
 				});
 			} else if let Some(c) = self.eat_char() {
@@ -166,20 +166,17 @@ impl Lexer {
 	fn single_line_comment(&mut self) -> Option<Token> {
 		let start = self.cursor;
 		self.eat_chars(2);
-		let mut comment = String::new();
 		loop {
-			if Some('\n') == self.cur_char() {
+			if self.cur_char() == Some('\n') {
 				break;
 			}
-			if let Some(c) = self.eat_char() {
-				comment.push(c);
-			} else {
+			if self.eat_char() == None {
 				break;
 			}
 		}
 		let end = self.cursor;
 		Some(Token {
-			kind: TokenKind::Comment(Comment::SingleLine(comment)),
+			kind: TokenKind::Comment(Comment::SingleLine),
 			span: Span { start, end },
 		})
 	}
@@ -188,18 +185,17 @@ impl Lexer {
 	fn single_line_string(&mut self) -> Option<Token> {
 		let start = self.cursor;
 		let closing = self.eat_char();
-		let mut s = String::new();
 		loop {
 			match self.eat_char() {
 				Some(e) if Some(e) == closing => break,
-				Some(sc) if sc == '\n' => return None,
-				Some(sc) => s.push(sc),
+				Some('\n') => return None,
+				Some(_) => (),
 				None => return None,
 			}
 		}
 		let end = self.cursor;
 		Some(Token {
-			kind: TokenKind::String(s),
+			kind: TokenKind::String,
 			span: Span { start, end },
 		})
 	}
@@ -208,18 +204,17 @@ impl Lexer {
 	fn multi_line_string(&mut self) -> Option<Token> {
 		let start = self.cursor;
 		self.eat_chars(2);
-		let mut s = String::new();
 		let end = self.cursor;
 		loop {
 			if self.match_chars("]]") {
 				self.eat_chars(2);
 				break Some(Token {
-					kind: TokenKind::String(s),
+					kind: TokenKind::String,
 					span: Span { start, end },
 				});
 			}
 			match self.eat_char() {
-				Some(sc) => s.push(sc),
+				Some(_) => (),
 				None => break None,
 			}
 		}
@@ -230,8 +225,7 @@ impl Lexer {
 		let mut s = String::new();
 		let start = self.cursor;
 
-		// TODO(sbdchd): this should handle the case where the ident starts with a letter.
-		// Right now we just don't allow numbers in idents
+		// TODO: fix ident start only with letter
 		while let Some(n) = self.cur_char() {
 			match n {
 				'A'..='Z' | 'a'..='z' | '0'..='9' | '_' => {
@@ -268,7 +262,7 @@ impl Lexer {
 			"elseif" => TokenKind::ElseIf,
 			"else" => TokenKind::Else,
 			"local" => TokenKind::Local,
-			_ => TokenKind::Ident(s),
+			_ => TokenKind::Ident,
 		};
 
 		Some(Token { kind, span })
@@ -305,17 +299,14 @@ impl Lexer {
 			end: self.cursor,
 		};
 
-		match s.parse() {
-			Ok(num) => Some(Token {
-				kind: TokenKind::Number(num),
-				span,
-			}),
-			_ => panic!("Malformed number"), // TODO: handle properly
-		}
+		Some(Token {
+			kind: TokenKind::Number,
+			span,
+		})
 	}
 }
 
-impl Iterator for Lexer {
+impl Iterator for Lexer<'_> {
 	type Item = Token;
 	fn next(&mut self) -> Option<Token> {
 		if let Some("--[[") = &self.peek(4) {

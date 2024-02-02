@@ -1,29 +1,29 @@
 use crate::ast::*;
-use crate::iter::*;
 use crate::lexer::*;
 use crate::parser::*;
+use crate::token_iter::*;
 
 #[test]
 fn test_parse_expr() {
 	let p = r#"nil"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
-	assert_eq!(parse_expr(&mut tokens), Ok(Expr::Nil));
+	let mut tokens = TokenIter::new(tokens);
+	assert_eq!(parse_expr(p, &mut tokens), Ok(Expr::Nil));
 
 	let p = r#"false"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
-	assert_eq!(parse_expr(&mut tokens), Ok(Expr::Bool(false)));
+	let mut tokens = TokenIter::new(tokens);
+	assert_eq!(parse_expr(p, &mut tokens), Ok(Expr::Bool(false)));
 
 	let p = r#"true"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
-	assert_eq!(parse_expr(&mut tokens), Ok(Expr::Bool(true)));
+	let mut tokens = TokenIter::new(tokens);
+	assert_eq!(parse_expr(p, &mut tokens), Ok(Expr::Bool(true)));
 
 	let p = r#"10"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
-	assert_eq!(parse_expr(&mut tokens), Ok(Expr::Num(10f64)));
+	let mut tokens = TokenIter::new(tokens);
+	assert_eq!(parse_expr(p, &mut tokens), Ok(Expr::Num(10f64)));
 }
 
 #[test]
@@ -31,9 +31,9 @@ fn test_parse_unexp() {
 	for (s, op) in vec![("-", Unop::Minus), ("not ", Unop::Not), ("#", Unop::Len)] {
 		let p = format!("{}foo", s);
 		let tokens: Vec<_> = Lexer::new(&p).collect();
-		let mut tokens = TokenIter::new(&tokens);
+		let mut tokens = TokenIter::new(tokens);
 		assert_eq!(
-			parse_expr(&mut tokens),
+			parse_expr(&p, &mut tokens),
 			Ok(Expr::UnExp(UnExp {
 				op,
 				exp: Box::new(Expr::PrefixExp(Box::new(PrefixExpr::Var(Var::Name(Name(
@@ -65,9 +65,9 @@ fn test_parse_binexp() {
 	] {
 		let p = format!("foo {} bar", s);
 		let tokens: Vec<_> = Lexer::new(&p).collect();
-		let mut tokens = TokenIter::new(&tokens);
+		let mut tokens = TokenIter::new(tokens);
 		assert_eq!(
-			parse_expr(&mut tokens),
+			parse_expr(&p, &mut tokens),
 			Ok(Expr::BinExp(BinExp {
 				op,
 				lhs: Box::new(Expr::PrefixExp(Box::new(PrefixExpr::Var(Var::Name(Name(
@@ -83,10 +83,11 @@ fn test_parse_binexp() {
 
 #[test]
 fn test_multi_part_binexpr() {
-	let tokens: Vec<_> = Lexer::new("1 + 2 * 3").collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let p = "1 + 2 * 3";
+	let tokens: Vec<_> = Lexer::new(p).collect();
+	let mut tokens = TokenIter::new(tokens);
 	assert_eq!(
-		parse_expr(&mut tokens),
+		parse_expr(p, &mut tokens),
 		Ok(Expr::BinExp(BinExp {
 			op: BinOp::Plus,
 			lhs: Box::new(Expr::Num(1.0)),
@@ -98,10 +99,11 @@ fn test_multi_part_binexpr() {
 		}))
 	);
 
-	let tokens: Vec<_> = Lexer::new("1 * 2 + 3").collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let p = "1 * 2 + 3";
+	let tokens: Vec<_> = Lexer::new(p).collect();
+	let mut tokens = TokenIter::new(tokens);
 	assert_eq!(
-		parse_expr(&mut tokens),
+		parse_expr(p, &mut tokens),
 		Ok(Expr::BinExp(BinExp {
 			op: BinOp::Plus,
 			lhs: Box::new(Expr::BinExp(BinExp {
@@ -113,10 +115,11 @@ fn test_multi_part_binexpr() {
 		}))
 	);
 
-	let tokens: Vec<_> = Lexer::new("1 + 2 + 3").collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let p = "1 + 2 + 3";
+	let tokens: Vec<_> = Lexer::new(p).collect();
+	let mut tokens = TokenIter::new(tokens);
 	assert_eq!(
-		parse_expr(&mut tokens),
+		parse_expr(p, &mut tokens),
 		Ok(Expr::BinExp(BinExp {
 			op: BinOp::Plus,
 			lhs: Box::new(Expr::BinExp(BinExp {
@@ -131,10 +134,11 @@ fn test_multi_part_binexpr() {
 
 #[test]
 fn test_simple_bin() {
-	let tokens: Vec<_> = Lexer::new("foo - bar").collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let p = "foo - bar";
+	let tokens: Vec<_> = Lexer::new(p).collect();
+	let mut tokens = TokenIter::new(tokens);
 	assert_eq!(
-		parse_expr(&mut tokens),
+		parse_expr(p, &mut tokens),
 		Ok(Expr::BinExp(BinExp {
 			op: BinOp::Minus,
 			lhs: Box::new(Expr::PrefixExp(Box::new(PrefixExpr::Var(Var::Name(Name(
@@ -151,10 +155,10 @@ fn test_simple_bin() {
 fn test_parse_prefix_exp_parens() {
 	let p = r#"foo"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
 	assert_eq!(
-		parse_expr(&mut tokens),
+		parse_expr(p, &mut tokens),
 		Ok(Expr::PrefixExp(Box::new(PrefixExpr::Var(Var::Name(Name(
 			String::from("foo")
 		))))))
@@ -162,10 +166,10 @@ fn test_parse_prefix_exp_parens() {
 
 	let p = r#"(foo)"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
 	assert_eq!(
-		parse_prefix_exp(&mut tokens),
+		parse_prefix_exp(p, &mut tokens),
 		Ok(PrefixExpr::Expr(Expr::PrefixExp(Box::new(PrefixExpr::Var(Var::Name(
 			Name(String::from("foo"))
 		))))))
@@ -176,16 +180,16 @@ fn test_parse_prefix_exp_parens() {
 fn test_parse_var() {
 	let p = r#"foo"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
-	assert_eq!(parse_var(&mut tokens), Ok(Var::Name(Name(String::from("foo")))));
+	assert_eq!(parse_var(p, &mut tokens), Ok(Var::Name(Name(String::from("foo")))));
 
 	let p = r#"(foo)[1]"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
 	assert_eq!(
-		parse_var(&mut tokens),
+		parse_var(p, &mut tokens),
 		Ok(Var::IndexExpr(IndexExpr {
 			expr: Box::new(PrefixExpr::Expr(Expr::PrefixExp(Box::new(PrefixExpr::Var(Var::Name(
 				Name(String::from("foo"))
@@ -195,10 +199,10 @@ fn test_parse_var() {
 	);
 	let p = r#"foo[1]"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
 	assert_eq!(
-		parse_var(&mut tokens),
+		parse_var(p, &mut tokens),
 		Ok(Var::IndexExpr(IndexExpr {
 			expr: Box::new(PrefixExpr::Var(Var::Name(Name(String::from("foo")))),),
 			arg: Expr::Num(1f64),
@@ -207,10 +211,10 @@ fn test_parse_var() {
 
 	let p = r#"foo.bar"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
 	assert_eq!(
-		parse_var(&mut tokens),
+		parse_var(p, &mut tokens),
 		Ok(Var::PropertyAccess(PropertyAccess {
 			expr: Box::new(PrefixExpr::Var(Var::Name(Name(String::from("foo"))))),
 			name: Name(String::from("bar"))
@@ -222,16 +226,16 @@ fn test_parse_var() {
 fn test_parse_args() {
 	let p = r#"()"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
-	assert_eq!(parse_args(&mut tokens), Ok(Args(vec![])));
+	assert_eq!(parse_args(p, &mut tokens), Ok(Args(vec![])));
 
 	let p = r#"(foo, nil, false, 10)"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
 	assert_eq!(
-		parse_args(&mut tokens),
+		parse_args(p, &mut tokens),
 		Ok(Args(vec![
 			Expr::PrefixExp(Box::new(PrefixExpr::Var(Var::Name(Name(String::from("foo")))))),
 			Expr::Nil,
@@ -245,9 +249,9 @@ fn test_parse_args() {
 fn test_parse_exprlist() {
 	let p = r#"nil, false, true, "str""#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 	assert_eq!(
-		parse_exprlist(&mut tokens),
+		parse_exprlist(p, &mut tokens),
 		Ok(vec![
 			Expr::Nil,
 			Expr::Bool(false),
@@ -258,8 +262,8 @@ fn test_parse_exprlist() {
 
 	let p = r#"nil, false,"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
-	assert_eq!(parse_exprlist(&mut tokens), Ok(vec![Expr::Nil, Expr::Bool(false)]));
+	let mut tokens = TokenIter::new(tokens);
+	assert_eq!(parse_exprlist(p, &mut tokens), Ok(vec![Expr::Nil, Expr::Bool(false)]));
 
 	assert_eq!(tokens.next().map(to_kind), Some(TokenKind::Comma));
 }
@@ -268,9 +272,9 @@ fn test_parse_exprlist() {
 fn test_parse_varlist() {
 	let p = r#"foo, bar, bizz"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 	assert_eq!(
-		parse_varlist(&mut tokens),
+		parse_varlist(p, &mut tokens),
 		Ok(vec![
 			Var::Name(Name(String::from("foo"))),
 			Var::Name(Name(String::from("bar"))),
@@ -283,10 +287,10 @@ fn test_parse_varlist() {
 fn test_parse_expr_func() {
 	let p = r#"function foo() return end"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
 	assert_eq!(
-		parse_expr(&mut tokens),
+		parse_expr(p, &mut tokens),
 		Ok(Expr::FuncDef(FunctionDef {
 			name: FuncName {
 				path: vec![Name(String::from("foo"))],
@@ -307,16 +311,16 @@ fn test_parse_expr_func() {
 fn test_parse_retstat() {
 	let p = r#"return nil, false;"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
-	assert_eq!(parse_retstat(&mut tokens), Ok(vec![Expr::Nil, Expr::Bool(false),]));
+	assert_eq!(parse_retstat(p, &mut tokens), Ok(vec![Expr::Nil, Expr::Bool(false),]));
 
 	let p = r#"return 10, "foo", true, bar"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
 	assert_eq!(
-		parse_retstat(&mut tokens),
+		parse_retstat(p, &mut tokens),
 		Ok(vec![
 			Expr::Num(10f64),
 			Expr::Str(String::from("foo")),
@@ -327,25 +331,25 @@ fn test_parse_retstat() {
 
 	let p = r#"return"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
-	assert_eq!(parse_retstat(&mut tokens), Ok(vec![]));
+	assert_eq!(parse_retstat(p, &mut tokens), Ok(vec![]));
 
 	let p = r#"return;"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
-	assert_eq!(parse_retstat(&mut tokens), Ok(vec![]));
+	assert_eq!(parse_retstat(p, &mut tokens), Ok(vec![]));
 }
 
 #[test]
 fn test_parse_block() {
 	let p = r#"return 10, "foo", true, bar"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
 	assert_eq!(
-		parse_block(&mut tokens),
+		parse_block(p, &mut tokens),
 		Ok(Block {
 			stats: vec![],
 			retstat: Some(vec![
@@ -359,10 +363,10 @@ fn test_parse_block() {
 
 	let p = r#"print(foo)"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
 	assert_eq!(
-		parse_block(&mut tokens),
+		parse_block(p, &mut tokens),
 		Ok(Block {
 			stats: vec![Stat::FunctionCall(FunctionCall {
 				expr: Box::new(PrefixExpr::Var(Var::Name(Name(String::from("print"))))),
@@ -379,10 +383,10 @@ fn test_parse_block() {
 fn test_parse_functiondef() {
 	let p = r#"function foo() return end"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
 	assert_eq!(
-		parse_functiondef(&mut tokens),
+		parse_functiondef(p, &mut tokens),
 		Ok(FunctionDef {
 			name: FuncName {
 				path: vec![Name(String::from("foo"))],
@@ -403,10 +407,10 @@ fn test_parse_functiondef() {
 fn test_parse_table_constructor() {
 	let p = r#"{foo = 'foo', bar = false, bizz = 1}"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
 	assert_eq!(
-		parse_table_constructor(&mut tokens),
+		parse_table_constructor(p, &mut tokens),
 		Ok(TableConstructor(vec![
 			Field::NameAssign(Name(String::from("foo")), Expr::Str(String::from("foo"))),
 			Field::NameAssign(Name(String::from("bar")), Expr::Bool(false)),
@@ -415,10 +419,10 @@ fn test_parse_table_constructor() {
 	);
 
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
 	assert_eq!(
-		parse_expr(&mut tokens),
+		parse_expr(p, &mut tokens),
 		Ok(Expr::Table(TableConstructor(vec![
 			Field::NameAssign(Name(String::from("foo")), Expr::Str(String::from("foo"))),
 			Field::NameAssign(Name(String::from("bar")), Expr::Bool(false)),
@@ -428,33 +432,36 @@ fn test_parse_table_constructor() {
 
 	let p = r#"{}"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
-	assert_eq!(parse_table_constructor(&mut tokens), Ok(TableConstructor(vec![])));
+	assert_eq!(parse_table_constructor(p, &mut tokens), Ok(TableConstructor(vec![])));
 }
 
 #[test]
 fn test_parse_prefix_exp() {
 	let p = "false)";
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
-	assert_eq!(parse_expr(&mut tokens), Ok(Expr::Bool(false)),);
+	let mut tokens = TokenIter::new(tokens);
+	assert_eq!(parse_expr(p, &mut tokens), Ok(Expr::Bool(false)),);
 	assert_eq!(tokens.next().map(to_kind), Some(TokenKind::RParen));
 
 	let p = r#"(false)"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
-	assert_eq!(parse_prefix_exp(&mut tokens), Ok(PrefixExpr::Expr(Expr::Bool(false))));
+	assert_eq!(
+		parse_prefix_exp(p, &mut tokens),
+		Ok(PrefixExpr::Expr(Expr::Bool(false)))
+	);
 
 	let p = r#"foo(false, true, nil)"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
 	assert_eq!(
-		parse_prefix_exp(&mut tokens),
+		parse_prefix_exp(p, &mut tokens),
 		Ok(PrefixExpr::FunctionCall(FunctionCall {
 			expr: Box::new(PrefixExpr::Var(Var::Name(Name(String::from("foo"))))),
 			args: Args(vec![Expr::Bool(false), Expr::Bool(true), Expr::Nil])
@@ -466,10 +473,10 @@ fn test_parse_prefix_exp() {
 fn test_parse_parlist() {
 	let p = r#"Name,Another_Name"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
 	assert_eq!(
-		parse_parlist(&mut tokens),
+		parse_parlist(p, &mut tokens),
 		Ok(Params {
 			names: vec![Name(String::from("Name")), Name(String::from("Another_Name"))],
 		})
@@ -480,16 +487,16 @@ fn test_parse_parlist() {
 fn test_parse_namelist() {
 	let p = r#"Name"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
-	assert_eq!(parse_namelist(&mut tokens), Ok(vec![Name(String::from("Name"))]));
+	assert_eq!(parse_namelist(p, &mut tokens), Ok(vec![Name(String::from("Name"))]));
 
 	let p = r#"Name,Another_Name"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
 	assert_eq!(
-		parse_namelist(&mut tokens),
+		parse_namelist(p, &mut tokens),
 		Ok(vec![Name(String::from("Name")), Name(String::from("Another_Name"))])
 	);
 }
@@ -498,19 +505,19 @@ fn test_parse_namelist() {
 fn test_parse_stat() {
 	let p = r#";"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
-	assert_eq!(parse_stat(&mut tokens), Ok(Stat::SemiColon));
+	let mut tokens = TokenIter::new(tokens);
+	assert_eq!(parse_stat(p, &mut tokens), Ok(Stat::SemiColon));
 
 	let p = r#"break"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
-	assert_eq!(parse_stat(&mut tokens), Ok(Stat::Break));
+	let mut tokens = TokenIter::new(tokens);
+	assert_eq!(parse_stat(p, &mut tokens), Ok(Stat::Break));
 
 	let p = r#"do end"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 	assert_eq!(
-		parse_stat(&mut tokens),
+		parse_stat(p, &mut tokens),
 		Ok(Stat::DoBlock(Block {
 			stats: vec![],
 			retstat: None
@@ -519,9 +526,9 @@ fn test_parse_stat() {
 
 	let p = r#"while true do end"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 	assert_eq!(
-		parse_stat(&mut tokens),
+		parse_stat(p, &mut tokens),
 		Ok(Stat::WhileBlock(WhileBlock {
 			expr: Expr::Bool(true),
 			block: Block {
@@ -533,9 +540,9 @@ fn test_parse_stat() {
 
 	let p = r#"if foo then elseif bar then else end"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 	assert_eq!(
-		parse_stat(&mut tokens),
+		parse_stat(p, &mut tokens),
 		Ok(Stat::IfBlock(Box::new(IfBlock {
 			expr: Expr::PrefixExp(Box::new(PrefixExpr::Var(Var::Name(Name(String::from("foo")))))),
 			block: Block {
@@ -558,9 +565,9 @@ fn test_parse_stat() {
 
 	let p = r#"for foo = 1, 2, bar do end"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 	assert_eq!(
-		parse_stat(&mut tokens),
+		parse_stat(p, &mut tokens),
 		Ok(Stat::ForRange(Box::new(ForRange {
 			name: Name(String::from("foo")),
 			exprs: (
@@ -579,9 +586,9 @@ fn test_parse_stat() {
 
 	let p = r#"for foo, bar in true, nil do end"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 	assert_eq!(
-		parse_stat(&mut tokens),
+		parse_stat(p, &mut tokens),
 		Ok(Stat::ForIn(ForIn {
 			namelist: vec![Name(String::from("foo")), Name(String::from("bar"))],
 			exprlist: vec![Expr::Bool(true), Expr::Nil],
@@ -594,9 +601,9 @@ fn test_parse_stat() {
 
 	let p = r#"function foo(a) return end"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 	assert_eq!(
-		parse_stat(&mut tokens),
+		parse_stat(p, &mut tokens),
 		Ok(Stat::FunctionDef(FunctionDef {
 			name: FuncName {
 				path: vec![Name(String::from("foo"))],
@@ -616,9 +623,9 @@ fn test_parse_stat() {
 
 	let p = r#"local function bar() return end"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 	assert_eq!(
-		parse_stat(&mut tokens),
+		parse_stat(p, &mut tokens),
 		Ok(Stat::LocalFunctionDef(LocalFunctionDef {
 			name: Name(String::from("bar")),
 			body: FuncBody {
@@ -633,9 +640,9 @@ fn test_parse_stat() {
 
 	let p = r#"local foo, bar, buzz = nil, 10, "word""#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 	assert_eq!(
-		parse_stat(&mut tokens),
+		parse_stat(p, &mut tokens),
 		Ok(Stat::LocalAssignment(LocalAssignment {
 			namelist: vec![
 				Name(String::from("foo")),
@@ -648,9 +655,9 @@ fn test_parse_stat() {
 
 	let p = r#"foo, bar = true, nil"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 	assert_eq!(
-		parse_stat(&mut tokens),
+		parse_stat(p, &mut tokens),
 		Ok(Stat::Assignment(Assignment {
 			varlist: vec![
 				Var::Name(Name(String::from("foo"))),
@@ -662,9 +669,9 @@ fn test_parse_stat() {
 
 	let p = r#"foo("bar")"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 	assert_eq!(
-		parse_stat(&mut tokens),
+		parse_stat(p, &mut tokens),
 		Ok(Stat::FunctionCall(FunctionCall {
 			expr: Box::new(PrefixExpr::Var(Var::Name(Name(String::from("foo"))))),
 			args: Args(vec![Expr::Str(String::from("bar"))])
@@ -676,10 +683,10 @@ fn test_parse_stat() {
 fn test_parse_funcbody() {
 	let p = r#"() return end"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
 	assert_eq!(
-		parse_funcbody(&mut tokens),
+		parse_funcbody(p, &mut tokens),
 		Ok(FuncBody {
 			params: Params { names: vec![] },
 			body: Block {
@@ -694,10 +701,10 @@ fn test_parse_funcbody() {
 fn test_parse_funcname() {
 	let p = r#"abc"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
 	assert_eq!(
-		parse_funcname(&mut tokens),
+		parse_funcname(p, &mut tokens),
 		Ok(FuncName {
 			path: vec![Name("abc".to_string())],
 			method: None,
@@ -706,10 +713,10 @@ fn test_parse_funcname() {
 
 	let p = r#"abc.bar1"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
 	assert_eq!(
-		parse_funcname(&mut tokens),
+		parse_funcname(p, &mut tokens),
 		Ok(FuncName {
 			path: vec![Name("abc".to_string()), Name("bar1".to_string())],
 			method: None,
@@ -718,10 +725,10 @@ fn test_parse_funcname() {
 
 	let p = r#"abc.bar1:mno"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = TokenIter::new(&tokens);
+	let mut tokens = TokenIter::new(tokens);
 
 	assert_eq!(
-		parse_funcname(&mut tokens),
+		parse_funcname(p, &mut tokens),
 		Ok(FuncName {
 			path: vec![Name("abc".to_string()), Name("bar1".to_string())],
 			method: Some(Name("mno".to_string())),

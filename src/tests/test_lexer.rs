@@ -1,4 +1,5 @@
 use crate::lexer::*;
+use crate::span::Span;
 
 #[test]
 fn whitespace() {
@@ -19,7 +20,7 @@ fn single_line_comment() {
 	assert_eq!(
 		lex.next(),
 		Some(Token {
-			kind: TokenKind::Comment(Comment::SingleLine(String::from(" This is an example lua comment"))),
+			kind: TokenKind::Comment(Comment::SingleLine),
 			span: Span { start: 0, end: 34 }
 		})
 	);
@@ -34,7 +35,7 @@ fn multi_line_comment() {
 	assert_eq!(
 		lex.next(),
 		Some(Token {
-			kind: TokenKind::Comment(Comment::MultiLine(String::from(" multi-line comment "))),
+			kind: TokenKind::Comment(Comment::MultiLine),
 			span: Span { start: 0, end: 28 }
 		})
 	)
@@ -47,7 +48,7 @@ fn single_line_string() {
 	assert_eq!(
 		lex.next(),
 		Some(Token {
-			kind: TokenKind::String(String::from("example string")),
+			kind: TokenKind::String,
 			span: Span { start: 0, end: 16 }
 		})
 	);
@@ -57,7 +58,7 @@ fn single_line_string() {
 	assert_eq!(
 		lex.next(),
 		Some(Token {
-			kind: TokenKind::String(String::from("example string")),
+			kind: TokenKind::String,
 			span: Span { start: 0, end: 16 }
 		})
 	);
@@ -76,7 +77,7 @@ fn multi_line_string() {
 	assert_eq!(
 		lex.next(),
 		Some(Token {
-			kind: TokenKind::String(String::from(" This is a multi-line string ")),
+			kind: TokenKind::String,
 			span: Span { start: 0, end: 2 }
 		})
 	);
@@ -91,7 +92,7 @@ fn basic_assignment() {
 		actual,
 		vec![
 			Token {
-				kind: TokenKind::Ident(String::from("x")),
+				kind: TokenKind::Ident,
 				span: Span { start: 0, end: 1 }
 			},
 			Token {
@@ -116,7 +117,7 @@ fn basic_assignment() {
 				span: Span { start: 0, end: 5 }
 			},
 			Token {
-				kind: TokenKind::Ident(String::from("_x")),
+				kind: TokenKind::Ident,
 				span: Span { start: 6, end: 8 }
 			},
 			Token {
@@ -124,7 +125,7 @@ fn basic_assignment() {
 				span: Span { start: 9, end: 10 }
 			},
 			Token {
-				kind: TokenKind::Number(1f64),
+				kind: TokenKind::Number,
 				span: Span { start: 11, end: 12 }
 			},
 		]
@@ -140,7 +141,7 @@ fn assignment() {
 		actual,
 		vec![
 			Token {
-				kind: TokenKind::Ident(String::from("x")),
+				kind: TokenKind::Ident,
 				span: Span { start: 0, end: 1 }
 			},
 			Token {
@@ -162,7 +163,7 @@ fn assignment() {
 		actual,
 		vec![
 			Token {
-				kind: TokenKind::Ident(String::from("x")),
+				kind: TokenKind::Ident,
 				span: Span { start: 0, end: 1 }
 			},
 			Token {
@@ -170,7 +171,7 @@ fn assignment() {
 				span: Span { start: 2, end: 3 }
 			},
 			Token {
-				kind: TokenKind::String(String::from("foo")),
+				kind: TokenKind::String,
 				span: Span { start: 4, end: 9 }
 			},
 		]
@@ -184,7 +185,7 @@ fn assignment() {
 		actual,
 		vec![
 			Token {
-				kind: TokenKind::Ident(String::from("x")),
+				kind: TokenKind::Ident,
 				span: Span { start: 0, end: 1 }
 			},
 			Token {
@@ -205,7 +206,7 @@ fn assignment() {
 		actual,
 		vec![
 			Token {
-				kind: TokenKind::Ident(String::from("x")),
+				kind: TokenKind::Ident,
 				span: Span { start: 0, end: 1 }
 			},
 			Token {
@@ -213,7 +214,7 @@ fn assignment() {
 				span: Span { start: 2, end: 3 }
 			},
 			Token {
-				kind: TokenKind::Ident(String::from("y")),
+				kind: TokenKind::Ident,
 				span: Span { start: 4, end: 5 }
 			},
 		]
@@ -230,7 +231,7 @@ fn string_concat() {
 		actual,
 		vec![
 			Token {
-				kind: TokenKind::String(String::from("foo")),
+				kind: TokenKind::String,
 				span: Span { start: 0, end: 5 }
 			},
 			Token {
@@ -238,7 +239,7 @@ fn string_concat() {
 				span: Span { start: 6, end: 8 }
 			},
 			Token {
-				kind: TokenKind::Ident(String::from("bar")),
+				kind: TokenKind::Ident,
 				span: Span { start: 9, end: 12 }
 			},
 		]
@@ -275,7 +276,7 @@ fn empty_table() {
 		actual,
 		vec![
 			Token {
-				kind: TokenKind::Ident(String::from("x")),
+				kind: TokenKind::Ident,
 				span: Span { start: 0, end: 1 }
 			},
 			Token {
