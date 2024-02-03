@@ -290,8 +290,7 @@ fn expr_func() {
 			body: FuncBody {
 				params: Params { names: vec![] },
 				body: Block {
-					stats: vec![],
-					retstat: Some(vec![]),
+					stats: vec![Stat::Return(vec![])]
 				}
 			}
 		}))
@@ -299,19 +298,19 @@ fn expr_func() {
 }
 
 #[test]
-fn retstat() {
+fn test_return() {
 	let p = r#"return nil, false;"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
 
-	assert_eq!(parse_retstat(p, &mut tokens), (vec![Expr::Nil, Expr::Bool(false),]));
+	assert_eq!(parse_return(p, &mut tokens), (vec![Expr::Nil, Expr::Bool(false),]));
 
 	let p = r#"return 10, "foo", true, bar"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
 
 	assert_eq!(
-		parse_retstat(p, &mut tokens),
+		parse_return(p, &mut tokens),
 		(vec![
 			Expr::Num(10f64),
 			Expr::Str(String::from("foo")),
@@ -324,13 +323,13 @@ fn retstat() {
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
 
-	assert_eq!(parse_retstat(p, &mut tokens), (vec![]));
+	assert_eq!(parse_return(p, &mut tokens), (vec![]));
 
 	let p = r#"return;"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
 
-	assert_eq!(parse_retstat(p, &mut tokens), (vec![]));
+	assert_eq!(parse_return(p, &mut tokens), (vec![]));
 }
 
 #[test]
@@ -342,13 +341,12 @@ fn block() {
 	assert_eq!(
 		parse_block(p, &mut tokens),
 		(Block {
-			stats: vec![],
-			retstat: Some(vec![
+			stats: vec![Stat::Return(vec![
 				Expr::Num(10f64),
 				Expr::Str(String::from("foo")),
 				Expr::Bool(true),
 				Expr::PrefixExp(Box::new(PrefixExpr::Var(Var::Name(Name(String::from("bar"))))))
-			])
+			])]
 		})
 	);
 
@@ -365,7 +363,6 @@ fn block() {
 					String::from("foo")
 				)))))])
 			})],
-			retstat: None
 		})
 	);
 }
@@ -386,8 +383,7 @@ fn functiondef() {
 			body: FuncBody {
 				params: Params { names: vec![] },
 				body: Block {
-					stats: vec![],
-					retstat: Some(vec![]),
+					stats: vec![Stat::Return(vec![])]
 				}
 			}
 		})
@@ -519,13 +515,7 @@ fn stat() {
 	let p = r#"do end"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
-	assert_eq!(
-		parse_stat(p, &mut tokens),
-		(Stat::DoBlock(Block {
-			stats: vec![],
-			retstat: None
-		}))
-	);
+	assert_eq!(parse_stat(p, &mut tokens), (Stat::DoBlock(Block { stats: vec![] })));
 
 	let p = r#"while true do end"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
@@ -534,10 +524,7 @@ fn stat() {
 		parse_stat(p, &mut tokens),
 		(Stat::WhileBlock(WhileBlock {
 			expr: Expr::Bool(true),
-			block: Block {
-				stats: vec![],
-				retstat: None
-			}
+			block: Block { stats: vec![] }
 		}))
 	);
 
@@ -548,21 +535,12 @@ fn stat() {
 		parse_stat(p, &mut tokens),
 		(Stat::IfBlock(Box::new(IfBlock {
 			expr: Expr::PrefixExp(Box::new(PrefixExpr::Var(Var::Name(Name(String::from("foo")))))),
-			block: Block {
-				stats: vec![],
-				retstat: None
-			},
+			block: Block { stats: vec![] },
 			elseif: vec![ElseIf {
 				expr: Expr::PrefixExp(Box::new(PrefixExpr::Var(Var::Name(Name(String::from("bar")))))),
-				block: Block {
-					stats: vec![],
-					retstat: None,
-				}
+				block: Block { stats: vec![] }
 			}],
-			else_blk: Some(Block {
-				stats: vec![],
-				retstat: None,
-			})
+			else_blk: Some(Block { stats: vec![] })
 		})))
 	);
 
@@ -580,10 +558,7 @@ fn stat() {
 					String::from("bar")
 				))))))
 			),
-			block: Block {
-				stats: vec![],
-				retstat: None
-			},
+			block: Block { stats: vec![] },
 		})))
 	);
 
@@ -595,10 +570,7 @@ fn stat() {
 		(Stat::ForIn(ForIn {
 			namelist: vec![Name(String::from("foo")), Name(String::from("bar"))],
 			exprlist: vec![Expr::Bool(true), Expr::Nil],
-			block: Block {
-				stats: vec![],
-				retstat: None
-			},
+			block: Block { stats: vec![] },
 		}))
 	);
 
@@ -617,8 +589,7 @@ fn stat() {
 					names: vec![Name(String::from("a"))],
 				},
 				body: Block {
-					stats: vec![],
-					retstat: Some(vec![]),
+					stats: vec![Stat::Return(vec![])]
 				}
 			}
 		}))
@@ -634,8 +605,7 @@ fn stat() {
 			body: FuncBody {
 				params: Params { names: vec![] },
 				body: Block {
-					stats: vec![],
-					retstat: Some(vec![]),
+					stats: vec![Stat::Return(vec![])]
 				}
 			}
 		}))
@@ -693,8 +663,7 @@ fn funcbody() {
 		(FuncBody {
 			params: Params { names: vec![] },
 			body: Block {
-				stats: vec![],
-				retstat: Some(vec![]),
+				stats: vec![Stat::Return(vec![])]
 			}
 		})
 	);

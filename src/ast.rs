@@ -142,11 +142,10 @@ pub enum PrefixExpr {
 	Expr(Expr),
 }
 
-/// block ::= {stat} [retstat]
+/// block ::= {stat} [laststat]
 #[derive(Debug, PartialEq)]
 pub struct Block {
 	pub stats: Vec<Stat>,
-	pub retstat: Option<Vec<Expr>>,
 }
 
 /// varlist '=' explist
@@ -220,7 +219,6 @@ pub enum Stat {
 	SemiColon,
 	Assignment(Assignment), // varlist '=' explist
 	FunctionCall(FunctionCall),
-	Break,
 	DoBlock(Block),
 	WhileBlock(WhileBlock),
 	IfBlock(Box<IfBlock>),
@@ -229,6 +227,8 @@ pub enum Stat {
 	FunctionDef(FunctionDef),
 	LocalFunctionDef(LocalFunctionDef),
 	LocalAssignment(LocalAssignment),
+	Break,
+	Return(Vec<Expr>),
 }
 
 /// funcbody ::= `(` [parlist] `)` block end

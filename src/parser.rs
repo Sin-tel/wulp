@@ -8,7 +8,7 @@ pub fn parse(input: &str) -> Block {
 
 	let mut tokens = Tokens::new(tokens);
 
-	println!("{}", tokens);
+	// println!("{}", tokens);
 
 	let ast = parse_block(input, &mut tokens);
 
@@ -332,6 +332,7 @@ pub fn parse_stat(input: &str, tokens: &mut Tokens) -> Stat {
 			tokens.next();
 			Stat::Break
 		},
+		TokenKind::Return => Stat::Return(parse_return(input, tokens)),
 		TokenKind::Do => Stat::DoBlock(parse_do_block(input, tokens)),
 		TokenKind::While => Stat::WhileBlock(parse_while_block(input, tokens)),
 		TokenKind::If => Stat::IfBlock(Box::new(parse_if_block(input, tokens))),
@@ -536,7 +537,7 @@ fn block_follow(tk: Token) -> bool {
 	}
 }
 
-/// block ::= {stat} [retstat]
+/// block ::= {stat} [laststat]
 pub fn parse_block(input: &str, tokens: &mut Tokens) -> Block {
 	let mut stats = vec![];
 
@@ -544,21 +545,22 @@ pub fn parse_block(input: &str, tokens: &mut Tokens) -> Block {
 		let tk = tokens.peek();
 		if block_follow(tk) {
 			break;
-		} else if tk.kind == TokenKind::Return {
-			let retstat = parse_retstat(input, tokens);
-			return Block {
-				stats,
-				retstat: Some(retstat),
-			};
+		} else if tk.kind == TokenKind::Return || tk.kind == TokenKind::Break {
+			// These have to be the last statements in a block
+			stats.push(parse_stat(input, tokens));
+			if tokens.peek().kind == TokenKind::SemiColon {
+				tokens.next();
+			}
+			return Block { stats };
 		} else {
 			stats.push(parse_stat(input, tokens));
 		}
 	}
-	Block { stats, retstat: None }
+	Block { stats }
 }
 
-/// retstat ::= return [explist] [;]
-pub fn parse_retstat(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
+/// laststat ::= return [explist]
+pub fn parse_return(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
 	tokens.assert_next(input, TokenKind::Return);
 
 	if tokens.peek().kind == TokenKind::SemiColon {
