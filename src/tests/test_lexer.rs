@@ -1,5 +1,6 @@
 use crate::lexer::*;
 use crate::span::Span;
+use crate::token::*;
 
 #[test]
 fn whitespace() {
@@ -20,7 +21,7 @@ fn single_line_comment() {
 	assert_eq!(
 		lex.next(),
 		Some(Token {
-			kind: TokenKind::Comment(Comment::SingleLine),
+			kind: TokenKind::Comment,
 			span: Span { start: 0, end: 34 }
 		})
 	);
@@ -35,7 +36,7 @@ fn multi_line_comment() {
 	assert_eq!(
 		lex.next(),
 		Some(Token {
-			kind: TokenKind::Comment(Comment::MultiLine),
+			kind: TokenKind::Comment,
 			span: Span { start: 0, end: 28 }
 		})
 	)
@@ -48,7 +49,7 @@ fn single_line_string() {
 	assert_eq!(
 		lex.next(),
 		Some(Token {
-			kind: TokenKind::String,
+			kind: TokenKind::Str,
 			span: Span { start: 0, end: 16 }
 		})
 	);
@@ -58,7 +59,7 @@ fn single_line_string() {
 	assert_eq!(
 		lex.next(),
 		Some(Token {
-			kind: TokenKind::String,
+			kind: TokenKind::Str,
 			span: Span { start: 0, end: 16 }
 		})
 	);
@@ -77,7 +78,7 @@ fn multi_line_string() {
 	assert_eq!(
 		lex.next(),
 		Some(Token {
-			kind: TokenKind::String,
+			kind: TokenKind::Str,
 			span: Span { start: 0, end: 2 }
 		})
 	);
@@ -171,7 +172,7 @@ fn assignment() {
 				span: Span { start: 2, end: 3 }
 			},
 			Token {
-				kind: TokenKind::String,
+				kind: TokenKind::Str,
 				span: Span { start: 4, end: 9 }
 			},
 		]
@@ -231,7 +232,7 @@ fn string_concat() {
 		actual,
 		vec![
 			Token {
-				kind: TokenKind::String,
+				kind: TokenKind::Str,
 				span: Span { start: 0, end: 5 }
 			},
 			Token {

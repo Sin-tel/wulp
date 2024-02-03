@@ -1,25 +1,26 @@
+// use mlua::Lua;
+
 mod ast;
 mod lexer;
 mod parser;
 mod span;
-mod token_iter;
+mod token;
 
 #[cfg(test)]
 mod tests;
 
 fn main() {
 	let input = r#"
-	for x = 1, 10 do
+	for x = 1, 2 do
 		a = a + 1
 		i = g
-		print("hello!!!")
 	end
+	print("hello!")
 	"#;
-
-	// let input = r#"nil, false, true, "str""#;
-
-	// let input = " print('hello world')";
 
 	let ast = parser::parse(&input);
 	dbg!(ast);
+
+	// let lua = Lua::new();
+	// lua.load(r#"print("hello world!")"#).exec().unwrap();
 }

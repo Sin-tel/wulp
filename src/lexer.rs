@@ -1,71 +1,7 @@
 use crate::span::format_err;
 use crate::span::Span;
+use crate::token::*;
 use std::iter::zip;
-
-#[derive(PartialEq, Debug, Copy, Clone)]
-pub struct Token {
-	pub kind: TokenKind,
-	pub span: Span,
-}
-
-#[derive(PartialEq, Debug, Copy, Clone)]
-pub enum TokenKind {
-	And,
-	Break,
-	Do,
-	Else,
-	ElseIf,
-	End,
-	For,
-	Function,
-	If,
-	In,
-	Local,
-	Nil,
-	Not,
-	Or,
-	Return,
-	Then,
-	True,
-	False,
-	While,
-	Concat,
-	Period,
-	LParen,
-	RParen,
-	LCurly,
-	RCurly,
-	LBracket,
-	RBracket,
-	Comma,
-	Plus,
-	Minus,
-	Mul,
-	Div,
-	Mod,
-	Pow,
-	Assign,
-	Eq,
-	Neq,
-	Gte,
-	Lte,
-	Lt,
-	Gt,
-	Hash,
-	SemiColon,
-	Colon,
-	String,
-	Number,
-	Ident,
-	Comment(Comment),
-	Eof,
-}
-
-#[derive(PartialEq, Debug, Copy, Clone)]
-pub enum Comment {
-	SingleLine,
-	MultiLine,
-}
 
 #[derive(Debug)]
 pub struct Lexer<'a> {
@@ -153,7 +89,7 @@ impl<'a> Lexer<'a> {
 				self.eat_chars(4);
 				let end = self.cursor;
 				break Some(Token {
-					kind: TokenKind::Comment(Comment::MultiLine),
+					kind: TokenKind::Comment,
 					span: Span { start, end },
 				});
 			} else if let Some(c) = self.eat_char() {
@@ -178,7 +114,7 @@ impl<'a> Lexer<'a> {
 		}
 		let end = self.cursor;
 		Some(Token {
-			kind: TokenKind::Comment(Comment::SingleLine),
+			kind: TokenKind::Comment,
 			span: Span { start, end },
 		})
 	}
@@ -197,7 +133,7 @@ impl<'a> Lexer<'a> {
 		}
 		let end = self.cursor;
 		Some(Token {
-			kind: TokenKind::String,
+			kind: TokenKind::Str,
 			span: Span { start, end },
 		})
 	}
@@ -211,7 +147,7 @@ impl<'a> Lexer<'a> {
 			if self.match_chars("]]") {
 				self.eat_chars(2);
 				break Some(Token {
-					kind: TokenKind::String,
+					kind: TokenKind::Str,
 					span: Span { start, end },
 				});
 			}

@@ -31,6 +31,34 @@ pub enum BinOp {
 	Or,
 }
 
+impl BinOp {
+	pub fn priority(&self) -> i32 {
+		match self {
+			BinOp::Pow => 8,
+			BinOp::Mul | BinOp::Div | BinOp::Mod => 6,
+			BinOp::Plus | BinOp::Minus => 5,
+			BinOp::Concat => 4,
+			BinOp::Lt | BinOp::Gt | BinOp::Lte | BinOp::Gte | BinOp::Eq | BinOp::Neq => 3,
+			BinOp::And => 2,
+			BinOp::Or => 1,
+		}
+	}
+}
+
+/// unop ::= `-` | not | `#` | `~`
+#[derive(Debug, PartialEq)]
+pub enum UnOp {
+	Minus,
+	Not,
+	Len,
+}
+
+impl UnOp {
+	pub fn priority(&self) -> i32 {
+		7
+	}
+}
+
 /// exp binop exp
 #[derive(Debug, PartialEq)]
 pub struct BinExp {
@@ -42,7 +70,7 @@ pub struct BinExp {
 /// unop exp
 #[derive(Debug, PartialEq)]
 pub struct UnExp {
-	pub op: Unop,
+	pub op: UnOp,
 	pub exp: Box<Expr>,
 }
 
@@ -61,7 +89,7 @@ pub enum Expr {
 	UnExp(UnExp),
 }
 
-/// field ::= `[` exp `]` `=` exp | Name `=` exp | exp
+/// field ::= `[` exp `]` | `=` exp | Name `=` exp | exp
 #[derive(Debug, PartialEq)]
 pub enum Field {
 	NameAssign(Name, Expr),
@@ -228,12 +256,4 @@ pub struct FunctionDef {
 #[derive(Debug, PartialEq)]
 pub struct Params {
 	pub names: Vec<Name>,
-}
-
-/// unop ::= `-` | not | `#` | `~`
-#[derive(Debug, PartialEq)]
-pub enum Unop {
-	Minus,
-	Not,
-	Len,
 }
