@@ -1,5 +1,6 @@
 use crate::ast::*;
 use crate::lexer::Lexer;
+use crate::span::format_err;
 use crate::token::{Token, TokenKind, Tokens};
 
 pub fn parse(input: &str) -> Block {
@@ -12,27 +13,28 @@ pub fn parse(input: &str) -> Block {
 	let ast = parse_block(input, &mut tokens);
 
 	// make sure we are done
-	if tokens.next().kind != TokenKind::Eof {
-		panic!("Expected end of file at {:?}", tokens.cur());
+	let tk = tokens.next();
+	if tk.kind != TokenKind::Eof {
+		format_err(&format!("Expected end of file but found: {}.", tk), tk.span, input);
 	}
 	ast
 }
 
 /// funcname ::= Name {`.` Name} [`:` Name]
 pub fn parse_funcname(input: &str, tokens: &mut Tokens) -> FuncName {
-	tokens.assert_next(TokenKind::Ident);
+	tokens.assert_next(input, TokenKind::Ident);
 
 	let mut path = vec![Name(tokens.cur().span.as_string(input))];
 	// if next token is period then loop
 	while tokens.peek().kind == (TokenKind::Period) {
 		tokens.next();
-		tokens.assert_next(TokenKind::Ident);
+		tokens.assert_next(input, TokenKind::Ident);
 		path.push(Name(tokens.cur().span.as_string(input)));
 	}
 	let mut method: Option<Name> = None;
 	if tokens.peek().kind == TokenKind::Colon {
 		tokens.next();
-		tokens.assert_next(TokenKind::Ident);
+		tokens.assert_next(input, TokenKind::Ident);
 		method = Some(Name(tokens.cur().span.as_string(input)));
 	}
 	FuncName { path, method }
@@ -114,7 +116,7 @@ pub fn parse_field(input: &str, tokens: &mut Tokens) -> Field {
 	match name_token.kind {
 		// Name '=' exp
 		TokenKind::Ident => {
-			tokens.assert_next(TokenKind::Assign);
+			tokens.assert_next(input, TokenKind::Assign);
 
 			let expr = parse_expr(input, tokens);
 			Field::NameAssign(Name(name_token.span.as_string(input)), expr)
@@ -123,8 +125,8 @@ pub fn parse_field(input: &str, tokens: &mut Tokens) -> Field {
 		TokenKind::LBracket => {
 			let lexpr = parse_expr(input, tokens);
 
-			tokens.assert_next(TokenKind::RBracket);
-			tokens.assert_next(TokenKind::Assign);
+			tokens.assert_next(input, TokenKind::RBracket);
+			tokens.assert_next(input, TokenKind::Assign);
 
 			let rexpr = parse_expr(input, tokens);
 			Field::ExprAssign(lexpr, rexpr)
@@ -136,13 +138,13 @@ pub fn parse_field(input: &str, tokens: &mut Tokens) -> Field {
 
 /// tableconstructor ::= `{` [fieldlist] `}`
 pub fn parse_table_constructor(input: &str, tokens: &mut Tokens) -> TableConstructor {
-	tokens.assert_next(TokenKind::LCurly);
+	tokens.assert_next(input, TokenKind::LCurly);
 	if tokens.peek().kind == TokenKind::RCurly {
 		tokens.next();
 		return TableConstructor(vec![]);
 	};
 	let fieldlist = parse_fieldlist(input, tokens);
-	tokens.assert_next(TokenKind::RCurly);
+	tokens.assert_next(input, TokenKind::RCurly);
 	TableConstructor(fieldlist)
 }
 
@@ -176,13 +178,13 @@ pub fn parse_exprlist(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
 
 /// args ::=  `(` [explist] `)`
 pub fn parse_args(input: &str, tokens: &mut Tokens) -> Args {
-	tokens.assert_next(TokenKind::LParen);
+	tokens.assert_next(input, TokenKind::LParen);
 	if tokens.peek().kind == TokenKind::RParen {
 		tokens.next();
 		return Args(vec![]);
 	}
 	let explist = parse_exprlist(input, tokens);
-	tokens.assert_next(TokenKind::RParen);
+	tokens.assert_next(input, TokenKind::RParen);
 	Args(explist)
 }
 
@@ -203,7 +205,7 @@ pub fn parse_var(input: &str, tokens: &mut Tokens) -> Var {
 
 					let expr = parse_expr(input, tokens);
 
-					tokens.assert_next(TokenKind::RBracket);
+					tokens.assert_next(input, TokenKind::RBracket);
 
 					Var::IndexExpr(IndexExpr {
 						expr: Box::new(PrefixExpr::Var(Var::Name(Name(name_token.span.as_string(input))))),
@@ -212,7 +214,7 @@ pub fn parse_var(input: &str, tokens: &mut Tokens) -> Var {
 				},
 				TokenKind::Period => {
 					tokens.next();
-					tokens.assert_next(TokenKind::Ident);
+					tokens.assert_next(input, TokenKind::Ident);
 
 					Var::Property(Property {
 						expr: Box::new(PrefixExpr::Var(Var::Name(Name(name_token.span.as_string(input))))),
@@ -224,14 +226,15 @@ pub fn parse_var(input: &str, tokens: &mut Tokens) -> Var {
 		},
 		_ => {
 			let prefixexp = parse_prefix_exp(input, tokens);
+			let tk = tokens.peek();
 
-			match tokens.peek().kind {
+			match tk.kind {
 				TokenKind::LBracket => {
 					tokens.next();
 
 					let expr = parse_expr(input, tokens);
 
-					tokens.assert_next(TokenKind::RBracket);
+					tokens.assert_next(input, TokenKind::RBracket);
 
 					Var::IndexExpr(IndexExpr {
 						expr: Box::new(prefixexp),
@@ -240,14 +243,15 @@ pub fn parse_var(input: &str, tokens: &mut Tokens) -> Var {
 				},
 				TokenKind::Period => {
 					tokens.next();
-					tokens.assert_next(TokenKind::Ident);
+					tokens.assert_next(input, TokenKind::Ident);
 
 					Var::Property(Property {
 						expr: Box::new(prefixexp),
 						name: Name(tokens.cur().span.as_string(input)),
 					})
 				},
-				_ => panic!(),
+				// TODO: I'm not sure if this is even reachable
+				_ => format_err(&format!("Expected `[` or `.` but found: {}.", tk), tk.span, input),
 			}
 		},
 	}
@@ -257,11 +261,12 @@ pub fn parse_var(input: &str, tokens: &mut Tokens) -> Var {
 // functioncall ::=  prefixexp args | prefixexp `:` Name args
 // var ::=  Name | prefixexp `[` exp `]` | prefixexp `.` Name
 pub fn parse_prefix_exp(input: &str, tokens: &mut Tokens) -> PrefixExpr {
-	match tokens.peek().kind {
+	let tk = tokens.peek();
+	match tk.kind {
 		TokenKind::LParen => {
 			tokens.next();
 			let expr = PrefixExpr::Expr(parse_expr(input, tokens));
-			tokens.assert_next(TokenKind::RParen);
+			tokens.assert_next(input, TokenKind::RParen);
 			expr
 		},
 
@@ -274,7 +279,7 @@ pub fn parse_prefix_exp(input: &str, tokens: &mut Tokens) -> PrefixExpr {
 
 					let expr = parse_expr(input, tokens);
 
-					tokens.assert_next(TokenKind::RBracket);
+					tokens.assert_next(input, TokenKind::RBracket);
 
 					PrefixExpr::Var(Var::IndexExpr(IndexExpr {
 						expr: Box::new(PrefixExpr::Var(Var::Name(Name(tokens.cur().span.as_string(input))))),
@@ -283,7 +288,7 @@ pub fn parse_prefix_exp(input: &str, tokens: &mut Tokens) -> PrefixExpr {
 				},
 				TokenKind::Period => {
 					tokens.next();
-					tokens.assert_next(TokenKind::Ident);
+					tokens.assert_next(input, TokenKind::Ident);
 
 					PrefixExpr::Var(Var::Property(Property {
 						expr: Box::new(PrefixExpr::Var(Var::Name(Name(tokens.cur().span.as_string(input))))),
@@ -297,7 +302,7 @@ pub fn parse_prefix_exp(input: &str, tokens: &mut Tokens) -> PrefixExpr {
 				_ => PrefixExpr::Var(Var::Name(Name(tokens.cur().span.as_string(input)))),
 			}
 		},
-		_ => panic!(),
+		_ => format_err(&format!("Expected expression but found: {}.", tk), tk.span, input),
 	}
 }
 
@@ -356,7 +361,7 @@ pub fn parse_stat(input: &str, tokens: &mut Tokens) -> Stat {
 				Stat::Assignment(parse_assignment(input, tokens))
 			}
 		},
-		other => panic!("not a valid statement: {:?}", other),
+		_ => format_err(&format!("Expected statement but found: {}.", tk), tk.span, input),
 	}
 }
 
@@ -364,7 +369,7 @@ pub fn parse_stat(input: &str, tokens: &mut Tokens) -> Stat {
 pub fn parse_assignment(input: &str, tokens: &mut Tokens) -> Assignment {
 	let varlist = parse_varlist(input, tokens);
 
-	tokens.assert_next(TokenKind::Assign);
+	tokens.assert_next(input, TokenKind::Assign);
 
 	let exprlist = parse_exprlist(input, tokens);
 
@@ -373,7 +378,7 @@ pub fn parse_assignment(input: &str, tokens: &mut Tokens) -> Assignment {
 
 /// local namelist [`=` explist]
 pub fn parse_local_assignment(input: &str, tokens: &mut Tokens) -> LocalAssignment {
-	tokens.assert_next(TokenKind::Local);
+	tokens.assert_next(input, TokenKind::Local);
 
 	let namelist = parse_namelist(input, tokens);
 
@@ -389,9 +394,9 @@ pub fn parse_local_assignment(input: &str, tokens: &mut Tokens) -> LocalAssignme
 
 /// local function Name funcbody
 pub fn parse_local_function_def(input: &str, tokens: &mut Tokens) -> LocalFunctionDef {
-	tokens.assert_next(TokenKind::Local);
-	tokens.assert_next(TokenKind::Function);
-	tokens.assert_next(TokenKind::Ident);
+	tokens.assert_next(input, TokenKind::Local);
+	tokens.assert_next(input, TokenKind::Function);
+	tokens.assert_next(input, TokenKind::Ident);
 
 	let name = Name(tokens.cur().span.as_string(input));
 	let body = parse_funcbody(input, tokens);
@@ -401,7 +406,7 @@ pub fn parse_local_function_def(input: &str, tokens: &mut Tokens) -> LocalFuncti
 
 /// function funcname funcbody
 pub fn parse_function_def(input: &str, tokens: &mut Tokens) -> FunctionDef {
-	tokens.assert_next(TokenKind::Function);
+	tokens.assert_next(input, TokenKind::Function);
 
 	let name = parse_funcname(input, tokens);
 	let body = parse_funcbody(input, tokens);
@@ -411,11 +416,11 @@ pub fn parse_function_def(input: &str, tokens: &mut Tokens) -> FunctionDef {
 
 /// for namelist in explist do block end
 pub fn parse_for_in(input: &str, tokens: &mut Tokens) -> ForIn {
-	tokens.assert_next(TokenKind::For);
+	tokens.assert_next(input, TokenKind::For);
 
 	let namelist = parse_namelist(input, tokens);
 
-	tokens.assert_next(TokenKind::In);
+	tokens.assert_next(input, TokenKind::In);
 
 	let exprlist = parse_exprlist(input, tokens);
 	let block = parse_do_block(input, tokens);
@@ -429,15 +434,15 @@ pub fn parse_for_in(input: &str, tokens: &mut Tokens) -> ForIn {
 
 /// for Name `=` exp `,` exp [`,` exp] do block end
 pub fn parse_for_range(input: &str, tokens: &mut Tokens) -> ForRange {
-	tokens.assert_next(TokenKind::For);
+	tokens.assert_next(input, TokenKind::For);
 
-	tokens.assert_next(TokenKind::Ident);
+	tokens.assert_next(input, TokenKind::Ident);
 	let name = Name(tokens.cur().span.as_string(input));
 
-	tokens.assert_next(TokenKind::Assign);
+	tokens.assert_next(input, TokenKind::Assign);
 	let exp_start = parse_expr(input, tokens);
 
-	tokens.assert_next(TokenKind::Comma);
+	tokens.assert_next(input, TokenKind::Comma);
 
 	let exp_end = parse_expr(input, tokens);
 
@@ -459,9 +464,9 @@ pub fn parse_for_range(input: &str, tokens: &mut Tokens) -> ForRange {
 
 /// elseif exp then block
 pub fn parse_elseif(input: &str, tokens: &mut Tokens) -> ElseIf {
-	tokens.assert_next(TokenKind::ElseIf);
+	tokens.assert_next(input, TokenKind::ElseIf);
 	let expr = parse_expr(input, tokens);
-	tokens.assert_next(TokenKind::Then);
+	tokens.assert_next(input, TokenKind::Then);
 	let block = parse_block(input, tokens);
 
 	ElseIf { block, expr }
@@ -479,11 +484,11 @@ pub fn parse_else_block(input: &str, tokens: &mut Tokens) -> Option<Block> {
 
 /// if exp then block {elseif exp then block} [else block] end
 pub fn parse_if_block(input: &str, tokens: &mut Tokens) -> IfBlock {
-	tokens.assert_next(TokenKind::If);
+	tokens.assert_next(input, TokenKind::If);
 
 	let expr = parse_expr(input, tokens);
 
-	tokens.assert_next(TokenKind::Then);
+	tokens.assert_next(input, TokenKind::Then);
 
 	let block = parse_block(input, tokens);
 
@@ -495,7 +500,7 @@ pub fn parse_if_block(input: &str, tokens: &mut Tokens) -> IfBlock {
 
 	let else_blk = parse_else_block(input, tokens);
 
-	tokens.assert_next(TokenKind::End);
+	tokens.assert_next(input, TokenKind::End);
 
 	IfBlock {
 		expr,
@@ -507,7 +512,7 @@ pub fn parse_if_block(input: &str, tokens: &mut Tokens) -> IfBlock {
 
 /// while exp do block end
 pub fn parse_while_block(input: &str, tokens: &mut Tokens) -> WhileBlock {
-	tokens.assert_next(TokenKind::While);
+	tokens.assert_next(input, TokenKind::While);
 
 	let expr = parse_expr(input, tokens);
 	let block = parse_do_block(input, tokens);
@@ -517,9 +522,9 @@ pub fn parse_while_block(input: &str, tokens: &mut Tokens) -> WhileBlock {
 
 /// do block end
 pub fn parse_do_block(input: &str, tokens: &mut Tokens) -> Block {
-	tokens.assert_next(TokenKind::Do);
+	tokens.assert_next(input, TokenKind::Do);
 	let blk = parse_block(input, tokens);
-	tokens.assert_next(TokenKind::End);
+	tokens.assert_next(input, TokenKind::End);
 	blk
 }
 
@@ -554,10 +559,11 @@ pub fn parse_block(input: &str, tokens: &mut Tokens) -> Block {
 
 /// retstat ::= return [explist] [;]
 pub fn parse_retstat(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
-	tokens.assert_next(TokenKind::Return);
+	tokens.assert_next(input, TokenKind::Return);
 
 	if tokens.peek().kind == TokenKind::SemiColon {
 		tokens.next();
+		return vec![];
 	}
 
 	if block_follow(tokens.peek()) {
@@ -575,11 +581,11 @@ pub fn parse_retstat(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
 
 /// funcbody ::= `(` [parlist] `)` block end
 pub fn parse_funcbody(input: &str, tokens: &mut Tokens) -> FuncBody {
-	tokens.assert_next(TokenKind::LParen);
+	tokens.assert_next(input, TokenKind::LParen);
 	let params = parse_parlist(input, tokens);
-	tokens.assert_next(TokenKind::RParen);
+	tokens.assert_next(input, TokenKind::RParen);
 	let body = parse_block(input, tokens);
-	tokens.assert_next(TokenKind::End);
+	tokens.assert_next(input, TokenKind::End);
 
 	FuncBody { params, body }
 }
@@ -588,7 +594,7 @@ pub fn parse_funcbody(input: &str, tokens: &mut Tokens) -> FuncBody {
 /// stat ::= function funcname funcbody
 /// stat ::= local function Name funcbody
 pub fn parse_functiondef(input: &str, tokens: &mut Tokens) -> FunctionDef {
-	tokens.assert_next(TokenKind::Function);
+	tokens.assert_next(input, TokenKind::Function);
 
 	let name = parse_funcname(input, tokens);
 	let body = parse_funcbody(input, tokens);
@@ -598,7 +604,7 @@ pub fn parse_functiondef(input: &str, tokens: &mut Tokens) -> FunctionDef {
 
 /// namelist ::= Name {`,` Name}
 pub fn parse_namelist(input: &str, tokens: &mut Tokens) -> Vec<Name> {
-	tokens.assert_next(TokenKind::Ident);
+	tokens.assert_next(input, TokenKind::Ident);
 
 	let first_name = tokens.cur().span.as_string(input);
 
@@ -660,20 +666,22 @@ pub fn parse_fieldlist(input: &str, tokens: &mut Tokens) -> Vec<Field> {
 
 // TODO: multi line string currently broken
 fn parse_string(input: &str, tokens: &mut Tokens) -> String {
-	let mut chars = tokens.next().span.as_str(input).chars();
+	let tk = tokens.next();
+	let mut chars = tk.span.as_str(input).chars();
 	match chars.next() {
 		Some('\'') | Some('\"') => {
 			chars.next_back();
 			chars.as_str().to_string() // really?
 		},
-		_ => panic!("Malformed string {}", chars.as_str()),
+		_ => format_err(&format!("Malformed string: `{}`.", chars.as_str()), tk.span, input),
 	}
 }
 
 fn parse_number(input: &str, tokens: &mut Tokens) -> f64 {
-	let s = tokens.next().span.as_string(input);
+	let tk = tokens.next();
+	let s = tk.span.as_string(input);
 	match s.parse() {
 		Ok(num) => num,
-		_ => panic!("Malformed number"), // TODO: handle properly
+		_ => format_err(&format!("Malformed number: `{}`.", s), tk.span, input),
 	}
 }

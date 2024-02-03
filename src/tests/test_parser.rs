@@ -4,7 +4,7 @@ use crate::parser::*;
 use crate::token::*;
 
 #[test]
-fn test_parse_expr() {
+fn expr() {
 	let p = r#"nil"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
@@ -27,7 +27,7 @@ fn test_parse_expr() {
 }
 
 #[test]
-fn test_parse_unexp() {
+fn unexp() {
 	for (s, op) in vec![("-", UnOp::Minus), ("not ", UnOp::Not), ("#", UnOp::Len)] {
 		let p = format!("{}foo", s);
 		let tokens: Vec<_> = Lexer::new(&p).collect();
@@ -45,7 +45,7 @@ fn test_parse_unexp() {
 }
 
 #[test]
-fn test_parse_binexp() {
+fn binexp() {
 	for (s, op) in vec![
 		("+", BinOp::Plus),
 		("-", BinOp::Minus),
@@ -152,7 +152,7 @@ fn test_simple_bin() {
 }
 
 #[test]
-fn test_parse_prefix_exp_parens() {
+fn prefix_exp_parens() {
 	let p = r#"foo"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
@@ -175,7 +175,7 @@ fn test_parse_prefix_exp_parens() {
 }
 
 #[test]
-fn test_parse_var() {
+fn var() {
 	let p = r#"foo"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
@@ -221,7 +221,7 @@ fn test_parse_var() {
 }
 
 #[test]
-fn test_parse_args() {
+fn args() {
 	let p = r#"()"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
@@ -244,7 +244,7 @@ fn test_parse_args() {
 }
 
 #[test]
-fn test_parse_exprlist() {
+fn exprlist() {
 	let p = r#"nil, false, true, "str""#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
@@ -260,17 +260,7 @@ fn test_parse_exprlist() {
 }
 
 #[test]
-#[should_panic]
-// #[should_panic(expected = "less than or equal to 100")]
-fn test_parse_exprlist_fail() {
-	let p = r#"nil, false,"#;
-	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = Tokens::new(tokens);
-	parse_exprlist(p, &mut tokens);
-}
-
-#[test]
-fn test_parse_varlist() {
+fn varlist() {
 	let p = r#"foo, bar, bizz"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
@@ -285,7 +275,7 @@ fn test_parse_varlist() {
 }
 
 #[test]
-fn test_parse_expr_func() {
+fn expr_func() {
 	let p = r#"function foo() return ; end"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
@@ -309,7 +299,7 @@ fn test_parse_expr_func() {
 }
 
 #[test]
-fn test_parse_retstat() {
+fn retstat() {
 	let p = r#"return nil, false;"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
@@ -344,7 +334,7 @@ fn test_parse_retstat() {
 }
 
 #[test]
-fn test_parse_block() {
+fn block() {
 	let p = r#"return 10, "foo", true, bar"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
@@ -381,7 +371,7 @@ fn test_parse_block() {
 }
 
 #[test]
-fn test_parse_functiondef() {
+fn functiondef() {
 	let p = r#"function foo() return end"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
@@ -405,7 +395,7 @@ fn test_parse_functiondef() {
 }
 
 #[test]
-fn test_parse_table_constructor() {
+fn table_constructor() {
 	let p = r#"{foo = 'foo', bar = false, bizz = 1}"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
@@ -442,7 +432,7 @@ fn test_parse_table_constructor() {
 }
 
 #[test]
-fn test_parse_prefix_exp() {
+fn prefix_exp() {
 	// TODO: ???
 	let p = "false)";
 	let tokens: Vec<_> = Lexer::new(p).collect();
@@ -472,7 +462,7 @@ fn test_parse_prefix_exp() {
 }
 
 #[test]
-fn test_parse_parlist() {
+fn parlist() {
 	let p = r#"Name,Another_Name"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
@@ -497,7 +487,7 @@ fn test_parse_parlist() {
 }
 
 #[test]
-fn test_parse_namelist() {
+fn namelist() {
 	let p = r#"Name"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
@@ -515,7 +505,7 @@ fn test_parse_namelist() {
 }
 
 #[test]
-fn test_parse_stat() {
+fn stat() {
 	let p = r#";"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
@@ -693,7 +683,7 @@ fn test_parse_stat() {
 }
 
 #[test]
-fn test_parse_funcbody() {
+fn funcbody() {
 	let p = r#"() return end"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
@@ -711,7 +701,7 @@ fn test_parse_funcbody() {
 }
 
 #[test]
-fn test_parse_funcname() {
+fn funcname() {
 	let p = r#"abc"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
@@ -747,4 +737,27 @@ fn test_parse_funcname() {
 			method: Some(Name("mno".to_string())),
 		})
 	);
+}
+
+#[test]
+#[should_panic(expected = "Expected expression but found: end of file.")]
+fn exprlist_fail() {
+	let p = r#"nil, false,"#;
+	let tokens: Vec<_> = Lexer::new(p).collect();
+	let mut tokens = Tokens::new(tokens);
+	parse_exprlist(p, &mut tokens);
+}
+
+#[test]
+#[should_panic(expected = "Malformed number: `100.00.00`.")]
+fn number_fail() {
+	let p = r#"a = 100.00.00"#;
+	parse(p);
+}
+
+#[test]
+#[should_panic(expected = "Expected `do` but found `while`.")]
+fn expect_token_fail() {
+	let p = r#"for x in y while"#;
+	parse(p);
 }

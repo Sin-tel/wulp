@@ -1,4 +1,5 @@
 use crate::ast::{BinOp, UnOp};
+use crate::span::format_err;
 use crate::span::Span;
 use core::fmt;
 
@@ -100,11 +101,7 @@ pub struct Tokens {
 }
 
 impl Tokens {
-	pub fn new(mut tokens: Vec<Token>) -> Tokens {
-		tokens.push(Token {
-			span: Span::at(0),
-			kind: TokenKind::Eof,
-		});
+	pub fn new(tokens: Vec<Token>) -> Tokens {
 		Tokens { index: 0, tokens }
 	}
 
@@ -122,11 +119,12 @@ impl Tokens {
 		self.index += 1;
 		tk
 	}
-	pub fn assert_next(&mut self, knd: TokenKind) {
-		if self.next().kind == knd {
+	pub fn assert_next(&mut self, input: &str, expect: TokenKind) {
+		let tk = self.next();
+		if tk.kind == expect {
 			()
 		} else {
-			panic!("Expected: {:?}", knd)
+			format_err(&format!("Expected {} but found {}.", expect, tk.kind), tk.span, input);
 		}
 	}
 	pub fn cur(&mut self) -> Token {
@@ -139,16 +137,78 @@ impl Tokens {
 	}
 }
 
+impl fmt::Display for TokenKind {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		use TokenKind::*;
+
+		write!(
+			f,
+			"{}",
+			match self {
+				And => "`and`",
+				Break => "`break`",
+				Do => "`do`",
+				Else => "`else`",
+				ElseIf => "`elseif`",
+				End => "`end`",
+				For => "`for`",
+				Function => "`function`",
+				If => "`if`",
+				In => "`in`",
+				Local => "`local`",
+				Nil => "`nil`",
+				Not => "`not`",
+				Or => "`or`",
+				Return => "`return`",
+				Then => "`then`",
+				True => "`true`",
+				False => "`false`",
+				While => "`while`",
+				Concat => "`..`",
+				Period => "`.`",
+				LParen => "`(`",
+				RParen => "`)`",
+				LCurly => "`{`",
+				RCurly => "`}`",
+				LBracket => "`[`",
+				RBracket => "`]`",
+				Comma => "`,`",
+				Plus => "`+`",
+				Minus => "`-`",
+				Mul => "`*`",
+				Div => "`/`",
+				Mod => "`%`",
+				Pow => "`^`",
+				Assign => "`=`",
+				Eq => "`==`",
+				Neq => "`~=`",
+				Gte => "`>=`",
+				Lte => "`<=`",
+				Lt => "`<`",
+				Gt => "`>`",
+				Hash => "`#`",
+				SemiColon => "`;`",
+				Colon => "`:",
+				Str => "string",
+				Number => "number",
+				Ident => "identifier",
+				Comment => "comment",
+				Eof => "end of file",
+			}
+		)
+	}
+}
+
 impl fmt::Display for Token {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{:?}", self.kind)
+		write!(f, "{}", self.kind)
 	}
 }
 
 impl fmt::Display for Tokens {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		for token in self.tokens.iter() {
-			write!(f, "{} ", token)?
+			write!(f, "{}\t", token)?
 		}
 		Ok(())
 	}

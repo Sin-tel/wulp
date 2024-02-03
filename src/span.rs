@@ -5,6 +5,9 @@ pub struct Span {
 }
 
 impl Span {
+	pub fn new(start: usize, end: usize) -> Self {
+		Self { start, end }
+	}
 	pub fn at(c: usize) -> Self {
 		Self { start: c, end: c + 1 }
 	}
@@ -40,21 +43,17 @@ fn line_col(input: &str, pos: usize) -> (usize, usize) {
 pub fn format_err(message: &str, span: Span, input: &str) -> ! {
 	// TODO: this only works properly if the span is one line
 
-	// lmao
-	let message = message.replace("{}", &["`", span.as_str(input), "`"].concat());
-
 	let (startl, startc, endl, endc) = span.line_col(input);
 
 	let mut linepos = startl;
 
 	let mut spaces = String::new();
-
-	for _ in linepos.to_string().chars().take(startc - 1) {
+	for _ in linepos.to_string().chars() {
 		spaces.push(' ');
 	}
 
 	// TODO fix the filename
-	eprintln!("error: src\\main.rs:{}: {}", startl + 10, message);
+	eprintln!("error: src\\file:{}: {}", startl, message);
 	eprintln!("{} |", spaces);
 
 	for l in input.lines().skip(startl - 1) {

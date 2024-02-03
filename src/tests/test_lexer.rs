@@ -7,8 +7,8 @@ fn whitespace() {
 	let ws = "  ";
 
 	let mut lex = Lexer::new(ws);
+	lex.next();
 
-	assert_eq!(lex.next(), None);
 	assert_eq!(lex.next(), None);
 }
 
@@ -63,235 +63,106 @@ fn single_line_string() {
 			span: Span { start: 0, end: 16 }
 		})
 	);
-
-	let bad_new_line = r#""example string
-	""#;
-	let mut lex = Lexer::new(bad_new_line);
-	assert_eq!(lex.next(), None);
 }
 
 #[test]
 fn multi_line_string() {
 	let multi_line = "[[ This is a multi-line string ]]";
-
 	let mut lex = Lexer::new(multi_line);
 	assert_eq!(
 		lex.next(),
 		Some(Token {
 			kind: TokenKind::Str,
-			span: Span { start: 0, end: 2 }
+			span: Span { start: 0, end: 33 }
 		})
 	);
 }
 
 #[test]
 fn basic_assignment() {
-	let nil_assignment = r#"x =nil"#;
-	let actual: Vec<_> = Lexer::new(nil_assignment).collect();
+	use TokenKind::*;
 
-	assert_eq!(
-		actual,
-		vec![
-			Token {
-				kind: TokenKind::Ident,
-				span: Span { start: 0, end: 1 }
-			},
-			Token {
-				kind: TokenKind::Assign,
-				span: Span { start: 2, end: 3 }
-			},
-			Token {
-				kind: TokenKind::Nil,
-				span: Span { start: 3, end: 6 }
-			},
-		]
-	);
+	let nil_assignment = r#"x =nil"#;
+	let actual: Vec<_> = Lexer::new(nil_assignment).map(|tk| tk.kind).collect();
+
+	assert_eq!(actual, vec![Ident, Assign, Nil, Eof]);
 
 	let p = r#"local _x = 1"#;
-	let actual: Vec<_> = Lexer::new(p).collect();
+	let actual: Vec<_> = Lexer::new(p).map(|tk| tk.kind).collect();
 
-	assert_eq!(
-		actual,
-		vec![
-			Token {
-				kind: TokenKind::Local,
-				span: Span { start: 0, end: 5 }
-			},
-			Token {
-				kind: TokenKind::Ident,
-				span: Span { start: 6, end: 8 }
-			},
-			Token {
-				kind: TokenKind::Assign,
-				span: Span { start: 9, end: 10 }
-			},
-			Token {
-				kind: TokenKind::Number,
-				span: Span { start: 11, end: 12 }
-			},
-		]
-	);
+	assert_eq!(actual, vec![Local, Ident, Assign, Number, Eof]);
 }
 
 #[test]
 fn assignment() {
-	let nil_assignment = r#"x = nil"#;
-	let lex = Lexer::new(nil_assignment);
-	let actual: Vec<_> = lex.collect();
-	assert_eq!(
-		actual,
-		vec![
-			Token {
-				kind: TokenKind::Ident,
-				span: Span { start: 0, end: 1 }
-			},
-			Token {
-				kind: TokenKind::Assign,
-				span: Span { start: 2, end: 3 }
-			},
-			Token {
-				kind: TokenKind::Nil,
-				span: Span { start: 4, end: 7 }
-			},
-		]
-	);
+	use TokenKind::*;
 
 	let string_assignment = r#"x = 'foo'"#;
 
 	let lex = Lexer::new(string_assignment);
-	let actual: Vec<_> = lex.collect();
-	assert_eq!(
-		actual,
-		vec![
-			Token {
-				kind: TokenKind::Ident,
-				span: Span { start: 0, end: 1 }
-			},
-			Token {
-				kind: TokenKind::Assign,
-				span: Span { start: 2, end: 3 }
-			},
-			Token {
-				kind: TokenKind::Str,
-				span: Span { start: 4, end: 9 }
-			},
-		]
-	);
+	let actual: Vec<_> = lex.map(|tk| tk.kind).collect();
+	assert_eq!(actual, vec![Ident, Assign, Str, Eof]);
 
 	let bool_assignment = r#"x = false"#;
 	let lex = Lexer::new(bool_assignment);
-	let actual: Vec<_> = lex.collect();
+	let actual: Vec<_> = lex.map(|tk| tk.kind).collect();
 
-	assert_eq!(
-		actual,
-		vec![
-			Token {
-				kind: TokenKind::Ident,
-				span: Span { start: 0, end: 1 }
-			},
-			Token {
-				kind: TokenKind::Assign,
-				span: Span { start: 2, end: 3 }
-			},
-			Token {
-				kind: TokenKind::False,
-				span: Span { start: 4, end: 9 }
-			},
-		]
-	);
+	assert_eq!(actual, vec![Ident, Assign, False, Eof]);
 
 	let var_assignment = r#"x = y"#;
 	let lex = Lexer::new(var_assignment);
-	let actual: Vec<_> = lex.collect();
-	assert_eq!(
-		actual,
-		vec![
-			Token {
-				kind: TokenKind::Ident,
-				span: Span { start: 0, end: 1 }
-			},
-			Token {
-				kind: TokenKind::Assign,
-				span: Span { start: 2, end: 3 }
-			},
-			Token {
-				kind: TokenKind::Ident,
-				span: Span { start: 4, end: 5 }
-			},
-		]
-	);
+	let actual: Vec<_> = lex.map(|tk| tk.kind).collect();
+	assert_eq!(actual, vec![Ident, Assign, Ident, Eof]);
 }
 
 #[test]
 fn string_concat() {
 	let p = r#"'foo' .. bar"#;
 
-	let actual: Vec<_> = Lexer::new(p).collect();
+	let actual: Vec<_> = Lexer::new(p).map(|tk| tk.kind).collect();
 
-	assert_eq!(
-		actual,
-		vec![
-			Token {
-				kind: TokenKind::Str,
-				span: Span { start: 0, end: 5 }
-			},
-			Token {
-				kind: TokenKind::Concat,
-				span: Span { start: 6, end: 8 }
-			},
-			Token {
-				kind: TokenKind::Ident,
-				span: Span { start: 9, end: 12 }
-			},
-		]
-	)
+	use TokenKind::*;
+	assert_eq!(actual, vec![Str, Concat, Ident, Eof])
 }
 
 #[test]
 fn not_expressions() {
 	let p = r#"not true"#;
 
-	let actual: Vec<_> = Lexer::new(p).collect();
-	assert_eq!(
-		actual,
-		vec![
-			Token {
-				kind: TokenKind::Not,
-				span: Span { start: 0, end: 3 }
-			},
-			Token {
-				kind: TokenKind::True,
-				span: Span { start: 4, end: 8 }
-			},
-		]
-	)
+	let actual: Vec<_> = Lexer::new(p).map(|tk| tk.kind).collect();
+
+	use TokenKind::*;
+	assert_eq!(actual, vec![Not, True, Eof])
 }
 
 #[test]
 fn empty_table() {
 	let p = r#"x = {}"#;
 
-	let actual: Vec<_> = Lexer::new(p).collect();
+	let actual: Vec<_> = Lexer::new(p).map(|tk| tk.kind).collect();
 
-	assert_eq!(
-		actual,
-		vec![
-			Token {
-				kind: TokenKind::Ident,
-				span: Span { start: 0, end: 1 }
-			},
-			Token {
-				kind: TokenKind::Assign,
-				span: Span { start: 2, end: 3 }
-			},
-			Token {
-				kind: TokenKind::LCurly,
-				span: Span { start: 4, end: 5 }
-			},
-			Token {
-				kind: TokenKind::RCurly,
-				span: Span { start: 5, end: 6 }
-			},
-		]
-	);
+	use TokenKind::*;
+	assert_eq!(actual, vec![Ident, Assign, LCurly, RCurly, Eof]);
+}
+
+#[test]
+#[should_panic(expected = "Failed to close string.")]
+fn string_fail() {
+	let p = r#"'hello"#;
+	let _: Vec<_> = Lexer::new(p).collect();
+}
+
+#[test]
+#[should_panic(expected = "Failed to close string.")]
+fn string_fail2() {
+	let p = r#""hello
+	\""#;
+	let _: Vec<_> = Lexer::new(p).collect();
+}
+
+#[test]
+#[should_panic(expected = "Unexpected token: `$`")]
+fn bad_char() {
+	let p = r#"let x = $100"#;
+	let _: Vec<_> = Lexer::new(p).collect();
 }

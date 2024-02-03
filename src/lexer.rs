@@ -8,6 +8,7 @@ pub struct Lexer<'a> {
 	input: &'a str,
 	bytes: &'a [u8],
 	cursor: usize,
+	eof_done: bool,
 }
 
 impl<'a> Lexer<'a> {
@@ -16,6 +17,7 @@ impl<'a> Lexer<'a> {
 			input,
 			bytes: input.as_bytes(),
 			cursor: 0,
+			eof_done: false,
 		}
 	}
 
@@ -120,32 +122,33 @@ impl<'a> Lexer<'a> {
 	}
 
 	// '\'' CONTENT '\'' | ''' CONTENT '"'
-	fn single_line_string(&mut self) -> Option<Token> {
+	fn single_line_string(&mut self) -> Token {
 		let start = self.cursor;
 		let closing = self.eat_char();
 		loop {
 			match self.eat_char() {
 				Some(e) if Some(e) == closing => break,
-				Some('\n') => return None,
-				Some(_) => (),
-				None => return None,
+				Some('\n') | None => {
+					format_err("Failed to close string.", Span::new(start, self.cursor - 1), self.input)
+				},
+				_ => (),
 			}
 		}
 		let end = self.cursor;
-		Some(Token {
+		Token {
 			kind: TokenKind::Str,
 			span: Span { start, end },
-		})
+		}
 	}
 
 	// '[[' CONTENT ']]'
 	fn multi_line_string(&mut self) -> Option<Token> {
 		let start = self.cursor;
 		self.eat_chars(2);
-		let end = self.cursor;
 		loop {
 			if self.match_chars("]]") {
 				self.eat_chars(2);
+				let end = self.cursor;
 				break Some(Token {
 					kind: TokenKind::Str,
 					span: Span { start, end },
@@ -253,7 +256,7 @@ impl Iterator for Lexer<'_> {
 			let start = self.cursor;
 			let next = self.next_char();
 			match c {
-				'\'' | '"' => self.single_line_string(),
+				'\'' | '"' => Some(self.single_line_string()),
 				'[' if next == Some('[') => self.multi_line_string(),
 				'=' if next == Some('=') => {
 					self.eat_chars(2);
@@ -466,12 +469,24 @@ impl Iterator for Lexer<'_> {
 						span: Span { start, end },
 					})
 				},
-				_ => {
-					format_err("Unexpected token: {}", Span::at(self.cursor), self.input);
+				tk => {
+					format_err(
+						&format!("Unexpected token: `{}`", tk),
+						Span::at(self.cursor),
+						self.input,
+					);
 				},
 			}
 		} else {
-			None
+			if self.eof_done {
+				None
+			} else {
+				self.eof_done = true;
+				Some(Token {
+					kind: TokenKind::Eof,
+					span: Span::at(self.cursor - 1), // point to last character
+				})
+			}
 		}
 	}
 }
