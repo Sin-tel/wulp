@@ -12,7 +12,8 @@ pub fn parse(input: &str) -> Block {
 			_ => true,
 		})
 		.collect();
-	dbg!(&tokens);
+
+	// dbg!(&tokens);
 	let mut tokens = TokenIter::new(tokens);
 	let ast = parse_block(&input, &mut tokens);
 
@@ -27,34 +28,30 @@ pub fn parse(input: &str) -> Block {
 pub fn parse_funcname(input: &str, tokens: &mut TokenIter) -> FuncName {
 	tokens.assert_next(TokenKind::Ident);
 
-	let mut path = vec![Name(tokens.cur().unwrap().span.as_str(input).to_string())];
+	let mut path = vec![Name(tokens.cur().span.as_string(input))];
 	// if next token is period then loop
 	while tokens.peek().kind == (TokenKind::Period) {
 		tokens.next();
 		tokens.assert_next(TokenKind::Ident);
-		path.push(Name(tokens.cur().unwrap().span.as_str(input).to_string()));
+		path.push(Name(tokens.cur().span.as_string(input)));
 	}
 	let mut method: Option<Name> = None;
 	if tokens.peek().kind == TokenKind::Colon {
 		tokens.next();
 		tokens.assert_next(TokenKind::Ident);
-		method = Some(Name(tokens.cur().unwrap().span.as_str(input).to_string()));
+		method = Some(Name(tokens.cur().span.as_string(input)));
 	}
 	FuncName { path, method }
 }
 
 pub fn parse_simple_exp(input: &str, tokens: &mut TokenIter) -> Option<Expr> {
-	let tk = tokens.next();
-
-	match tk.kind {
+	match tokens.next().kind {
 		TokenKind::Nil => Some(Expr::Nil),
 		TokenKind::True => Some(Expr::Bool(true)),
 		TokenKind::False => Some(Expr::Bool(false)),
-		TokenKind::String => Some(Expr::Str(
-			parse_string(tokens.cur().unwrap().span.as_str(input)).to_string(),
-		)),
+		TokenKind::String => Some(Expr::Str(parse_string(tokens.cur().span.as_str(input)).to_string())),
 		TokenKind::Number => {
-			let s = tokens.cur().unwrap().span.as_str(input).to_string();
+			let s = tokens.cur().span.as_string(input);
 			match s.parse() {
 				Ok(num) => Some(Expr::Num(num)),
 				_ => panic!("Malformed number"), // TODO: handle properly
@@ -81,7 +78,7 @@ pub fn bin_priority(op: Token) -> i32 {
 		TokenKind::Lt | TokenKind::Gt | TokenKind::Lte | TokenKind::Gte | TokenKind::Eq | TokenKind::Neq => 3,
 		TokenKind::And => 2,
 		TokenKind::Or => 1,
-		_ => panic!("No priority defined for {:?}", op),
+		_ => unreachable!(),
 	}
 }
 
@@ -95,12 +92,11 @@ pub fn is_un_op(token: Token) -> bool {
 }
 
 pub fn parse_unexp(input: &str, tokens: &mut TokenIter) -> Expr {
-	let tk = tokens.next();
-	let op = match tk.kind {
+	let op = match tokens.next().kind {
 		TokenKind::Minus => Unop::Minus,
 		TokenKind::Not => Unop::Not,
 		TokenKind::Hash => Unop::Len,
-		_ => panic!(),
+		_ => unreachable!(),
 	};
 
 	let exp = parse_sub_expr(&input, tokens, UNARY_PRIORITY);
@@ -170,7 +166,7 @@ pub fn parse_sub_expr(input: &str, tokens: &mut TokenIter, min_priority: i32) ->
 			TokenKind::Neq => BinOp::Neq,
 			TokenKind::And => BinOp::And,
 			TokenKind::Or => BinOp::Or,
-			_ => break,
+			_ => unreachable!(),
 		};
 
 		let prority = bin_priority(tk);
@@ -196,7 +192,7 @@ pub fn parse_field(input: &str, tokens: &mut TokenIter) -> Field {
 			tokens.assert_next(TokenKind::Assign);
 
 			let expr = parse_expr(&input, tokens);
-			Field::NameAssign(Name(name_token.span.as_str(input).to_string()), expr)
+			Field::NameAssign(Name(name_token.span.as_string(input)), expr)
 		},
 		// '[' exp ']' '=' exp
 		TokenKind::LBracket => {
@@ -261,18 +257,14 @@ pub fn parse_exprlist(input: &str, tokens: &mut TokenIter) -> Vec<Expr> {
 
 /// args ::=  `(` [explist] `)`
 pub fn parse_args(input: &str, tokens: &mut TokenIter) -> Args {
-	match tokens.next().kind {
-		TokenKind::LParen => {
-			if tokens.peek().kind == TokenKind::RParen {
-				tokens.next();
-				return Args(vec![]);
-			}
-			let explist = parse_exprlist(&input, tokens);
-			tokens.assert_next(TokenKind::RParen);
-			Args(explist)
-		},
-		_ => panic!(),
+	tokens.assert_next(TokenKind::LParen);
+	if tokens.peek().kind == TokenKind::RParen {
+		tokens.next();
+		return Args(vec![]);
 	}
+	let explist = parse_exprlist(&input, tokens);
+	tokens.assert_next(TokenKind::RParen);
+	Args(explist)
 }
 
 /// var ::=  Name | prefixexp `[` exp `]` | prefixexp `.` Name
@@ -295,27 +287,20 @@ pub fn parse_var(input: &str, tokens: &mut TokenIter) -> Var {
 					tokens.assert_next(TokenKind::RBracket);
 
 					Var::IndexExpr(IndexExpr {
-						expr: Box::new(PrefixExpr::Var(Var::Name(Name(
-							name_token.span.as_str(input).to_string(),
-						)))),
+						expr: Box::new(PrefixExpr::Var(Var::Name(Name(name_token.span.as_string(input))))),
 						arg: expr,
 					})
 				},
 				TokenKind::Period => {
 					tokens.next();
+					tokens.assert_next(TokenKind::Ident);
 
-					if tokens.next().kind == TokenKind::Ident {
-						Var::Property(Property {
-							expr: Box::new(PrefixExpr::Var(Var::Name(Name(
-								name_token.span.as_str(input).to_string(),
-							)))),
-							name: Name(tokens.cur().unwrap().span.as_str(input).to_string()),
-						})
-					} else {
-						panic!()
-					}
+					Var::Property(Property {
+						expr: Box::new(PrefixExpr::Var(Var::Name(Name(name_token.span.as_string(input))))),
+						name: Name(tokens.cur().span.as_string(input)),
+					})
 				},
-				_ => Var::Name(Name(tokens.cur().unwrap().span.as_str(input).to_string())),
+				_ => Var::Name(Name(tokens.cur().span.as_string(input))),
 			}
 		},
 		_ => {
@@ -336,15 +321,12 @@ pub fn parse_var(input: &str, tokens: &mut TokenIter) -> Var {
 				},
 				TokenKind::Period => {
 					tokens.next();
+					tokens.assert_next(TokenKind::Ident);
 
-					if tokens.next().kind == TokenKind::Ident {
-						Var::Property(Property {
-							expr: Box::new(prefixexp),
-							name: Name(tokens.cur().unwrap().span.as_str(input).to_string()),
-						})
-					} else {
-						panic!()
-					}
+					Var::Property(Property {
+						expr: Box::new(prefixexp),
+						name: Name(tokens.cur().span.as_string(input)),
+					})
 				},
 				_ => panic!(),
 			}
@@ -374,33 +356,24 @@ pub fn parse_prefix_exp(input: &str, tokens: &mut TokenIter) -> PrefixExpr {
 					tokens.assert_next(TokenKind::RBracket);
 
 					PrefixExpr::Var(Var::IndexExpr(IndexExpr {
-						expr: Box::new(PrefixExpr::Var(Var::Name(Name(
-							tokens.cur().unwrap().span.as_str(input).to_string(),
-						)))),
+						expr: Box::new(PrefixExpr::Var(Var::Name(Name(tokens.cur().span.as_string(input))))),
 						arg: expr,
 					}))
 				},
 				TokenKind::Period => {
 					tokens.next();
+					tokens.assert_next(TokenKind::Ident);
 
-					if tokens.next().kind == TokenKind::Ident {
-						PrefixExpr::Var(Var::Property(Property {
-							expr: Box::new(PrefixExpr::Var(Var::Name(Name(
-								tokens.cur().unwrap().span.as_str(input).to_string(),
-							)))),
-							name: Name(tokens.cur().unwrap().span.as_str(input).to_string()),
-						}))
-					} else {
-						panic!()
-					}
+					PrefixExpr::Var(Var::Property(Property {
+						expr: Box::new(PrefixExpr::Var(Var::Name(Name(tokens.cur().span.as_string(input))))),
+						name: Name(tokens.cur().span.as_string(input)),
+					}))
 				},
 				TokenKind::LParen => PrefixExpr::FunctionCall(FunctionCall {
-					expr: Box::new(PrefixExpr::Var(Var::Name(Name(
-						tokens.cur().unwrap().span.as_str(input).to_string(),
-					)))),
+					expr: Box::new(PrefixExpr::Var(Var::Name(Name(tokens.cur().span.as_string(input))))),
 					args: parse_args(&input, tokens),
 				}),
-				_ => PrefixExpr::Var(Var::Name(Name(tokens.cur().unwrap().span.as_str(input).to_string()))),
+				_ => PrefixExpr::Var(Var::Name(Name(tokens.cur().span.as_string(input)))),
 			}
 		},
 		_ => panic!(),
@@ -464,9 +437,7 @@ pub fn parse_stat(input: &str, tokens: &mut TokenIter) -> Stat {
 			tokens.next();
 			if tokens.peek().kind == TokenKind::LParen {
 				Stat::FunctionCall(FunctionCall {
-					expr: Box::new(PrefixExpr::Var(Var::Name(Name(
-						tokens.cur().unwrap().span.as_str(input).to_string(),
-					)))),
+					expr: Box::new(PrefixExpr::Var(Var::Name(Name(tokens.cur().span.as_string(input))))),
 					args: parse_args(&input, tokens),
 				})
 			} else {
@@ -482,11 +453,7 @@ pub fn parse_stat(input: &str, tokens: &mut TokenIter) -> Stat {
 pub fn parse_assignment(input: &str, tokens: &mut TokenIter) -> Assignment {
 	let varlist = parse_varlist(&input, tokens);
 
-	if tokens.peek().kind == TokenKind::Assign {
-		tokens.next();
-	} else {
-		panic!();
-	}
+	tokens.assert_next(TokenKind::Assign);
 
 	let exprlist = parse_exprlist(&input, tokens);
 
@@ -495,11 +462,7 @@ pub fn parse_assignment(input: &str, tokens: &mut TokenIter) -> Assignment {
 
 /// local namelist [`=` explist]
 pub fn parse_local_assignment(input: &str, tokens: &mut TokenIter) -> LocalAssignment {
-	if tokens.peek().kind == TokenKind::Local {
-		tokens.next();
-	} else {
-		panic!();
-	}
+	tokens.assert_next(TokenKind::Local);
 
 	let namelist = parse_namelist(&input, tokens);
 
@@ -519,7 +482,7 @@ pub fn parse_local_function_def(input: &str, tokens: &mut TokenIter) -> LocalFun
 	tokens.assert_next(TokenKind::Function);
 	tokens.assert_next(TokenKind::Ident);
 
-	let name = Name(tokens.cur().unwrap().span.as_str(input).to_string());
+	let name = Name(tokens.cur().span.as_string(input));
 	let body = parse_funcbody(&input, tokens);
 
 	LocalFunctionDef { name, body }
@@ -558,7 +521,7 @@ pub fn parse_for_range(input: &str, tokens: &mut TokenIter) -> ForRange {
 	tokens.assert_next(TokenKind::For);
 
 	tokens.assert_next(TokenKind::Ident);
-	let name = Name(tokens.cur().unwrap().span.as_str(input).to_string());
+	let name = Name(tokens.cur().span.as_string(input));
 
 	tokens.assert_next(TokenKind::Assign);
 	let exp_start = parse_expr(&input, tokens);
@@ -725,14 +688,14 @@ pub fn parse_functiondef(input: &str, tokens: &mut TokenIter) -> FunctionDef {
 pub fn parse_namelist(input: &str, tokens: &mut TokenIter) -> Vec<Name> {
 	tokens.assert_next(TokenKind::Ident);
 
-	let first_name = tokens.cur().unwrap().span.as_str(input).to_string();
+	let first_name = tokens.cur().span.as_string(input);
 
 	let mut names = vec![Name(first_name)];
 
 	while tokens.peek().kind == TokenKind::Comma {
 		tokens.next();
 		tokens.assert_next(TokenKind::Ident);
-		names.push(Name(tokens.cur().unwrap().span.as_str(input).to_string()));
+		names.push(Name(tokens.cur().span.as_string(input)));
 	}
 
 	names

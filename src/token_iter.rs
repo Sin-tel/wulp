@@ -18,21 +18,18 @@ impl TokenIter {
 	pub fn peek(&mut self) -> Token {
 		*self.tokens.get(self.index).unwrap()
 	}
-	// pub fn peek_n(&mut self, n: usize) -> Option<Token> {
-	// 	self.tokens.get(self.index + n).copied()
-	// }
 	pub fn next(&mut self) -> Token {
 		let tk = *self.tokens.get(self.index).unwrap();
 		self.index += 1;
 		tk
 	}
 	// TODO: try to get rid of this
-	pub fn prev(&mut self) -> Option<Token> {
+	pub fn prev(&mut self) -> Token {
 		if self.index == 0 {
 			panic!("Trying to read negative character index (THIS SHOULD NOT HAPPEN!)")
 		} else {
 			self.index -= 1;
-			self.tokens.get(self.index).copied()
+			*self.tokens.get(self.index).unwrap()
 		}
 	}
 	pub fn assert_next(&mut self, knd: TokenKind) {
@@ -42,11 +39,11 @@ impl TokenIter {
 			panic!("Expected: {:?}", knd)
 		}
 	}
-	pub fn cur(&mut self) -> Option<Token> {
+	pub fn cur(&mut self) -> Token {
 		if self.index == 0 {
-			return None;
+			panic!("Trying to read negative character index (THIS SHOULD NOT HAPPEN!)");
 		} else {
-			self.tokens.get(self.index - 1).copied()
+			*self.tokens.get(self.index - 1).unwrap()
 		}
 	}
 }

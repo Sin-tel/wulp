@@ -19,11 +19,9 @@ impl Span {
 		&input[self.start..self.end]
 	}
 
-	// pub fn join(s1: Self, s2: Self) -> Self {
-	// 	let start = s1.start;
-	// 	let end = s2.end;
-	// 	Self { start, end }
-	// }
+	pub fn as_string(&self, input: &str) -> String {
+		input[self.start..self.end].to_string()
+	}
 }
 
 // https://github.com/pest-parser/pest/blob/1e407663b4aeef32e481643d0c45d834799af404/pest/src/position.rs

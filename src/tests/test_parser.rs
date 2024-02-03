@@ -265,9 +265,7 @@ fn test_parse_exprlist_fail() {
 	let p = r#"nil, false,"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = TokenIter::new(tokens);
-	assert_eq!(parse_exprlist(p, &mut tokens), (vec![Expr::Nil, Expr::Bool(false)]));
-
-	assert_eq!(tokens.next().kind, TokenKind::Comma);
+	parse_exprlist(p, &mut tokens);
 }
 
 #[test]
