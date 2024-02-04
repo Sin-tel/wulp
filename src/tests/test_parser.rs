@@ -244,12 +244,12 @@ fn args() {
 }
 
 #[test]
-fn exprlist() {
+fn exprs() {
 	let p = r#"nil, false, true, "str""#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
 	assert_eq!(
-		parse_exprlist(p, &mut tokens),
+		parse_exprs(p, &mut tokens),
 		(vec![
 			Expr::Nil,
 			Expr::Bool(false),
@@ -260,12 +260,12 @@ fn exprlist() {
 }
 
 #[test]
-fn varlist() {
+fn vars() {
 	let p = r#"foo, bar, bizz"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
 	assert_eq!(
-		parse_varlist(p, &mut tokens),
+		parse_vars(p, &mut tokens),
 		(vec![
 			Var::Name(Name(String::from("foo"))),
 			Var::Name(Name(String::from("bar"))),
@@ -479,19 +479,19 @@ fn parlist() {
 }
 
 #[test]
-fn namelist() {
+fn names() {
 	let p = r#"Name"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
 
-	assert_eq!(parse_namelist(p, &mut tokens), (vec![Name(String::from("Name"))]));
+	assert_eq!(parse_names(p, &mut tokens), (vec![Name(String::from("Name"))]));
 
 	let p = r#"Name,Another_Name"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
 
 	assert_eq!(
-		parse_namelist(p, &mut tokens),
+		parse_names(p, &mut tokens),
 		(vec![Name(String::from("Name")), Name(String::from("Another_Name"))])
 	);
 }
@@ -564,8 +564,8 @@ fn stat() {
 	assert_eq!(
 		parse_stat(p, &mut tokens),
 		(Stat::ForIn(ForIn {
-			namelist: vec![Name(String::from("foo")), Name(String::from("bar"))],
-			exprlist: vec![Expr::Bool(true), Expr::Nil],
+			names: vec![Name(String::from("foo")), Name(String::from("bar"))],
+			exprs: vec![Expr::Bool(true), Expr::Nil],
 			block: Block { stats: vec![] },
 		}))
 	);
@@ -612,12 +612,12 @@ fn stat() {
 	assert_eq!(
 		parse_stat(p, &mut tokens),
 		(Stat::LocalAssignment(LocalAssignment {
-			namelist: vec![
+			names: vec![
 				Name(String::from("foo")),
 				Name(String::from("bar")),
 				Name(String::from("buzz"))
 			],
-			exprlist: vec![Expr::Nil, Expr::Num(10f64), Expr::Str(String::from("word"))],
+			exprs: vec![Expr::Nil, Expr::Num(10f64), Expr::Str(String::from("word"))],
 		}))
 	);
 
@@ -627,11 +627,11 @@ fn stat() {
 	assert_eq!(
 		parse_stat(p, &mut tokens),
 		(Stat::Assignment(Assignment {
-			varlist: vec![
+			vars: vec![
 				Var::Name(Name(String::from("foo"))),
 				Var::Name(Name(String::from("bar")))
 			],
-			exprlist: vec![Expr::Bool(true), Expr::Nil],
+			exprs: vec![Expr::Bool(true), Expr::Nil],
 		}))
 	);
 
@@ -705,11 +705,11 @@ fn funcname() {
 
 #[test]
 #[should_panic(expected = "Expected expression but found: end of file.")]
-fn exprlist_fail() {
+fn exprs_fail() {
 	let p = r#"nil, false,"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
-	parse_exprlist(p, &mut tokens);
+	parse_exprs(p, &mut tokens);
 }
 
 #[test]

@@ -22,19 +22,19 @@ pub fn parse(input: &str) -> Block {
 
 /// funcname ::= Name {`.` Name} [`:` Name]
 pub fn parse_funcname(input: &str, tokens: &mut Tokens) -> FuncName {
-	tokens.assert_next(input, TokenKind::Ident);
+	tokens.assert_next(input, TokenKind::Name);
 
 	let mut path = vec![Name(tokens.cur().span.as_string(input))];
 	// if next token is period then loop
 	while tokens.peek().kind == (TokenKind::Period) {
 		tokens.next();
-		tokens.assert_next(input, TokenKind::Ident);
+		tokens.assert_next(input, TokenKind::Name);
 		path.push(Name(tokens.cur().span.as_string(input)));
 	}
 	let mut method: Option<Name> = None;
 	if tokens.peek().kind == TokenKind::Colon {
 		tokens.next();
-		tokens.assert_next(input, TokenKind::Ident);
+		tokens.assert_next(input, TokenKind::Name);
 		method = Some(Name(tokens.cur().span.as_string(input)));
 	}
 	FuncName { path, method }
@@ -113,7 +113,7 @@ pub fn parse_field(input: &str, tokens: &mut Tokens) -> Field {
 	let name_token = tokens.next();
 	match name_token.kind {
 		// Name '=' exp
-		TokenKind::Ident => {
+		TokenKind::Name => {
 			tokens.assert_next(input, TokenKind::Assign);
 
 			let expr = parse_expr(input, tokens);
@@ -146,22 +146,22 @@ pub fn parse_table_constructor(input: &str, tokens: &mut Tokens) -> Vec<Field> {
 	fieldlist
 }
 
-/// varlist ::= var {`,` var}
-pub fn parse_varlist(input: &str, tokens: &mut Tokens) -> Vec<Var> {
-	let mut varlist = vec![];
+/// vars ::= var {`,` var}
+pub fn parse_vars(input: &str, tokens: &mut Tokens) -> Vec<Var> {
+	let mut vars = vec![];
 
-	varlist.push(parse_var(input, tokens));
+	vars.push(parse_var(input, tokens));
 
 	while tokens.peek().kind == TokenKind::Comma {
 		tokens.next();
-		varlist.push(parse_var(input, tokens));
+		vars.push(parse_var(input, tokens));
 	}
 
-	varlist
+	vars
 }
 
 /// explist ::= exp {`,` exp}
-pub fn parse_exprlist(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
+pub fn parse_exprs(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
 	let mut exprs = vec![];
 
 	exprs.push(parse_expr(input, tokens));
@@ -181,7 +181,7 @@ pub fn parse_args(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
 		tokens.next();
 		return vec![];
 	}
-	let explist = parse_exprlist(input, tokens);
+	let explist = parse_exprs(input, tokens);
 	tokens.assert_next(input, TokenKind::RParen);
 	explist
 }
@@ -192,7 +192,7 @@ pub fn parse_args(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
 /// bar[0]
 /// bar.bizz
 pub fn parse_var(input: &str, tokens: &mut Tokens) -> Var {
-	if tokens.peek().kind == TokenKind::Ident {
+	if tokens.peek().kind == TokenKind::Name {
 		let name_token = tokens.next();
 
 		// TODO: these are completely incomprehensible, fix it
@@ -211,7 +211,7 @@ pub fn parse_var(input: &str, tokens: &mut Tokens) -> Var {
 			},
 			TokenKind::Period => {
 				tokens.next();
-				tokens.assert_next(input, TokenKind::Ident);
+				tokens.assert_next(input, TokenKind::Name);
 
 				Var::Property(Property {
 					expr: Box::new(PrefixExpr::Var(Var::Name(Name(name_token.span.as_string(input))))),
@@ -239,7 +239,7 @@ pub fn parse_var(input: &str, tokens: &mut Tokens) -> Var {
 			},
 			TokenKind::Period => {
 				tokens.next();
-				tokens.assert_next(input, TokenKind::Ident);
+				tokens.assert_next(input, TokenKind::Name);
 
 				Var::Property(Property {
 					expr: Box::new(prefixexp),
@@ -266,7 +266,7 @@ pub fn parse_prefix_exp(input: &str, tokens: &mut Tokens) -> PrefixExpr {
 		},
 
 		// TODO: these are completely incomprehensible, fix it
-		TokenKind::Ident => {
+		TokenKind::Name => {
 			tokens.next();
 			match tokens.peek().kind {
 				TokenKind::LBracket => {
@@ -283,7 +283,7 @@ pub fn parse_prefix_exp(input: &str, tokens: &mut Tokens) -> PrefixExpr {
 				},
 				TokenKind::Period => {
 					tokens.next();
-					tokens.assert_next(input, TokenKind::Ident);
+					tokens.assert_next(input, TokenKind::Name);
 
 					PrefixExpr::Var(Var::Property(Property {
 						expr: Box::new(PrefixExpr::Var(Var::Name(Name(tokens.cur().span.as_string(input))))),
@@ -335,7 +335,7 @@ pub fn parse_stat_inner(input: &str, tokens: &mut Tokens) -> Stat {
 				Stat::LocalAssignment(parse_local_assignment(input, tokens))
 			}
 		},
-		TokenKind::Ident => {
+		TokenKind::Name => {
 			if tokens.peek_n(2).kind == TokenKind::LParen {
 				tokens.next();
 				Stat::FunctionCall(FunctionCall {
@@ -350,38 +350,38 @@ pub fn parse_stat_inner(input: &str, tokens: &mut Tokens) -> Stat {
 	}
 }
 
-/// varlist `=` explist
+/// vars `=` explist
 pub fn parse_assignment(input: &str, tokens: &mut Tokens) -> Assignment {
-	let varlist = parse_varlist(input, tokens);
+	let vars = parse_vars(input, tokens);
 
 	tokens.assert_next(input, TokenKind::Assign);
 
-	let exprlist = parse_exprlist(input, tokens);
+	let exprs = parse_exprs(input, tokens);
 
-	Assignment { varlist, exprlist }
+	Assignment { vars, exprs }
 }
 
-/// local namelist [`=` explist]
+/// local names [`=` explist]
 pub fn parse_local_assignment(input: &str, tokens: &mut Tokens) -> LocalAssignment {
 	tokens.assert_next(input, TokenKind::Local);
 
-	let namelist = parse_namelist(input, tokens);
+	let names = parse_names(input, tokens);
 
-	let exprlist = if tokens.peek().kind == TokenKind::Assign {
+	let exprs = if tokens.peek().kind == TokenKind::Assign {
 		tokens.next();
-		parse_exprlist(input, tokens)
+		parse_exprs(input, tokens)
 	} else {
 		vec![]
 	};
 
-	LocalAssignment { namelist, exprlist }
+	LocalAssignment { names, exprs }
 }
 
 /// local function Name funcbody
 pub fn parse_local_function_def(input: &str, tokens: &mut Tokens) -> LocalFunctionDef {
 	tokens.assert_next(input, TokenKind::Local);
 	tokens.assert_next(input, TokenKind::Function);
-	tokens.assert_next(input, TokenKind::Ident);
+	tokens.assert_next(input, TokenKind::Name);
 
 	let name = Name(tokens.cur().span.as_string(input));
 	let body = parse_funcbody(input, tokens);
@@ -399,29 +399,25 @@ pub fn parse_function_def(input: &str, tokens: &mut Tokens) -> FunctionDef {
 	FunctionDef { name, body }
 }
 
-/// for namelist in explist do block end
+/// for names in explist do block end
 pub fn parse_for_in(input: &str, tokens: &mut Tokens) -> ForIn {
 	tokens.assert_next(input, TokenKind::For);
 
-	let namelist = parse_namelist(input, tokens);
+	let names = parse_names(input, tokens);
 
 	tokens.assert_next(input, TokenKind::In);
 
-	let exprlist = parse_exprlist(input, tokens);
+	let exprs = parse_exprs(input, tokens);
 	let block = parse_do_block(input, tokens);
 
-	ForIn {
-		namelist,
-		exprlist,
-		block,
-	}
+	ForIn { names, exprs, block }
 }
 
 /// for Name `=` exp `,` exp [`,` exp] do block end
 pub fn parse_for_range(input: &str, tokens: &mut Tokens) -> ForRange {
 	tokens.assert_next(input, TokenKind::For);
 
-	tokens.assert_next(input, TokenKind::Ident);
+	tokens.assert_next(input, TokenKind::Name);
 	let name = Name(tokens.cur().span.as_string(input));
 
 	tokens.assert_next(input, TokenKind::Assign);
@@ -553,13 +549,13 @@ pub fn parse_return(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
 		return vec![];
 	}
 
-	let exprlist = parse_exprlist(input, tokens);
+	let exprs = parse_exprs(input, tokens);
 
 	if tokens.peek().kind == TokenKind::SemiColon {
 		tokens.next();
 	}
 
-	exprlist
+	exprs
 }
 
 /// funcbody ::= `(` [parlist] `)` block end
@@ -585,9 +581,9 @@ pub fn parse_functiondef(input: &str, tokens: &mut Tokens) -> FunctionDef {
 	FunctionDef { name, body }
 }
 
-/// namelist ::= Name {`,` Name}
-pub fn parse_namelist(input: &str, tokens: &mut Tokens) -> Vec<Name> {
-	tokens.assert_next(input, TokenKind::Ident);
+/// names ::= Name {`,` Name}
+pub fn parse_names(input: &str, tokens: &mut Tokens) -> Vec<Name> {
+	tokens.assert_next(input, TokenKind::Name);
 
 	let first_name = tokens.cur().span.as_string(input);
 
@@ -597,7 +593,7 @@ pub fn parse_namelist(input: &str, tokens: &mut Tokens) -> Vec<Name> {
 		tokens.next();
 
 		// don't crash on trailing comma
-		if tokens.peek().kind == TokenKind::Ident {
+		if tokens.peek().kind == TokenKind::Name {
 			tokens.next();
 			names.push(Name(tokens.cur().span.as_string(input)));
 		} else {
@@ -607,12 +603,12 @@ pub fn parse_namelist(input: &str, tokens: &mut Tokens) -> Vec<Name> {
 	names
 }
 
-/// parlist ::= namelist [`,`]
+/// parlist ::= names [`,`]
 pub fn parse_parlist(input: &str, tokens: &mut Tokens) -> Vec<Name> {
 	match tokens.peek().kind {
-		// namelist
-		TokenKind::Ident => {
-			let names = parse_namelist(input, tokens);
+		// names
+		TokenKind::Name => {
+			let names = parse_names(input, tokens);
 
 			// [',']
 			if tokens.peek().kind == TokenKind::Comma {

@@ -57,7 +57,7 @@ pub enum TokenKind {
 	Colon,
 	Str,
 	Number,
-	Ident,
+	Name,
 	Comment,
 	Eof,
 }
@@ -188,7 +188,7 @@ impl fmt::Display for TokenKind {
 				Colon => "`:",
 				Str => "string",
 				Number => "number",
-				Ident => "identifier",
+				Name => "identifier",
 				Comment => "comment",
 				Eof => "end of file",
 			}

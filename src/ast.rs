@@ -4,21 +4,21 @@ pub struct Block {
 	pub stats: Vec<Stat>,
 }
 
-/// stat ::=  varlist `=` explist |
+/// stat ::=  vars `=` explist |
 ///       functioncall |
 ///       do block end |
 ///       while exp do block end |
 ///       repeat block until exp |
 ///       if exp then block {elseif exp then block} [else block] end |
 ///       for Name `=` exp `,` exp [`,` exp] do block end |
-///       for namelist in explist do block end |
+///       for names in explist do block end |
 ///       function funcname funcbody |
 ///       local function Name funcbody |
-///       local namelist [`=` explist]
+///       local names [`=` explist]
 /// laststat ::= return [explist] | break
 #[derive(Debug, PartialEq)]
 pub enum Stat {
-	Assignment(Assignment), // varlist '=' explist
+	Assignment(Assignment), // vars '=' explist
 	FunctionCall(FunctionCall),
 	DoBlock(Block),
 	WhileBlock(WhileBlock),
@@ -63,26 +63,26 @@ pub struct ForRange {
 	pub block: Block,
 }
 
-/// for namelist in explist do block end
+/// for names in explist do block end
 #[derive(Debug, PartialEq)]
 pub struct ForIn {
-	pub namelist: Vec<Name>,
-	pub exprlist: Vec<Expr>,
+	pub names: Vec<Name>,
+	pub exprs: Vec<Expr>,
 	pub block: Block,
 }
 
-/// varlist '=' explist
+/// vars '=' explist
 #[derive(Debug, PartialEq)]
 pub struct Assignment {
-	pub varlist: Vec<Var>,
-	pub exprlist: Vec<Expr>,
+	pub vars: Vec<Var>,
+	pub exprs: Vec<Expr>,
 }
 
-/// local namelist [`=` explist]
+/// local names [`=` explist]
 #[derive(Debug, PartialEq)]
 pub struct LocalAssignment {
-	pub namelist: Vec<Name>,
-	pub exprlist: Vec<Expr>, // If vec is empty there is no `=`
+	pub names: Vec<Name>,
+	pub exprs: Vec<Expr>, // If vec is empty there is no `=`
 }
 
 /// funcname ::= Name {`.` Name} [`:` Name]
@@ -161,7 +161,7 @@ pub struct LocalFunctionDef {
 }
 
 /// funcbody ::= `(` [parlist] `)` block end
-/// parlist ::= namelist [`,`]
+/// parlist ::= names [`,`]
 #[derive(Debug, PartialEq)]
 pub struct FuncBody {
 	pub params: Vec<Name>,

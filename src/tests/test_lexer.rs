@@ -85,12 +85,12 @@ fn basic_assignment() {
 	let nil_assignment = r#"x =nil"#;
 	let actual: Vec<_> = Lexer::new(nil_assignment).map(|tk| tk.kind).collect();
 
-	assert_eq!(actual, vec![Ident, Assign, Nil, Eof]);
+	assert_eq!(actual, vec![Name, Assign, Nil, Eof]);
 
 	let p = r#"local _x = 1"#;
 	let actual: Vec<_> = Lexer::new(p).map(|tk| tk.kind).collect();
 
-	assert_eq!(actual, vec![Local, Ident, Assign, Number, Eof]);
+	assert_eq!(actual, vec![Local, Name, Assign, Number, Eof]);
 }
 
 #[test]
@@ -101,18 +101,18 @@ fn assignment() {
 
 	let lex = Lexer::new(string_assignment);
 	let actual: Vec<_> = lex.map(|tk| tk.kind).collect();
-	assert_eq!(actual, vec![Ident, Assign, Str, Eof]);
+	assert_eq!(actual, vec![Name, Assign, Str, Eof]);
 
 	let bool_assignment = r#"x = false"#;
 	let lex = Lexer::new(bool_assignment);
 	let actual: Vec<_> = lex.map(|tk| tk.kind).collect();
 
-	assert_eq!(actual, vec![Ident, Assign, False, Eof]);
+	assert_eq!(actual, vec![Name, Assign, False, Eof]);
 
 	let var_assignment = r#"x = y"#;
 	let lex = Lexer::new(var_assignment);
 	let actual: Vec<_> = lex.map(|tk| tk.kind).collect();
-	assert_eq!(actual, vec![Ident, Assign, Ident, Eof]);
+	assert_eq!(actual, vec![Name, Assign, Name, Eof]);
 }
 
 #[test]
@@ -122,7 +122,7 @@ fn string_concat() {
 	let actual: Vec<_> = Lexer::new(p).map(|tk| tk.kind).collect();
 
 	use TokenKind::*;
-	assert_eq!(actual, vec![Str, Concat, Ident, Eof])
+	assert_eq!(actual, vec![Str, Concat, Name, Eof])
 }
 
 #[test]
@@ -142,7 +142,7 @@ fn empty_table() {
 	let actual: Vec<_> = Lexer::new(p).map(|tk| tk.kind).collect();
 
 	use TokenKind::*;
-	assert_eq!(actual, vec![Ident, Assign, LCurly, RCurly, Eof]);
+	assert_eq!(actual, vec![Name, Assign, LCurly, RCurly, Eof]);
 }
 
 #[test]

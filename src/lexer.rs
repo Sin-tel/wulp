@@ -192,7 +192,7 @@ impl<'a> Lexer<'a> {
 			"elseif" => TokenKind::ElseIf,
 			"else" => TokenKind::Else,
 			"local" => TokenKind::Local,
-			_ => TokenKind::Ident,
+			_ => TokenKind::Name,
 		};
 
 		Token { kind, span }
