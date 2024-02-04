@@ -22,20 +22,16 @@ pub fn parse(input: &str) -> Block {
 
 /// funcname ::= Name {`.` Name} [`:` Name]
 pub fn parse_funcname(input: &str, tokens: &mut Tokens) -> FuncName {
-	tokens.assert_next(input, TokenKind::Name);
-
-	let mut path = vec![Name(tokens.cur().span.as_string(input))];
+	let mut path = vec![parse_name(input, tokens)];
 	// if next token is period then loop
 	while tokens.peek().kind == (TokenKind::Period) {
 		tokens.next();
-		tokens.assert_next(input, TokenKind::Name);
-		path.push(Name(tokens.cur().span.as_string(input)));
+		path.push(parse_name(input, tokens));
 	}
 	let mut method: Option<Name> = None;
 	if tokens.peek().kind == TokenKind::Colon {
 		tokens.next();
-		tokens.assert_next(input, TokenKind::Name);
-		method = Some(Name(tokens.cur().span.as_string(input)));
+		method = Some(parse_name(input, tokens));
 	}
 	FuncName { path, method }
 }
@@ -116,11 +112,11 @@ pub fn parse_field(input: &str, tokens: &mut Tokens) -> Field {
 	match tokens.peek().kind {
 		// Name '=' exp
 		TokenKind::Name => {
-			let name_token = tokens.next();
+			let name = parse_name(input, tokens);
 			tokens.assert_next(input, TokenKind::Assign);
 
 			let expr = parse_expr(input, tokens);
-			Field::Assign(Name(name_token.span.as_string(input)), expr)
+			Field::Assign(name, expr)
 		},
 		// '[' exp ']' '=' exp
 		TokenKind::LBracket => {
@@ -139,22 +135,16 @@ pub fn parse_field(input: &str, tokens: &mut Tokens) -> Field {
 }
 
 /// tableconstructor ::= `{` [fieldlist] `}`
+/// fieldlist ::= field {fieldsep field} [fieldsep]
+/// fieldsep ::= `,` | `;`
 pub fn parse_table_constructor(input: &str, tokens: &mut Tokens) -> Vec<Field> {
 	tokens.assert_next(input, TokenKind::LCurly);
 	if tokens.peek().kind == TokenKind::RCurly {
 		tokens.next();
 		return vec![];
 	};
-	let fieldlist = parse_fieldlist(input, tokens);
-	tokens.assert_next(input, TokenKind::RCurly);
-	fieldlist
-}
 
-/// fieldlist ::= field {fieldsep field} [fieldsep]
-/// fieldsep ::= `,` | `;`
-pub fn parse_fieldlist(input: &str, tokens: &mut Tokens) -> Vec<Field> {
 	let mut fields = vec![];
-
 	loop {
 		let f = parse_field(input, tokens);
 		fields.push(f);
@@ -167,6 +157,8 @@ pub fn parse_fieldlist(input: &str, tokens: &mut Tokens) -> Vec<Field> {
 			_ => break,
 		}
 	}
+
+	tokens.assert_next(input, TokenKind::RCurly);
 	fields
 }
 
@@ -217,9 +209,8 @@ pub fn parse_args(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
 /// bar.bizz
 pub fn parse_var(input: &str, tokens: &mut Tokens) -> Var {
 	if tokens.peek().kind == TokenKind::Name {
-		let name_token = tokens.next();
+		let name = parse_name(input, tokens);
 
-		// TODO: these are completely incomprehensible, fix it
 		match tokens.peek().kind {
 			TokenKind::LBracket => {
 				tokens.next();
@@ -229,20 +220,21 @@ pub fn parse_var(input: &str, tokens: &mut Tokens) -> Var {
 				tokens.assert_next(input, TokenKind::RBracket);
 
 				Var::IndexExpr(IndexExpr {
-					expr: Box::new(PrefixExpr::Var(Var::Name(Name(name_token.span.as_string(input))))),
+					expr: Box::new(PrefixExpr::Var(Var::Name(name))),
 					arg: expr,
 				})
 			},
 			TokenKind::Period => {
 				tokens.next();
-				tokens.assert_next(input, TokenKind::Name);
+
+				let next_name = parse_name(input, tokens);
 
 				Var::Property(Property {
-					expr: Box::new(PrefixExpr::Var(Var::Name(Name(name_token.span.as_string(input))))),
-					name: Name(tokens.cur().span.as_string(input)),
+					expr: Box::new(PrefixExpr::Var(Var::Name(name))),
+					name: next_name,
 				})
 			},
-			_ => Var::Name(Name(tokens.cur().span.as_string(input))),
+			_ => Var::Name(name),
 		}
 	} else {
 		let prefixexp = parse_prefix_exp(input, tokens);
@@ -263,11 +255,11 @@ pub fn parse_var(input: &str, tokens: &mut Tokens) -> Var {
 			},
 			TokenKind::Period => {
 				tokens.next();
-				tokens.assert_next(input, TokenKind::Name);
+				let name = parse_name(input, tokens);
 
 				Var::Property(Property {
 					expr: Box::new(prefixexp),
-					name: Name(tokens.cur().span.as_string(input)),
+					name,
 				})
 			},
 			// TODO: I'm not sure if this is even reachable
@@ -290,9 +282,9 @@ pub fn parse_prefix_exp(input: &str, tokens: &mut Tokens) -> PrefixExpr {
 			expr
 		},
 
-		// TODO: these are completely incomprehensible, fix it
 		TokenKind::Name => {
-			tokens.next();
+			let name = parse_name(input, tokens);
+
 			match tokens.peek().kind {
 				TokenKind::LBracket => {
 					tokens.next();
@@ -302,24 +294,25 @@ pub fn parse_prefix_exp(input: &str, tokens: &mut Tokens) -> PrefixExpr {
 					tokens.assert_next(input, TokenKind::RBracket);
 
 					PrefixExpr::Var(Var::IndexExpr(IndexExpr {
-						expr: Box::new(PrefixExpr::Var(Var::Name(Name(tokens.cur().span.as_string(input))))),
+						expr: Box::new(PrefixExpr::Var(Var::Name(name))),
 						arg: expr,
 					}))
 				},
 				TokenKind::Period => {
 					tokens.next();
-					tokens.assert_next(input, TokenKind::Name);
+
+					let next_name = parse_name(input, tokens);
 
 					PrefixExpr::Var(Var::Property(Property {
-						expr: Box::new(PrefixExpr::Var(Var::Name(Name(tokens.cur().span.as_string(input))))),
-						name: Name(tokens.cur().span.as_string(input)),
+						expr: Box::new(PrefixExpr::Var(Var::Name(name))),
+						name: next_name,
 					}))
 				},
 				TokenKind::LParen => PrefixExpr::FunctionCall(FunctionCall {
-					expr: Box::new(PrefixExpr::Var(Var::Name(Name(tokens.cur().span.as_string(input))))),
+					expr: Box::new(PrefixExpr::Var(Var::Name(name))),
 					args: parse_args(input, tokens),
 				}),
-				_ => PrefixExpr::Var(Var::Name(Name(tokens.cur().span.as_string(input)))),
+				_ => PrefixExpr::Var(Var::Name(name)),
 			}
 		},
 		_ => format_err(&format!("Expected expression but found: {tk}."), tk.span, input),
@@ -363,9 +356,9 @@ pub fn parse_stat_inner(input: &str, tokens: &mut Tokens) -> Stat {
 		},
 		TokenKind::Name => {
 			if tokens.peek_n(2).kind == TokenKind::LParen {
-				tokens.next();
+				let name = parse_name(input, tokens);
 				Stat::FunctionCall(FunctionCall {
-					expr: Box::new(PrefixExpr::Var(Var::Name(Name(tokens.cur().span.as_string(input))))),
+					expr: Box::new(PrefixExpr::Var(Var::Name(name))),
 					args: parse_args(input, tokens),
 				})
 			} else {
@@ -407,9 +400,8 @@ pub fn parse_local_assignment(input: &str, tokens: &mut Tokens) -> LocalAssignme
 pub fn parse_local_function_def(input: &str, tokens: &mut Tokens) -> LocalFunctionDef {
 	tokens.assert_next(input, TokenKind::Local);
 	tokens.assert_next(input, TokenKind::Function);
-	tokens.assert_next(input, TokenKind::Name);
 
-	let name = Name(tokens.cur().span.as_string(input));
+	let name = parse_name(input, tokens);
 	let body = parse_funcbody(input, tokens);
 
 	LocalFunctionDef { name, body }
@@ -443,8 +435,7 @@ pub fn parse_for_in(input: &str, tokens: &mut Tokens) -> ForIn {
 pub fn parse_for_range(input: &str, tokens: &mut Tokens) -> ForRange {
 	tokens.assert_next(input, TokenKind::For);
 
-	tokens.assert_next(input, TokenKind::Name);
-	let name = Name(tokens.cur().span.as_string(input));
+	let name = parse_name(input, tokens);
 
 	tokens.assert_next(input, TokenKind::Assign);
 	let exp_start = parse_expr(input, tokens);
@@ -597,19 +588,14 @@ pub fn parse_funcbody(input: &str, tokens: &mut Tokens) -> FuncBody {
 
 /// names ::= Name {`,` Name}
 pub fn parse_names(input: &str, tokens: &mut Tokens) -> Vec<Name> {
-	tokens.assert_next(input, TokenKind::Name);
-
-	let first_name = tokens.cur().span.as_string(input);
-
-	let mut names = vec![Name(first_name)];
+	let mut names = vec![parse_name(input, tokens)];
 
 	while tokens.peek().kind == TokenKind::Comma {
 		tokens.next();
 
 		// don't crash on trailing comma
 		if tokens.peek().kind == TokenKind::Name {
-			tokens.next();
-			names.push(Name(tokens.cur().span.as_string(input)));
+			names.push(parse_name(input, tokens));
 		} else {
 			break;
 		}
@@ -654,4 +640,9 @@ fn parse_number(input: &str, tokens: &mut Tokens) -> f64 {
 		Ok(num) => num,
 		_ => format_err(&format!("Malformed number: `{s}`."), tk.span, input),
 	}
+}
+
+fn parse_name(input: &str, tokens: &mut Tokens) -> Name {
+	tokens.assert_next(input, TokenKind::Name);
+	Name(tokens.cur().span.as_string(input))
 }

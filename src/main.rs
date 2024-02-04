@@ -42,12 +42,13 @@ fn main() {
 
 	let mut ast = parser::parse(input);
 	println!("{input}");
-	// dbg!(&ast);
+	dbg!(&ast);
 
-	// let mut printer = ast_print::AstPrinter;
-	// printer.print_ast(&mut ast);
+	let mut printer = ast_print::AstPrinter;
+	printer.print_ast(&mut ast);
 
 	let lua = mlua::Lua::new();
-	let ret = lua.load(input).eval::<String>().unwrap();
-	println!("{ret:?}");
+	lua.load(input).exec().ok();
+	// let ret = lua.load(input).eval::<String>().unwrap();
+	// println!("{ret:?}");
 }

@@ -31,7 +31,13 @@ pub trait Visitor: Sized {
 	fn visit_prefix_expr(&mut self, node: &mut PrefixExpr) {
 		node.visit(self);
 	}
+	fn visit_index_expr(&mut self, node: &mut IndexExpr) {
+		node.visit(self);
+	}
 	fn visit_var(&mut self, node: &mut Var) {
+		node.visit(self);
+	}
+	fn visit_field(&mut self, node: &mut Field) {
 		node.visit(self);
 	}
 	fn visit_name(&mut self, _node: &mut Name) {}
@@ -110,9 +116,13 @@ impl<V: Visitor> VisitNode<V> for Expr {
 		match self {
 			Expr::PrefixExp(e) => v.visit_prefix_expr(e),
 			Expr::Lambda(e) => v.visit_function_body(e),
-			Expr::Table(e) => unimplemented!("{e:?}"),
 			Expr::BinExp(e) => v.visit_bin_expr(e),
 			Expr::UnExp(e) => v.visit_un_expr(e),
+			Expr::Table(t) => {
+				for e in t {
+					v.visit_field(e);
+				}
+			},
 			_ => (),
 		}
 	}
@@ -141,12 +151,29 @@ impl<V: Visitor> VisitNode<V> for PrefixExpr {
 	}
 }
 
+impl<V: Visitor> VisitNode<V> for IndexExpr {
+	fn visit(&mut self, v: &mut V) {
+		v.visit_prefix_expr(&mut self.expr);
+		v.visit_expr(&mut self.arg);
+	}
+}
+
 impl<V: Visitor> VisitNode<V> for Var {
 	fn visit(&mut self, v: &mut V) {
 		match self {
 			Var::Name(e) => v.visit_name(e),
-			Var::IndexExpr(e) => unimplemented!("{e:?}"),
+			Var::IndexExpr(e) => v.visit_index_expr(e),
 			Var::Property(e) => unimplemented!("{e:?}"),
+		}
+	}
+}
+
+impl<V: Visitor> VisitNode<V> for Field {
+	fn visit(&mut self, v: &mut V) {
+		match self {
+			Field::Assign(_, _) => unimplemented!(),
+			Field::ExprAssign(_, _) => unimplemented!(),
+			Field::Expr(e) => v.visit_expr(e),
 		}
 	}
 }
