@@ -63,7 +63,7 @@ pub enum TokenKind {
 }
 
 impl Token {
-	pub fn to_bin_op(&mut self) -> Option<BinOp> {
+	pub fn as_bin_op(&mut self) -> Option<BinOp> {
 		match self.kind {
 			TokenKind::Plus => Some(BinOp::Plus),
 			TokenKind::Minus => Some(BinOp::Minus),
@@ -84,7 +84,7 @@ impl Token {
 		}
 	}
 
-	pub fn to_un_op(&mut self) -> Option<UnOp> {
+	pub fn as_un_op(&mut self) -> Option<UnOp> {
 		match self.kind {
 			TokenKind::Minus => Some(UnOp::Minus),
 			TokenKind::Not => Some(UnOp::Not),
@@ -121,9 +121,7 @@ impl Tokens {
 	}
 	pub fn assert_next(&mut self, input: &str, expect: TokenKind) {
 		let tk = self.next();
-		if tk.kind == expect {
-			()
-		} else {
+		if tk.kind != expect {
 			format_err(&format!("Expected {} but found {}.", expect, tk.kind), tk.span, input);
 		}
 	}
@@ -140,7 +138,6 @@ impl Tokens {
 impl fmt::Display for TokenKind {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		use TokenKind::*;
-
 		write!(
 			f,
 			"{}",
@@ -207,8 +204,8 @@ impl fmt::Display for Token {
 
 impl fmt::Display for Tokens {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		for token in self.tokens.iter() {
-			write!(f, "{}\t", token)?
+		for token in &self.tokens {
+			write!(f, "{token}\t")?;
 		}
 		Ok(())
 	}

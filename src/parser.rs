@@ -15,7 +15,7 @@ pub fn parse(input: &str) -> Block {
 	// make sure we are done
 	let tk = tokens.next();
 	if tk.kind != TokenKind::Eof {
-		format_err(&format!("Expected end of file but found: {}.", tk), tk.span, input);
+		format_err(&format!("Expected end of file but found: {tk}."), tk.span, input);
 	}
 	ast
 }
@@ -63,7 +63,7 @@ pub fn parse_simple_exp(input: &str, tokens: &mut Tokens) -> Option<Expr> {
 }
 
 pub fn parse_unexp(input: &str, tokens: &mut Tokens) -> Option<Expr> {
-	match tokens.peek().to_un_op() {
+	match tokens.peek().as_un_op() {
 		Some(op) => {
 			tokens.next();
 			let exp = parse_sub_expr(input, tokens, op.priority());
@@ -73,8 +73,6 @@ pub fn parse_unexp(input: &str, tokens: &mut Tokens) -> Option<Expr> {
 	}
 }
 
-/// exp ::= nil | false | true | Numeral | LiteralString | functiondef |
-///         prefixexp | tableconstructor | exp binop exp | unop exp
 pub fn parse_expr(input: &str, tokens: &mut Tokens) -> Expr {
 	parse_sub_expr(input, tokens, 0)
 }
@@ -91,7 +89,7 @@ pub fn parse_sub_expr(input: &str, tokens: &mut Tokens, min_priority: i32) -> Ex
 		},
 	};
 
-	while let Some(op) = tokens.peek().to_bin_op() {
+	while let Some(op) = tokens.peek().as_bin_op() {
 		let priority = op.priority();
 		if priority <= min_priority {
 			break;
@@ -104,7 +102,7 @@ pub fn parse_sub_expr(input: &str, tokens: &mut Tokens, min_priority: i32) -> Ex
 			op,
 			lhs: Box::new(expression),
 			rhs: Box::new(rhs),
-		})
+		});
 	}
 
 	expression
@@ -119,7 +117,7 @@ pub fn parse_field(input: &str, tokens: &mut Tokens) -> Field {
 			tokens.assert_next(input, TokenKind::Assign);
 
 			let expr = parse_expr(input, tokens);
-			Field::NameAssign(Name(name_token.span.as_string(input)), expr)
+			Field::Assign(Name(name_token.span.as_string(input)), expr)
 		},
 		// '[' exp ']' '=' exp
 		TokenKind::LBracket => {
@@ -132,7 +130,7 @@ pub fn parse_field(input: &str, tokens: &mut Tokens) -> Field {
 			Field::ExprAssign(lexpr, rexpr)
 		},
 
-		_ => Field::PosAssign(parse_expr(input, tokens)),
+		_ => Field::Expr(parse_expr(input, tokens)),
 	}
 }
 
@@ -156,7 +154,7 @@ pub fn parse_varlist(input: &str, tokens: &mut Tokens) -> Vec<Var> {
 
 	while tokens.peek().kind == TokenKind::Comma {
 		tokens.next();
-		varlist.push(parse_var(input, tokens))
+		varlist.push(parse_var(input, tokens));
 	}
 
 	varlist
@@ -194,66 +192,63 @@ pub fn parse_args(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
 /// bar[0]
 /// bar.bizz
 pub fn parse_var(input: &str, tokens: &mut Tokens) -> Var {
-	match tokens.peek().kind {
-		TokenKind::Ident => {
-			let name_token = tokens.next();
+	if tokens.peek().kind == TokenKind::Ident {
+		let name_token = tokens.next();
 
-			// TODO: these are completely incomprehensible, fix it
-			match tokens.peek().kind {
-				TokenKind::LBracket => {
-					tokens.next();
+		// TODO: these are completely incomprehensible, fix it
+		match tokens.peek().kind {
+			TokenKind::LBracket => {
+				tokens.next();
 
-					let expr = parse_expr(input, tokens);
+				let expr = parse_expr(input, tokens);
 
-					tokens.assert_next(input, TokenKind::RBracket);
+				tokens.assert_next(input, TokenKind::RBracket);
 
-					Var::IndexExpr(IndexExpr {
-						expr: Box::new(PrefixExpr::Var(Var::Name(Name(name_token.span.as_string(input))))),
-						arg: expr,
-					})
-				},
-				TokenKind::Period => {
-					tokens.next();
-					tokens.assert_next(input, TokenKind::Ident);
+				Var::IndexExpr(IndexExpr {
+					expr: Box::new(PrefixExpr::Var(Var::Name(Name(name_token.span.as_string(input))))),
+					arg: expr,
+				})
+			},
+			TokenKind::Period => {
+				tokens.next();
+				tokens.assert_next(input, TokenKind::Ident);
 
-					Var::Property(Property {
-						expr: Box::new(PrefixExpr::Var(Var::Name(Name(name_token.span.as_string(input))))),
-						name: Name(tokens.cur().span.as_string(input)),
-					})
-				},
-				_ => Var::Name(Name(tokens.cur().span.as_string(input))),
-			}
-		},
-		_ => {
-			let prefixexp = parse_prefix_exp(input, tokens);
-			let tk = tokens.peek();
+				Var::Property(Property {
+					expr: Box::new(PrefixExpr::Var(Var::Name(Name(name_token.span.as_string(input))))),
+					name: Name(tokens.cur().span.as_string(input)),
+				})
+			},
+			_ => Var::Name(Name(tokens.cur().span.as_string(input))),
+		}
+	} else {
+		let prefixexp = parse_prefix_exp(input, tokens);
+		let tk = tokens.peek();
 
-			match tk.kind {
-				TokenKind::LBracket => {
-					tokens.next();
+		match tk.kind {
+			TokenKind::LBracket => {
+				tokens.next();
 
-					let expr = parse_expr(input, tokens);
+				let expr = parse_expr(input, tokens);
 
-					tokens.assert_next(input, TokenKind::RBracket);
+				tokens.assert_next(input, TokenKind::RBracket);
 
-					Var::IndexExpr(IndexExpr {
-						expr: Box::new(prefixexp),
-						arg: expr,
-					})
-				},
-				TokenKind::Period => {
-					tokens.next();
-					tokens.assert_next(input, TokenKind::Ident);
+				Var::IndexExpr(IndexExpr {
+					expr: Box::new(prefixexp),
+					arg: expr,
+				})
+			},
+			TokenKind::Period => {
+				tokens.next();
+				tokens.assert_next(input, TokenKind::Ident);
 
-					Var::Property(Property {
-						expr: Box::new(prefixexp),
-						name: Name(tokens.cur().span.as_string(input)),
-					})
-				},
-				// TODO: I'm not sure if this is even reachable
-				_ => format_err(&format!("Expected `[` or `.` but found: {}.", tk), tk.span, input),
-			}
-		},
+				Var::Property(Property {
+					expr: Box::new(prefixexp),
+					name: Name(tokens.cur().span.as_string(input)),
+				})
+			},
+			// TODO: I'm not sure if this is even reachable
+			_ => format_err(&format!("Expected `[` or `.` but found: {tk}."), tk.span, input),
+		}
 	}
 }
 
@@ -302,7 +297,7 @@ pub fn parse_prefix_exp(input: &str, tokens: &mut Tokens) -> PrefixExpr {
 				_ => PrefixExpr::Var(Var::Name(Name(tokens.cur().span.as_string(input)))),
 			}
 		},
-		_ => format_err(&format!("Expected expression but found: {}.", tk), tk.span, input),
+		_ => format_err(&format!("Expected expression but found: {tk}."), tk.span, input),
 	}
 }
 
@@ -351,7 +346,7 @@ pub fn parse_stat_inner(input: &str, tokens: &mut Tokens) -> Stat {
 				Stat::Assignment(parse_assignment(input, tokens))
 			}
 		},
-		_ => format_err(&format!("Expected statement but found: {}.", tk), tk.span, input),
+		_ => format_err(&format!("Expected statement but found: {tk}."), tk.span, input),
 	}
 }
 
@@ -459,7 +454,7 @@ pub fn parse_elseif(input: &str, tokens: &mut Tokens) -> ElseIf {
 	tokens.assert_next(input, TokenKind::Then);
 	let block = parse_block(input, tokens);
 
-	ElseIf { block, expr }
+	ElseIf { expr, block }
 }
 
 /// else block
@@ -507,7 +502,7 @@ pub fn parse_while_block(input: &str, tokens: &mut Tokens) -> WhileBlock {
 	let expr = parse_expr(input, tokens);
 	let block = parse_do_block(input, tokens);
 
-	WhileBlock { block, expr }
+	WhileBlock { expr, block }
 }
 
 /// do block end
@@ -520,10 +515,10 @@ pub fn parse_do_block(input: &str, tokens: &mut Tokens) -> Block {
 
 // tokens that can follow after a block
 fn block_follow(tk: Token) -> bool {
-	match tk.kind {
-		TokenKind::End | TokenKind::Else | TokenKind::ElseIf | TokenKind::Eof => true,
-		_ => false,
-	}
+	matches!(
+		tk.kind,
+		TokenKind::End | TokenKind::Else | TokenKind::ElseIf | TokenKind::Eof
+	)
 }
 
 /// block ::= {stat} [laststat]
@@ -539,9 +534,8 @@ pub fn parse_block(input: &str, tokens: &mut Tokens) -> Block {
 			stats.push(parse_stat(input, tokens));
 
 			return Block { stats };
-		} else {
-			stats.push(parse_stat(input, tokens));
 		}
+		stats.push(parse_stat(input, tokens));
 	}
 	Block { stats }
 }
@@ -621,11 +615,8 @@ pub fn parse_parlist(input: &str, tokens: &mut Tokens) -> Vec<Name> {
 			let names = parse_namelist(input, tokens);
 
 			// [',']
-			match tokens.peek().kind {
-				TokenKind::Comma => {
-					tokens.next();
-				},
-				_ => (),
+			if tokens.peek().kind == TokenKind::Comma {
+				tokens.next();
 			};
 			names
 		},
@@ -658,7 +649,7 @@ fn parse_string(input: &str, tokens: &mut Tokens) -> String {
 	let tk = tokens.next();
 	let mut chars = tk.span.as_str(input).chars();
 	match chars.next() {
-		Some('\'') | Some('\"') => {
+		Some('\'' | '\"') => {
 			chars.next_back();
 			chars.as_str().to_string() // really?
 		},
@@ -671,6 +662,6 @@ fn parse_number(input: &str, tokens: &mut Tokens) -> f64 {
 	let s = tk.span.as_string(input);
 	match s.parse() {
 		Ok(num) => num,
-		_ => format_err(&format!("Malformed number: `{}`.", s), tk.span, input),
+		_ => format_err(&format!("Malformed number: `{s}`."), tk.span, input),
 	}
 }

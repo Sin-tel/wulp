@@ -42,20 +42,9 @@ impl<'a> Lexer<'a> {
 
 	fn peek_is_number(&mut self) -> bool {
 		if let Some(c) = self.next_char() {
-			return match c {
-				'0'..='9' => true,
-				_ => false,
-			};
+			return c.is_ascii_digit();
 		}
-
 		false
-	}
-
-	fn next_char_is_number(&self) -> bool {
-		match self.next_char() {
-			Some('0'..='9') => true,
-			_ => false,
-		}
 	}
 
 	fn cur_char(&self) -> Option<char> {
@@ -103,22 +92,22 @@ impl<'a> Lexer<'a> {
 	}
 
 	// '--' CONTENT '\n'?
-	fn single_line_comment(&mut self) -> Option<Token> {
+	fn single_line_comment(&mut self) -> Token {
 		let start = self.cursor;
 		self.eat_chars(2);
 		loop {
 			if self.cur_char() == Some('\n') {
 				break;
 			}
-			if self.eat_char() == None {
+			if self.eat_char().is_none() {
 				break;
 			}
 		}
 		let end = self.cursor;
-		Some(Token {
+		Token {
 			kind: TokenKind::Comment,
 			span: Span { start, end },
-		})
+		}
 	}
 
 	// '\'' CONTENT '\'' | ''' CONTENT '"'
@@ -162,7 +151,7 @@ impl<'a> Lexer<'a> {
 	}
 
 	// [A-z][A-z0-9]
-	fn identifier(&mut self) -> Option<Token> {
+	fn identifier(&mut self) -> Token {
 		let mut s = String::new();
 		let start = self.cursor;
 
@@ -206,11 +195,11 @@ impl<'a> Lexer<'a> {
 			_ => TokenKind::Ident,
 		};
 
-		Some(Token { kind, span })
+		Token { kind, span }
 	}
 
 	// ^-?[0-9](\.[0-9])?
-	fn number(&mut self) -> Option<Token> {
+	fn number(&mut self) -> Token {
 		let start = self.cursor;
 		let mut s = String::new();
 
@@ -240,10 +229,17 @@ impl<'a> Lexer<'a> {
 			end: self.cursor,
 		};
 
-		Some(Token {
+		Token {
 			kind: TokenKind::Number,
 			span,
-		})
+		}
+	}
+}
+
+fn newtoken(kind: TokenKind, start: usize, end: usize) -> Token {
+	Token {
+		kind,
+		span: Span { start, end },
 	}
 }
 
@@ -253,240 +249,161 @@ impl Iterator for Lexer<'_> {
 		if let Some("--[[") = &self.peek(4) {
 			self.multi_line_comment()
 		} else if let Some(c) = self.cur_char() {
+			use TokenKind::*;
 			let start = self.cursor;
 			let next = self.next_char();
+
 			match c {
 				'\'' | '"' => Some(self.single_line_string()),
 				'[' if next == Some('[') => self.multi_line_string(),
 				'=' if next == Some('=') => {
 					self.eat_chars(2);
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::Eq,
-						span: Span { start, end },
-					})
+					Some(newtoken(Eq, start, end))
 				},
 				'=' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::Assign,
-						span: Span { start, end },
-					})
+					Some(newtoken(Assign, start, end))
 				},
 				';' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::SemiColon,
-						span: Span { start, end },
-					})
+					Some(newtoken(SemiColon, start, end))
 				},
 				'[' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::LBracket,
-						span: Span { start, end },
-					})
+					Some(newtoken(LBracket, start, end))
 				},
 				']' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::RBracket,
-						span: Span { start, end },
-					})
+					Some(newtoken(RBracket, start, end))
 				},
-				'A'..='Z' | 'a'..='z' | '_' => self.identifier(),
+				'A'..='Z' | 'a'..='z' | '_' => Some(self.identifier()),
 				' ' | '\t' | '\n' => {
 					self.eat_char();
 					self.next()
 				},
-				'.' if self.next_char_is_number() => self.number(),
-				'0'..='9' => self.number(),
-				'-' if next == Some('-') => self.single_line_comment(),
+				'.' if self.peek_is_number() => Some(self.number()),
+				'0'..='9' => Some(self.number()),
+				'-' if next == Some('-') => Some(self.single_line_comment()),
 				'-' => {
 					if self.peek_is_number() {
-						return self.number();
+						return Some(self.number());
 					}
 					self.eat_char();
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::Minus,
-						span: Span { start, end },
-					})
+					Some(newtoken(Minus, start, end))
 				},
 				'(' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::LParen,
-						span: Span { start, end },
-					})
+					Some(newtoken(LParen, start, end))
 				},
 				')' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::RParen,
-						span: Span { start, end },
-					})
+					Some(newtoken(RParen, start, end))
 				},
 				'{' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::LCurly,
-						span: Span { start, end },
-					})
+					Some(newtoken(LCurly, start, end))
 				},
 				'}' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::RCurly,
-						span: Span { start, end },
-					})
+					Some(newtoken(RCurly, start, end))
 				},
 				',' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::Comma,
-						span: Span { start, end },
-					})
+					Some(newtoken(Comma, start, end))
 				},
 				'.' if next == Some('.') => {
 					self.eat_chars(2);
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::Concat,
-						span: Span { start, end },
-					})
+					Some(newtoken(Concat, start, end))
 				},
 				'.' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::Period,
-						span: Span { start, end },
-					})
+					Some(newtoken(Period, start, end))
 				},
 				':' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::Colon,
-						span: Span { start, end },
-					})
+					Some(newtoken(Colon, start, end))
 				},
 				'<' if next == Some('=') => {
 					self.eat_chars(2);
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::Lte,
-						span: Span { start, end },
-					})
+					Some(newtoken(Lte, start, end))
 				},
 				'<' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::Lt,
-						span: Span { start, end },
-					})
+					Some(newtoken(Lt, start, end))
 				},
 				'>' if next == Some('=') => {
 					self.eat_chars(2);
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::Gte,
-						span: Span { start, end },
-					})
+					Some(newtoken(Gte, start, end))
 				},
 				'>' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::Gt,
-						span: Span { start, end },
-					})
+					Some(newtoken(Gt, start, end))
 				},
 				'+' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::Plus,
-						span: Span { start, end },
-					})
+					Some(newtoken(Plus, start, end))
 				},
 				'#' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::Hash,
-						span: Span { start, end },
-					})
+					Some(newtoken(Hash, start, end))
 				},
 				'*' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::Mul,
-						span: Span { start, end },
-					})
+					Some(newtoken(Mul, start, end))
 				},
 				'/' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::Div,
-						span: Span { start, end },
-					})
+					Some(newtoken(Div, start, end))
 				},
 				'%' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::Mod,
-						span: Span { start, end },
-					})
+					Some(newtoken(Mod, start, end))
 				},
 				'^' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::Pow,
-						span: Span { start, end },
-					})
+					Some(newtoken(Pow, start, end))
 				},
 				'~' if next == Some('=') => {
 					self.eat_chars(2);
 					let end = self.cursor;
-					Some(Token {
-						kind: TokenKind::Neq,
-						span: Span { start, end },
-					})
+					Some(newtoken(Neq, start, end))
 				},
 				tk => {
-					format_err(
-						&format!("Unexpected token: `{}`", tk),
-						Span::at(self.cursor),
-						self.input,
-					);
+					format_err(&format!("Unexpected token: `{tk}`"), Span::at(self.cursor), self.input);
 				},
 			}
+		} else if self.eof_done {
+			None
 		} else {
-			if self.eof_done {
-				None
-			} else {
-				self.eof_done = true;
-				Some(Token {
-					kind: TokenKind::Eof,
-					span: Span::at(self.cursor - 1), // point to last character
-				})
-			}
+			self.eof_done = true;
+			Some(Token {
+				kind: TokenKind::Eof,
+				span: Span::at(self.cursor - 1), // point to last character
+			})
 		}
 	}
 }

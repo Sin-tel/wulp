@@ -53,8 +53,8 @@ pub fn format_err(message: &str, span: Span, input: &str) -> ! {
 	}
 
 	// TODO fix the filename
-	eprintln!("error: src\\file:{}: {}", startl, message);
-	eprintln!("{} |", spaces);
+	eprintln!("error: src\\file:{startl}: {message}");
+	eprintln!("{spaces} |");
 
 	for l in input.lines().skip(startl - 1) {
 		let mut underline = String::new();
@@ -69,8 +69,8 @@ pub fn format_err(message: &str, span: Span, input: &str) -> ! {
 			underline.push('^');
 		}
 
-		eprintln!("{} | {}", linepos, l);
-		eprintln!("{} | {}", spaces, underline);
+		eprintln!("{linepos} | {l}");
+		eprintln!("{spaces} | {underline}");
 		linepos += 1;
 		if linepos >= endl {
 			break;

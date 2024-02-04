@@ -4,17 +4,17 @@ pub struct Block {
 	pub stats: Vec<Stat>,
 }
 
-///	stat ::=  varlist `=´ explist |
-///		 functioncall |
-///		 do block end |
-///		 while exp do block end |
-///		 repeat block until exp |
-///		 if exp then block {elseif exp then block} [else block] end |
-///		 for Name `=´ exp `,´ exp [`,´ exp] do block end |
-///		 for namelist in explist do block end |
-///		 function funcname funcbody |
-///		 local function Name funcbody |
-///		 local namelist [`=´ explist]
+/// stat ::=  varlist `=` explist |
+///       functioncall |
+///       do block end |
+///       while exp do block end |
+///       repeat block until exp |
+///       if exp then block {elseif exp then block} [else block] end |
+///       for Name `=` exp `,` exp [`,` exp] do block end |
+///       for namelist in explist do block end |
+///       function funcname funcbody |
+///       local function Name funcbody |
+///       local namelist [`=` explist]
 /// laststat ::= return [explist] | break
 #[derive(Debug, PartialEq)]
 pub enum Stat {
@@ -114,7 +114,7 @@ pub struct Property {
 	pub name: Name,
 }
 
-/// exp ::= nil | false | true | Numeral | LiteralString | function |
+/// exp ::= nil | false | true | Numeral | String | function |
 ///         prefixexp | tableconstructor | exp binop exp | unop exp
 /// tableconstructor ::= `{` [fieldlist] `}`
 #[derive(Debug, PartialEq)]
@@ -171,9 +171,9 @@ pub struct FuncBody {
 /// field ::= `[` exp `]` | `=` exp | Name `=` exp | exp
 #[derive(Debug, PartialEq)]
 pub enum Field {
-	NameAssign(Name, Expr),
+	Assign(Name, Expr),
 	ExprAssign(Expr, Expr),
-	PosAssign(Expr),
+	Expr(Expr),
 }
 
 /// Name
@@ -196,8 +196,8 @@ pub struct UnExp {
 }
 
 /// binop ::= `+` | `-` | `*` | `/` | `^` | `%` | `..` |
-/// 	 `<` | `<=` | `>` | `>=` | `==` | `~=` |
-/// 	 and | or
+///       `<` | `<=` | `>` | `>=` | `==` | `~=` |
+///       and | or
 #[derive(Debug, PartialEq)]
 pub enum BinOp {
 	Plus,

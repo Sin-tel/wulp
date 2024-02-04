@@ -399,9 +399,9 @@ fn table_constructor() {
 	assert_eq!(
 		parse_table_constructor(p, &mut tokens),
 		vec![
-			Field::NameAssign(Name(String::from("foo")), Expr::Str(String::from("foo"))),
-			Field::NameAssign(Name(String::from("bar")), Expr::Bool(false)),
-			Field::NameAssign(Name(String::from("bizz")), Expr::Num(1f64)),
+			Field::Assign(Name(String::from("foo")), Expr::Str(String::from("foo"))),
+			Field::Assign(Name(String::from("bar")), Expr::Bool(false)),
+			Field::Assign(Name(String::from("bizz")), Expr::Num(1f64)),
 		]
 	);
 
