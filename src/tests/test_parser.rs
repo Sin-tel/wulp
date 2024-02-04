@@ -275,26 +275,27 @@ fn vars() {
 }
 
 #[test]
-fn expr_func() {
-	let p = r#"function foo() return ; end"#;
+fn expr_lambda() {
+	let p = r#"function () return ; end"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
 
 	assert_eq!(
 		parse_expr(p, &mut tokens),
-		(Expr::FuncDef(FunctionDef {
-			name: FuncName {
-				path: vec![Name(String::from("foo"))],
-				method: None,
-			},
-			body: FuncBody {
-				params: vec![],
-				body: Block {
-					stats: vec![Stat::Return(vec![])]
-				}
+		(Expr::Lambda(FuncBody {
+			params: vec![],
+			body: Block {
+				stats: vec![Stat::Return(vec![])]
 			}
 		}))
 	);
+}
+
+#[test]
+#[should_panic(expected = "Expected `(` but found identifier.")]
+fn expect_lambda_fail() {
+	let p = r#"local x = function a() return 1 end"#;
+	parse(p);
 }
 
 #[test]
@@ -498,11 +499,6 @@ fn names() {
 
 #[test]
 fn stat() {
-	// let p = r#";"#;
-	// let tokens: Vec<_> = Lexer::new(p).collect();
-	// let mut tokens = Tokens::new(tokens);
-	// assert_eq!(parse_stat(p, &mut tokens), (Stat::Break));
-
 	let p = r#"break"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);

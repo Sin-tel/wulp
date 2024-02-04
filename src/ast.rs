@@ -123,7 +123,7 @@ pub enum Expr {
 	Bool(bool),
 	Num(f64),
 	Str(String),
-	FuncDef(FunctionDef), // TODO: wrong, should be the unnamed kind
+	Lambda(FuncBody), // TODO: wrong, should be the unnamed kind
 	PrefixExp(Box<PrefixExpr>),
 	Table(Vec<Field>),
 	BinExp(BinExp),

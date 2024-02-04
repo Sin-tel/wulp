@@ -54,9 +54,12 @@ pub fn parse_simple_exp(input: &str, tokens: &mut Tokens) -> Option<Expr> {
 			tokens.next();
 			Some(Expr::Bool(false))
 		},
+		TokenKind::Function => {
+			tokens.next();
+			Some(Expr::Lambda(parse_funcbody(input, tokens)))
+		},
 		TokenKind::Str => Some(Expr::Str(parse_string(input, tokens))),
 		TokenKind::Number => Some(Expr::Num(parse_number(input, tokens))),
-		TokenKind::Function => Some(Expr::FuncDef(parse_functiondef(input, tokens))),
 		TokenKind::LCurly => Some(Expr::Table(parse_table_constructor(input, tokens))),
 		_ => None,
 	}

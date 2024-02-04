@@ -2,7 +2,7 @@ use crate::ast::*;
 use crate::visitor::*;
 use debug_tree::*;
 
-pub struct AstPrinter {}
+pub struct AstPrinter;
 
 impl Visitor for AstPrinter {
 	fn visit_block(&mut self, block: &mut Block) {
@@ -13,6 +13,10 @@ impl Visitor for AstPrinter {
 	fn visit_local_assignment(&mut self, local_assignment: &mut LocalAssignment) {
 		add_branch!("local assign");
 		walk_local_assignment(self, local_assignment);
+	}
+	fn visit_assignment(&mut self, assignment: &mut Assignment) {
+		add_branch!("assign");
+		walk_assignment(self, assignment);
 	}
 	fn visit_function_call(&mut self, function_call: &mut FunctionCall) {
 		add_branch!("function call");

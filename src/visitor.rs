@@ -12,6 +12,9 @@ pub trait Visitor: Sized {
 	fn visit_local_assignment(&mut self, local_assignment: &mut LocalAssignment) {
 		walk_local_assignment(self, local_assignment);
 	}
+	fn visit_assignment(&mut self, assignment: &mut Assignment) {
+		walk_assignment(self, assignment);
+	}
 	fn visit_function_call(&mut self, function_call: &mut FunctionCall) {
 		walk_function_call(self, function_call);
 	}
@@ -30,7 +33,7 @@ pub trait Visitor: Sized {
 }
 
 pub fn walk_block<V: Visitor>(v: &mut V, block: &mut Block) {
-	for s in block.stats.iter_mut() {
+	for s in &mut block.stats {
 		v.visit_stat(s);
 	}
 }
@@ -38,28 +41,38 @@ pub fn walk_block<V: Visitor>(v: &mut V, block: &mut Block) {
 pub fn walk_stat<V: Visitor>(v: &mut V, stat: &mut Stat) {
 	match stat {
 		Stat::LocalAssignment(s) => v.visit_local_assignment(s),
+		Stat::Assignment(s) => v.visit_assignment(s),
 		Stat::FunctionCall(s) => v.visit_function_call(s),
 		Stat::Return(exprs) => {
 			for e in exprs.iter_mut() {
-				v.visit_expr(e)
+				v.visit_expr(e);
 			}
 		},
-		_ => unimplemented!(),
+		s => unimplemented!("{s:?}"),
 	}
 }
 
 pub fn walk_local_assignment<V: Visitor>(v: &mut V, local_assignment: &mut LocalAssignment) {
-	for name in local_assignment.names.iter_mut() {
+	for name in &mut local_assignment.names {
 		v.visit_name(name);
 	}
-	for expr in local_assignment.exprs.iter_mut() {
+	for expr in &mut local_assignment.exprs {
+		v.visit_expr(expr);
+	}
+}
+
+pub fn walk_assignment<V: Visitor>(v: &mut V, assignment: &mut Assignment) {
+	for var in &mut assignment.vars {
+		v.visit_var(var);
+	}
+	for expr in &mut assignment.exprs {
 		v.visit_expr(expr);
 	}
 }
 
 pub fn walk_function_call<V: Visitor>(v: &mut V, function_call: &mut FunctionCall) {
 	v.visit_prefix_expr(&mut function_call.expr);
-	for e in function_call.args.iter_mut() {
+	for e in &mut function_call.args {
 		v.visit_expr(e);
 	}
 }
@@ -67,10 +80,10 @@ pub fn walk_function_call<V: Visitor>(v: &mut V, function_call: &mut FunctionCal
 pub fn walk_expr<V: Visitor>(v: &mut V, expr: &mut Expr) {
 	match expr {
 		Expr::PrefixExp(e) => v.visit_prefix_expr(e),
-		Expr::FuncDef(_) => unimplemented!(),
-		Expr::Table(_) => unimplemented!(),
-		Expr::BinExp(_) => unimplemented!(),
-		Expr::UnExp(_) => unimplemented!(),
+		Expr::Lambda(e) => unimplemented!("{e:?}"),
+		Expr::Table(e) => unimplemented!("{e:?}"),
+		Expr::BinExp(e) => unimplemented!("{e:?}"),
+		Expr::UnExp(e) => unimplemented!("{e:?}"),
 		_ => (),
 	}
 }
@@ -78,14 +91,14 @@ pub fn walk_expr<V: Visitor>(v: &mut V, expr: &mut Expr) {
 pub fn walk_prefix_expr<V: Visitor>(v: &mut V, expr: &mut PrefixExpr) {
 	match expr {
 		PrefixExpr::Var(e) => v.visit_var(e),
-		PrefixExpr::FunctionCall(_) => unimplemented!(),
-		PrefixExpr::Expr(_) => unimplemented!(),
+		PrefixExpr::FunctionCall(e) => unimplemented!("{e:?}"),
+		PrefixExpr::Expr(e) => unimplemented!("{e:?}"),
 	}
 }
 pub fn walk_var<V: Visitor>(v: &mut V, var: &mut Var) {
 	match var {
 		Var::Name(e) => v.visit_name(e),
-		Var::IndexExpr(_) => unimplemented!(),
-		Var::Property(_) => unimplemented!(),
+		Var::IndexExpr(e) => unimplemented!("{e:?}"),
+		Var::Property(e) => unimplemented!("{e:?}"),
 	}
 }
