@@ -137,15 +137,15 @@ pub fn parse_field(input: &str, tokens: &mut Tokens) -> Field {
 }
 
 /// tableconstructor ::= `{` [fieldlist] `}`
-pub fn parse_table_constructor(input: &str, tokens: &mut Tokens) -> TableConstructor {
+pub fn parse_table_constructor(input: &str, tokens: &mut Tokens) -> Vec<Field> {
 	tokens.assert_next(input, TokenKind::LCurly);
 	if tokens.peek().kind == TokenKind::RCurly {
 		tokens.next();
-		return TableConstructor(vec![]);
+		return vec![];
 	};
 	let fieldlist = parse_fieldlist(input, tokens);
 	tokens.assert_next(input, TokenKind::RCurly);
-	TableConstructor(fieldlist)
+	fieldlist
 }
 
 /// varlist ::= var {`,` var}
@@ -177,15 +177,15 @@ pub fn parse_exprlist(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
 }
 
 /// args ::=  `(` [explist] `)`
-pub fn parse_args(input: &str, tokens: &mut Tokens) -> Args {
+pub fn parse_args(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
 	tokens.assert_next(input, TokenKind::LParen);
 	if tokens.peek().kind == TokenKind::RParen {
 		tokens.next();
-		return Args(vec![]);
+		return vec![];
 	}
 	let explist = parse_exprlist(input, tokens);
 	tokens.assert_next(input, TokenKind::RParen);
-	Args(explist)
+	explist
 }
 
 /// var ::=  Name | prefixexp `[` exp `]` | prefixexp `.` Name
@@ -306,28 +306,17 @@ pub fn parse_prefix_exp(input: &str, tokens: &mut Tokens) -> PrefixExpr {
 	}
 }
 
-/// stat ::=  `;` |
-///         varlist `=` explist |
-///         functioncall |
-///         label |
-///         break |
-///         goto Name |
-///         do block end |
-///         while exp do block end |
-///         repeat block until exp |
-///         if exp then block {elseif exp then block} [else block] end |
-///         for Name `=` exp `,` exp [`,` exp] do block end |
-///         for namelist in explist do block end |
-///         function funcname funcbody |
-///         local function Name funcbody |
-///         local namelist [`=` explist]
 pub fn parse_stat(input: &str, tokens: &mut Tokens) -> Stat {
+	let stat = parse_stat_inner(input, tokens);
+	if tokens.peek().kind == TokenKind::SemiColon {
+		tokens.next();
+	}
+	stat
+}
+
+pub fn parse_stat_inner(input: &str, tokens: &mut Tokens) -> Stat {
 	let tk = tokens.peek();
 	match tk.kind {
-		TokenKind::SemiColon => {
-			tokens.next();
-			Stat::SemiColon
-		},
 		TokenKind::Break => {
 			tokens.next();
 			Stat::Break
@@ -385,9 +374,9 @@ pub fn parse_local_assignment(input: &str, tokens: &mut Tokens) -> LocalAssignme
 
 	let exprlist = if tokens.peek().kind == TokenKind::Assign {
 		tokens.next();
-		Some(parse_exprlist(input, tokens))
+		parse_exprlist(input, tokens)
 	} else {
-		None
+		vec![]
 	};
 
 	LocalAssignment { namelist, exprlist }
@@ -548,9 +537,7 @@ pub fn parse_block(input: &str, tokens: &mut Tokens) -> Block {
 		} else if tk.kind == TokenKind::Return || tk.kind == TokenKind::Break {
 			// These have to be the last statements in a block
 			stats.push(parse_stat(input, tokens));
-			if tokens.peek().kind == TokenKind::SemiColon {
-				tokens.next();
-			}
+
 			return Block { stats };
 		} else {
 			stats.push(parse_stat(input, tokens));
@@ -627,7 +614,7 @@ pub fn parse_namelist(input: &str, tokens: &mut Tokens) -> Vec<Name> {
 }
 
 /// parlist ::= namelist [`,`]
-pub fn parse_parlist(input: &str, tokens: &mut Tokens) -> Params {
+pub fn parse_parlist(input: &str, tokens: &mut Tokens) -> Vec<Name> {
 	match tokens.peek().kind {
 		// namelist
 		TokenKind::Ident => {
@@ -640,9 +627,9 @@ pub fn parse_parlist(input: &str, tokens: &mut Tokens) -> Params {
 				},
 				_ => (),
 			};
-			Params { names }
+			names
 		},
-		_ => Params { names: vec![] },
+		_ => vec![],
 	}
 }
 

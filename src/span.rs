@@ -23,7 +23,7 @@ impl Span {
 	}
 
 	pub fn as_string(&self, input: &str) -> String {
-		input[self.start..self.end].to_string()
+		self.as_str(input).to_string()
 	}
 }
 
