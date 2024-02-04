@@ -529,15 +529,15 @@ fn stat() {
 	let mut tokens = Tokens::new(tokens);
 	assert_eq!(
 		parse_stat(p, &mut tokens),
-		(Stat::IfBlock(Box::new(IfBlock {
+		(Stat::IfBlock(IfBlock {
 			expr: Expr::PrefixExp(Box::new(PrefixExpr::Var(Var::Name(Name(String::from("foo")))))),
 			block: Block { stats: vec![] },
 			elseif: vec![ElseIf {
 				expr: Expr::PrefixExp(Box::new(PrefixExpr::Var(Var::Name(Name(String::from("bar")))))),
 				block: Block { stats: vec![] }
 			}],
-			else_blk: Some(Block { stats: vec![] })
-		})))
+			else_block: Some(Block { stats: vec![] })
+		}))
 	);
 
 	let p = r#"for foo = 1, 2, bar do end"#;
@@ -545,7 +545,7 @@ fn stat() {
 	let mut tokens = Tokens::new(tokens);
 	assert_eq!(
 		parse_stat(p, &mut tokens),
-		(Stat::ForRange(Box::new(ForRange {
+		(Stat::ForRange(ForRange {
 			name: Name(String::from("foo")),
 			exprs: (
 				Expr::Num(1f64),
@@ -555,7 +555,7 @@ fn stat() {
 				))))))
 			),
 			block: Block { stats: vec![] },
-		})))
+		}))
 	);
 
 	let p = r#"for foo, bar in true, nil do end"#;

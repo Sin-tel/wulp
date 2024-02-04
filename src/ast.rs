@@ -22,8 +22,8 @@ pub enum Stat {
 	FunctionCall(FunctionCall),
 	DoBlock(Block),
 	WhileBlock(WhileBlock),
-	IfBlock(Box<IfBlock>),
-	ForRange(Box<ForRange>),
+	IfBlock(IfBlock),
+	ForRange(ForRange),
 	ForIn(ForIn),
 	FunctionDef(FunctionDef),
 	LocalFunctionDef(LocalFunctionDef),
@@ -38,7 +38,7 @@ pub struct IfBlock {
 	pub expr: Expr,
 	pub block: Block,
 	pub elseif: Vec<ElseIf>,
-	pub else_blk: Option<Block>,
+	pub else_block: Option<Block>,
 }
 
 /// elseif exp then block

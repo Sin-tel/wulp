@@ -324,10 +324,10 @@ pub fn parse_stat_inner(input: &str, tokens: &mut Tokens) -> Stat {
 		TokenKind::Return => Stat::Return(parse_return(input, tokens)),
 		TokenKind::Do => Stat::DoBlock(parse_do_block(input, tokens)),
 		TokenKind::While => Stat::WhileBlock(parse_while_block(input, tokens)),
-		TokenKind::If => Stat::IfBlock(Box::new(parse_if_block(input, tokens))),
+		TokenKind::If => Stat::IfBlock(parse_if_block(input, tokens)),
 		TokenKind::For => {
 			if tokens.peek_n(3).kind == TokenKind::Assign {
-				Stat::ForRange(Box::new(parse_for_range(input, tokens)))
+				Stat::ForRange(parse_for_range(input, tokens))
 			} else {
 				Stat::ForIn(parse_for_in(input, tokens))
 			}
@@ -488,7 +488,7 @@ pub fn parse_if_block(input: &str, tokens: &mut Tokens) -> IfBlock {
 		elseif.push(parse_elseif(input, tokens));
 	}
 
-	let else_blk = parse_else_block(input, tokens);
+	let else_block = parse_else_block(input, tokens);
 
 	tokens.assert_next(input, TokenKind::End);
 
@@ -496,7 +496,7 @@ pub fn parse_if_block(input: &str, tokens: &mut Tokens) -> IfBlock {
 		expr,
 		block,
 		elseif,
-		else_blk,
+		else_block,
 	}
 }
 
