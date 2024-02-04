@@ -41,6 +41,7 @@ pub fn parse_funcname(input: &str, tokens: &mut Tokens) -> FuncName {
 }
 
 pub fn parse_simple_exp(input: &str, tokens: &mut Tokens) -> Option<Expr> {
+	dbg!(tokens.peek());
 	match tokens.peek().kind {
 		TokenKind::Nil => {
 			tokens.next();
@@ -147,6 +148,26 @@ pub fn parse_table_constructor(input: &str, tokens: &mut Tokens) -> Vec<Field> {
 	let fieldlist = parse_fieldlist(input, tokens);
 	tokens.assert_next(input, TokenKind::RCurly);
 	fieldlist
+}
+
+/// fieldlist ::= field {fieldsep field} [fieldsep]
+/// fieldsep ::= `,` | `;`
+pub fn parse_fieldlist(input: &str, tokens: &mut Tokens) -> Vec<Field> {
+	let mut fields = vec![];
+
+	loop {
+		let f = parse_field(input, tokens);
+		fields.push(f);
+
+		match tokens.peek().kind {
+			TokenKind::Comma | TokenKind::SemiColon => {
+				tokens.next();
+				continue;
+			},
+			_ => break,
+		}
+	}
+	fields
 }
 
 /// vars ::= var {`,` var}
@@ -259,6 +280,7 @@ pub fn parse_var(input: &str, tokens: &mut Tokens) -> Var {
 // functioncall ::=  prefixexp args | prefixexp `:` Name args
 // var ::=  Name | prefixexp `[` exp `]` | prefixexp `.` Name
 pub fn parse_prefix_exp(input: &str, tokens: &mut Tokens) -> PrefixExpr {
+	// TODO: currently broken -- prefixexp `:` Name args
 	let tk = tokens.peek();
 	match tk.kind {
 		TokenKind::LParen => {
@@ -305,6 +327,7 @@ pub fn parse_prefix_exp(input: &str, tokens: &mut Tokens) -> PrefixExpr {
 }
 
 pub fn parse_stat(input: &str, tokens: &mut Tokens) -> Stat {
+	// take care of optional semicolon
 	let stat = parse_stat_inner(input, tokens);
 	if tokens.peek().kind == TokenKind::SemiColon {
 		tokens.next();
@@ -532,6 +555,7 @@ pub fn parse_block(input: &str, tokens: &mut Tokens) -> Block {
 			// These have to be the last statements in a block
 			stats.push(parse_stat(input, tokens));
 
+			// TODO: peek here to check it is the last statement, and produce error
 			return Block { stats };
 		}
 		stats.push(parse_stat(input, tokens));
@@ -539,7 +563,6 @@ pub fn parse_block(input: &str, tokens: &mut Tokens) -> Block {
 	Block { stats }
 }
 
-/// laststat ::= return [explist]
 pub fn parse_return(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
 	tokens.assert_next(input, TokenKind::Return);
 
@@ -570,18 +593,6 @@ pub fn parse_funcbody(input: &str, tokens: &mut Tokens) -> FuncBody {
 	tokens.assert_next(input, TokenKind::End);
 
 	FuncBody { params, body }
-}
-
-/// functiondef ::= function funcbody
-/// stat ::= function funcname funcbody
-/// stat ::= local function Name funcbody
-pub fn parse_functiondef(input: &str, tokens: &mut Tokens) -> FunctionDef {
-	tokens.assert_next(input, TokenKind::Function);
-
-	let name = parse_funcname(input, tokens);
-	let body = parse_funcbody(input, tokens);
-
-	FunctionDef { name, body }
 }
 
 /// names ::= Name {`,` Name}
@@ -621,26 +632,6 @@ pub fn parse_parlist(input: &str, tokens: &mut Tokens) -> Vec<Name> {
 		},
 		_ => vec![],
 	}
-}
-
-/// fieldlist ::= field {fieldsep field} [fieldsep]
-/// fieldsep ::= `,` | `;`
-pub fn parse_fieldlist(input: &str, tokens: &mut Tokens) -> Vec<Field> {
-	let mut fields = vec![];
-
-	loop {
-		let f = parse_field(input, tokens);
-		fields.push(f);
-
-		match tokens.peek().kind {
-			TokenKind::Comma | TokenKind::SemiColon => {
-				tokens.next();
-				continue;
-			},
-			_ => break,
-		}
-	}
-	fields
 }
 
 // TODO: multi line string currently broken

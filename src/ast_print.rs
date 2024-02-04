@@ -4,46 +4,79 @@ use debug_tree::*;
 
 pub struct AstPrinter;
 
-impl Visitor for AstPrinter {
-	fn visit_block(&mut self, block: &mut Block) {
+impl AstPrinter {
+	pub fn print_ast(&mut self, block: &mut Block) {
 		defer_print!();
+		self.visit_block(block);
+	}
+}
+
+impl Visitor for AstPrinter {
+	fn visit_block(&mut self, node: &mut Block) {
 		add_branch!("block");
-		walk_block(self, block);
+		node.visit(self);
 	}
-	fn visit_local_assignment(&mut self, local_assignment: &mut LocalAssignment) {
+	fn visit_local_assignment(&mut self, node: &mut LocalAssignment) {
 		add_branch!("local assign");
-		walk_local_assignment(self, local_assignment);
+		node.visit(self);
 	}
-	fn visit_assignment(&mut self, assignment: &mut Assignment) {
+	fn visit_assignment(&mut self, node: &mut Assignment) {
 		add_branch!("assign");
-		walk_assignment(self, assignment);
+		node.visit(self);
 	}
-	fn visit_function_call(&mut self, function_call: &mut FunctionCall) {
+	fn visit_function_call(&mut self, node: &mut FunctionCall) {
 		add_branch!("function call");
-		walk_function_call(self, function_call);
+		node.visit(self);
 	}
-	fn visit_stat(&mut self, stat: &mut Stat) {
-		match stat {
-			Stat::Return(_) => {
-				{
-					add_branch!("return");
-					walk_stat(self, stat);
-				};
+	fn visit_stat(&mut self, node: &mut Stat) {
+		let branch = match node {
+			Stat::Return(_) => Some("return"),
+			_ => None,
+		};
+		if let Some(br) = branch {
+			add_branch!("{br}");
+			node.visit(self);
+		} else {
+			node.visit(self);
+		}
+	}
+	fn visit_name(&mut self, node: &mut Name) {
+		add_leaf!("{} (identifier)", node.0);
+	}
+	fn visit_prefix_expr(&mut self, node: &mut PrefixExpr) {
+		if let PrefixExpr::Expr(_) = node {
+			add_branch!("(expr)");
+			node.visit(self);
+		} else {
+			node.visit(self);
+		}
+	}
+	fn visit_expr(&mut self, node: &mut Expr) {
+		match node {
+			Expr::Nil => add_leaf!("nil"),
+			Expr::Num(s) => add_leaf!("{} (number)", s),
+			Expr::Str(s) => add_leaf!("\"{}\" (string)", s),
+			Expr::Bool(s) => add_leaf!("{} (bool)", s),
+			Expr::Lambda(_) => {
+				add_branch!("lambda");
+				node.visit(self);
 			},
+			Expr::Table(_) => {
+				add_branch!("table");
+				node.visit(self);
+			},
+			// s => unimplemented!("{s:?}"),
 			_ => {
-				walk_stat(self, stat);
+				node.visit(self);
 			},
 		}
 	}
-	fn visit_name(&mut self, name: &mut Name) {
-		add_leaf!("{}", name.0);
+	fn visit_bin_expr(&mut self, node: &mut BinExp) {
+		add_branch!("`{}` binary", node.op);
+		node.visit(self);
 	}
-	fn visit_expr(&mut self, expr: &mut Expr) {
-		match expr {
-			Expr::Str(s) => add_leaf!("str \"{}\"", s),
-			Expr::Num(s) => add_leaf!("num {}", s),
-			_ => (),
-		}
-		walk_expr(self, expr);
+	fn visit_un_expr(&mut self, node: &mut UnExp) {
+		add_branch!("`{}` unary", node.op);
+		node.visit(self);
 	}
 }

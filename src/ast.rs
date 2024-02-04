@@ -1,3 +1,5 @@
+use std::fmt;
+
 /// block ::= {stat} [laststat]
 #[derive(Debug, PartialEq)]
 pub struct Block {
@@ -123,7 +125,7 @@ pub enum Expr {
 	Bool(bool),
 	Num(f64),
 	Str(String),
-	Lambda(FuncBody), // TODO: wrong, should be the unnamed kind
+	Lambda(FuncBody),
 	PrefixExp(Box<PrefixExpr>),
 	Table(Vec<Field>),
 	BinExp(BinExp),
@@ -242,5 +244,45 @@ pub enum UnOp {
 impl UnOp {
 	pub fn priority(&self) -> i32 {
 		7
+	}
+}
+
+impl fmt::Display for BinOp {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(
+			f,
+			"{}",
+			match self {
+				BinOp::Pow => "^",
+				BinOp::Mul => "*",
+				BinOp::Div => "*",
+				BinOp::Mod => "%",
+				BinOp::Plus => "+",
+				BinOp::Minus => "-",
+				BinOp::Concat => "..",
+				BinOp::Lt => "<",
+				BinOp::Gt => ">",
+				BinOp::Lte => "<=",
+				BinOp::Gte => "<=",
+				BinOp::Eq => "==",
+				BinOp::Neq => "~=",
+				BinOp::And => "and",
+				BinOp::Or => "or",
+			}
+		)
+	}
+}
+
+impl fmt::Display for UnOp {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(
+			f,
+			"{}",
+			match self {
+				UnOp::Minus => "-",
+				UnOp::Not => "not",
+				UnOp::Len => "#",
+			}
+		)
 	}
 }

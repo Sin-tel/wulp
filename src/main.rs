@@ -23,28 +23,31 @@ mod visitor;
 #[cfg(test)]
 mod tests;
 
-// use mlua::Lua;
-use crate::visitor::Visitor;
-
 fn main() {
-	let input = r#"
-	local a = 1
-	print("ok")
-	return a
-	"#;
-
 	// let input = r#"
-	// a = 1
-	// f.x(a)
+	// local x = 1, nil, true, "test", (x + 5*y)
+	// local y = {foo = 'foo', bar = false, bizz = 1}
+	// print("hello")
+	// a = function ()
+	// 	print("ok")
+	// 	return 0
+	// end
+	// return - 1
 	// "#;
 
-	let mut ast = parser::parse(input);
-	// dbg!(&ast);
-	println!("{}", input);
-	let mut printer = ast_print::AstPrinter {};
-	printer.visit_block(&mut ast);
+	let input = r#"
+	local y = {'one', false, 3}
+	return y[1]
+	"#;
 
-	// let lua = Lua::new();
-	// let ret = lua.load(input).eval::<String>().unwrap();
-	// println!("{:?}", ret);
+	let mut ast = parser::parse(input);
+	println!("{input}");
+	// dbg!(&ast);
+
+	// let mut printer = ast_print::AstPrinter;
+	// printer.print_ast(&mut ast);
+
+	let lua = mlua::Lua::new();
+	let ret = lua.load(input).eval::<String>().unwrap();
+	println!("{ret:?}");
 }

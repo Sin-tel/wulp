@@ -375,7 +375,7 @@ fn functiondef() {
 	let mut tokens = Tokens::new(tokens);
 
 	assert_eq!(
-		parse_functiondef(p, &mut tokens),
+		parse_function_def(p, &mut tokens),
 		(FunctionDef {
 			name: FuncName {
 				path: vec![Name(String::from("foo"))],
