@@ -12,21 +12,23 @@
 // #![allow(clippy::wildcard_imports)]
 // #![allow(clippy::too_many_lines)]
 
-// use mlua::Lua;
-
 mod ast;
+mod ast_print;
 mod lexer;
 mod parser;
 mod span;
 mod token;
-// mod visitor;
+mod visitor;
 
 #[cfg(test)]
 mod tests;
 
+// use mlua::Lua;
+use crate::visitor::Visitor;
+
 fn main() {
 	let input = r#"
-	local a = "hello"
+	local a = 1
 	print("ok")
 	return a
 	"#;
@@ -36,8 +38,11 @@ fn main() {
 	// f.x(a)
 	// "#;
 
-	let ast = parser::parse(input);
-	dbg!(ast);
+	let mut ast = parser::parse(input);
+	// dbg!(&ast);
+	println!("{}", input);
+	let mut printer = ast_print::AstPrinter {};
+	printer.visit_block(&mut ast);
 
 	// let lua = Lua::new();
 	// let ret = lua.load(input).eval::<String>().unwrap();
