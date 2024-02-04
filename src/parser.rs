@@ -41,7 +41,6 @@ pub fn parse_funcname(input: &str, tokens: &mut Tokens) -> FuncName {
 }
 
 pub fn parse_simple_exp(input: &str, tokens: &mut Tokens) -> Option<Expr> {
-	dbg!(tokens.peek());
 	match tokens.peek().kind {
 		TokenKind::Nil => {
 			tokens.next();
@@ -114,10 +113,10 @@ pub fn parse_sub_expr(input: &str, tokens: &mut Tokens, min_priority: i32) -> Ex
 
 /// field ::= `[` exp `]` `=` exp | Name `=` exp | exp
 pub fn parse_field(input: &str, tokens: &mut Tokens) -> Field {
-	let name_token = tokens.next();
-	match name_token.kind {
+	match tokens.peek().kind {
 		// Name '=' exp
 		TokenKind::Name => {
+			let name_token = tokens.next();
 			tokens.assert_next(input, TokenKind::Assign);
 
 			let expr = parse_expr(input, tokens);
@@ -125,6 +124,7 @@ pub fn parse_field(input: &str, tokens: &mut Tokens) -> Field {
 		},
 		// '[' exp ']' '=' exp
 		TokenKind::LBracket => {
+			tokens.next();
 			let lexpr = parse_expr(input, tokens);
 
 			tokens.assert_next(input, TokenKind::RBracket);
@@ -133,7 +133,7 @@ pub fn parse_field(input: &str, tokens: &mut Tokens) -> Field {
 			let rexpr = parse_expr(input, tokens);
 			Field::ExprAssign(lexpr, rexpr)
 		},
-
+		// exp
 		_ => Field::Expr(parse_expr(input, tokens)),
 	}
 }

@@ -426,6 +426,19 @@ fn table_constructor() {
 	let mut tokens = Tokens::new(tokens);
 
 	assert_eq!(parse_table_constructor(p, &mut tokens), vec![]);
+
+	let p = r#"{'one', false, 3}"#;
+	let tokens: Vec<_> = Lexer::new(p).collect();
+	let mut tokens = Tokens::new(tokens);
+
+	assert_eq!(
+		parse_table_constructor(p, &mut tokens),
+		vec![
+			Field::Expr(Expr::Str(String::from("one"))),
+			Field::Expr(Expr::Bool(false)),
+			Field::Expr(Expr::Num(3f64)),
+		]
+	);
 }
 
 #[test]
