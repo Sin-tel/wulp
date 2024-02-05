@@ -3,27 +3,32 @@ use crate::lexer::*;
 use crate::parser::*;
 use crate::token::*;
 
+fn make_tokens(input: &str) -> Tokens {
+	let tokens: Vec<_> = Lexer::new(input).collect();
+	Tokens::new(tokens)
+}
+
 #[test]
 fn expr() {
 	let p = r#"nil"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
-	assert_eq!(parse_expr(p, &mut tokens), (Expr::Nil));
+	assert_eq!(parse_expr(p, &mut tokens), Expr::Nil);
 
 	let p = r#"false"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
-	assert_eq!(parse_expr(p, &mut tokens), (Expr::Bool(false)));
+	assert_eq!(parse_expr(p, &mut tokens), Expr::Bool(false));
 
 	let p = r#"true"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
-	assert_eq!(parse_expr(p, &mut tokens), (Expr::Bool(true)));
+	assert_eq!(parse_expr(p, &mut tokens), Expr::Bool(true));
 
 	let p = r#"10"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
-	assert_eq!(parse_expr(p, &mut tokens), (Expr::Num(10f64)));
+	assert_eq!(parse_expr(p, &mut tokens), Expr::Num(10f64));
 }
 
 #[test]
@@ -141,74 +146,20 @@ fn test_simple_bin() {
 	);
 }
 
-// #[test]
-// fn prefix_exp_parens() {
-// 	let p = r#"foo"#;
-// 	let tokens: Vec<_> = Lexer::new(p).collect();
-// 	let mut tokens = Tokens::new(tokens);
+#[test]
+fn prefix_exp_parens() {
+	let p = r#"foo"#;
+	let tokens: Vec<_> = Lexer::new(p).collect();
+	let mut tokens = Tokens::new(tokens);
 
-// 	assert_eq!(
-// 		parse_expr(p, &mut tokens),
-// 		(Expr::PrefixExp(Box::new(PrefixExpr::Var(Var::Name(Name(String::from("foo")))))))
-// 	);
+	assert_eq!(parse_expr(p, &mut tokens), Expr::Name(Name("foo".to_string())));
 
-// 	let p = r#"(foo)"#;
-// 	let tokens: Vec<_> = Lexer::new(p).collect();
-// 	let mut tokens = Tokens::new(tokens);
+	let p = r#"(foo)"#;
+	let tokens: Vec<_> = Lexer::new(p).collect();
+	let mut tokens = Tokens::new(tokens);
 
-// 	assert_eq!(
-// 		parse_prefix_exp(p, &mut tokens),
-// 		(PrefixExpr::Expr(Expr::PrefixExp(Box::new(PrefixExpr::Var(Var::Name(Name(
-// 			String::from("foo")
-// 		)))))))
-// 	);
-// }
-
-// #[test]
-// fn var() {
-// 	let p = r#"foo"#;
-// 	let tokens: Vec<_> = Lexer::new(p).collect();
-// 	let mut tokens = Tokens::new(tokens);
-
-// 	assert_eq!(parse_var(p, &mut tokens), (Var::Name(Name(String::from("foo")))));
-
-// 	let p = r#"(foo)[1]"#;
-// 	let tokens: Vec<_> = Lexer::new(p).collect();
-// 	let mut tokens = Tokens::new(tokens);
-
-// 	assert_eq!(
-// 		parse_var(p, &mut tokens),
-// 		(Var::Index(Index {
-// 			expr: Box::new(PrefixExpr::Expr(Expr::PrefixExp(Box::new(PrefixExpr::Var(Var::Name(
-// 				Name(String::from("foo"))
-// 			)),)))),
-// 			arg: Expr::Num(1f64),
-// 		}))
-// 	);
-// 	let p = r#"foo[1]"#;
-// 	let tokens: Vec<_> = Lexer::new(p).collect();
-// 	let mut tokens = Tokens::new(tokens);
-
-// 	assert_eq!(
-// 		parse_var(p, &mut tokens),
-// 		(Var::Index(Index {
-// 			expr: Box::new(PrefixExpr::Var(Var::Name(Name(String::from("foo")))),),
-// 			arg: Expr::Num(1f64),
-// 		}))
-// 	);
-
-// 	let p = r#"foo.bar"#;
-// 	let tokens: Vec<_> = Lexer::new(p).collect();
-// 	let mut tokens = Tokens::new(tokens);
-
-// 	assert_eq!(
-// 		parse_var(p, &mut tokens),
-// 		(Var::Property(Property {
-// 			expr: Box::new(PrefixExpr::Var(Var::Name(Name(String::from("foo"))))),
-// 			name: Name(String::from("bar"))
-// 		}))
-// 	);
-// }
+	assert_eq!(parse_expr(p, &mut tokens), Expr::Name(Name("foo".to_string())));
+}
 
 #[test]
 fn args() {
@@ -243,21 +194,6 @@ fn exprs() {
 		])
 	);
 }
-
-// #[test]
-// fn vars() {
-// 	let p = r#"foo, bar, bizz"#;
-// 	let tokens: Vec<_> = Lexer::new(p).collect();
-// 	let mut tokens = Tokens::new(tokens);
-// 	assert_eq!(
-// 		parse_vars(p, &mut tokens),
-// 		(vec![
-// 			Var::Name(Name(String::from("foo"))),
-// 			Var::Name(Name(String::from("bar"))),
-// 			Var::Name(Name(String::from("bizz"))),
-// 		])
-// 	);
-// }
 
 #[test]
 fn expr_lambda() {
@@ -335,22 +271,6 @@ fn block() {
 			])]
 		})
 	);
-
-	// let p = r#"print(foo)"#;
-	// let tokens: Vec<_> = Lexer::new(p).collect();
-	// let mut tokens = Tokens::new(tokens);
-
-	// assert_eq!(
-	// 	parse_block(p, &mut tokens),
-	// 	(Block {
-	// 		stats: vec![Stat::FunctionCall(FunctionCall {
-	// 			expr: Box::new(PrefixExpr::Var(Var::Name(Name(String::from("print"))))),
-	// 			args: vec![Expr::PrefixExp(Box::new(PrefixExpr::Var(Var::Name(Name(
-	// 				String::from("foo")
-	// 			)))))]
-	// 		})],
-	// 	})
-	// );
 }
 
 #[test]
@@ -422,36 +342,6 @@ fn table_constructor() {
 		]
 	);
 }
-
-// #[test]
-// fn prefix_exp() {
-// 	// TODO: ???
-// 	let p = "false)";
-// 	let tokens: Vec<_> = Lexer::new(p).collect();
-// 	let mut tokens = Tokens::new(tokens);
-// 	assert_eq!(parse_expr(p, &mut tokens), (Expr::Bool(false)),);
-// 	assert_eq!(tokens.next().kind, TokenKind::RParen);
-
-// 	let p = r#"(false)"#;
-// 	let tokens: Vec<_> = Lexer::new(p).collect();
-
-// 	let mut tokens = Tokens::new(tokens);
-
-// 	assert_eq!(parse_prefix_exp(p, &mut tokens), (PrefixExpr::Expr(Expr::Bool(false))));
-
-// 	let p = r#"foo(false, true, nil)"#;
-// 	let tokens: Vec<_> = Lexer::new(p).collect();
-
-// 	let mut tokens = Tokens::new(tokens);
-
-// 	assert_eq!(
-// 		parse_prefix_exp(p, &mut tokens),
-// 		(PrefixExpr::FunctionCall(FunctionCall {
-// 			expr: Box::new(PrefixExpr::Var(Var::Name(Name(String::from("foo"))))),
-// 			args: vec![Expr::Bool(false), Expr::Bool(true), Expr::Nil]
-// 		}))
-// 	)
-// }
 
 #[test]
 fn parlist() {
@@ -605,31 +495,6 @@ fn statement() {
 			exprs: vec![Expr::Nil, Expr::Num(10f64), Expr::Str(String::from("word"))],
 		})
 	);
-
-	// let p = r#"foo, bar = true, nil"#;
-	// let tokens: Vec<_> = Lexer::new(p).collect();
-	// let mut tokens = Tokens::new(tokens);
-	// assert_eq!(
-	// 	parse_statement(p, &mut tokens),
-	// 	(Stat::Assignment(Assignment {
-	// 		vars: vec![
-	// 			Var::Name(Name(String::from("foo"))),
-	// 			Var::Name(Name(String::from("bar")))
-	// 		],
-	// 		exprs: vec![Expr::Bool(true), Expr::Nil],
-	// 	}))
-	// );
-
-	// let p = r#"foo("bar")"#;
-	// let tokens: Vec<_> = Lexer::new(p).collect();
-	// let mut tokens = Tokens::new(tokens);
-	// assert_eq!(
-	// 	parse_statement(p, &mut tokens),
-	// 	(Stat::FunctionCall(FunctionCall {
-	// 		expr: Box::new(PrefixExpr::Var(Var::Name(Name(String::from("foo"))))),
-	// 		args: vec![Expr::Str(String::from("bar"))]
-	// 	}))
-	// );
 }
 
 #[test]
@@ -709,4 +574,69 @@ fn number_fail() {
 fn expect_token_fail() {
 	let p = r#"for x in y while"#;
 	parse(p);
+}
+
+#[test]
+fn suffix_expr() {
+	let p = r#"a"#;
+	let mut tokens = make_tokens(p);
+	assert_eq!(format!("{:?}", parse_suffix_expr(p, &mut tokens)), "Name(Name(\"a\"))");
+
+	let p = r#"(a)[1]"#;
+	let mut tokens = make_tokens(p);
+	assert_eq!(
+		format!("{:?}", parse_suffix_expr(p, &mut tokens)),
+		"SuffixExpr { expr: Name(Name(\"a\")), suffix: [Index(Num(1.0))] }"
+	);
+
+	let p = r#"a[1]"#;
+	let mut tokens = make_tokens(p);
+	assert_eq!(
+		format!("{:?}", parse_suffix_expr(p, &mut tokens)),
+		"SuffixExpr { expr: Name(Name(\"a\")), suffix: [Index(Num(1.0))] }"
+	);
+
+	let p = r#"a.b.c"#;
+	let mut tokens = make_tokens(p);
+	assert_eq!(
+		format!("{:?}", parse_suffix_expr(p, &mut tokens)),
+		"SuffixExpr { expr: Name(Name(\"a\")), suffix: [Property(Name(\"b\")), Property(Name(\"c\"))] }"
+	);
+
+	let p = r#"a.b(c).d"#;
+	let mut tokens = make_tokens(p);
+	assert_eq!(
+		format!("{:?}", parse_suffix_expr(p, &mut tokens)),
+		r#"SuffixExpr { expr: Name(Name("a")), suffix: [Property(Name("b")), Call([Name(Name("c"))]), Property(Name("d"))] }"#
+	);
+}
+
+#[test]
+fn stat_assign() {
+	let p = r#"a, c = 1, 2"#;
+	let mut tokens = make_tokens(p);
+	assert_eq!(
+		format!("{:?}", parse_statement(p, &mut tokens)),
+		"Assignment(Assignment { vars: [Name(Name(\"a\")), Name(Name(\"c\"))], exprs: [Num(1.0), Num(2.0)] })"
+	);
+}
+
+#[test]
+fn stat_call() {
+	let p = r#"print("hello", "world")"#;
+	let mut tokens = make_tokens(p);
+	assert_eq!(
+		format!("{:?}", parse_statement(p, &mut tokens)),
+		"FunctionCall(FunctionCall { expr: Name(Name(\"print\")), args: [Str(\"hello\"), Str(\"world\")] })"
+	);
+}
+
+#[test]
+fn stat_single_local() {
+	let p = r#"local x"#;
+	let mut tokens = make_tokens(p);
+	assert_eq!(
+		format!("{:?}", parse_statement(p, &mut tokens)),
+		"LocalAssignment(LocalAssignment { names: [Name(\"x\")], exprs: [] })"
+	);
 }
