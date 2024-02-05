@@ -233,6 +233,7 @@ impl UnOp {
 	}
 }
 
+// These are used in the lua code gen!
 impl fmt::Display for BinOp {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(

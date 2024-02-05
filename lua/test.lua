@@ -1,4 +1,3 @@
--- defines a factorial function
 fact = function(n)
   if n == 0 then
     return 1

@@ -7,7 +7,8 @@ pub struct AstPrinter;
 impl AstPrinter {
 	pub fn print_ast(&mut self, block: &mut Block) {
 		defer_print!();
-		self.visit_block(block);
+		add_branch!("ast");
+		block.visit(self)
 	}
 }
 

@@ -128,17 +128,17 @@ impl<V: Visitor> VisitNode<V> for FuncBody {
 impl<V: Visitor> VisitNode<V> for Expr {
 	fn visit(&mut self, v: &mut V) {
 		match self {
-			Expr::Lambda(e) => v.visit_function_body(e),
+			Expr::Nil | Expr::Bool(_) | Expr::Str(_) | Expr::Num(_) => (),
+			Expr::Name(e) => v.visit_name(e),
 			Expr::BinExp(e) => v.visit_bin_expr(e),
 			Expr::UnExp(e) => v.visit_un_expr(e),
-			Expr::Name(e) => v.visit_name(e),
+			Expr::Lambda(e) => v.visit_function_body(e),
 			Expr::SuffixExpr(e) => v.visit_suffix_expr(e),
 			Expr::Table(t) => {
 				for e in t {
 					v.visit_field(e);
 				}
 			},
-			e => unimplemented!("{e:?}"),
 		}
 	}
 }
