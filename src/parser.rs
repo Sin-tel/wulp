@@ -84,7 +84,7 @@ pub fn parse_statement(input: &str, tokens: &mut Tokens) -> Stat {
 				TokenKind::Assign | TokenKind::Comma => Stat::Assignment(parse_assignment(suffix_expr, input, tokens)),
 				_ => {
 					// pop last suffix and check if its a call
-					if let Expr::SuffixExpr { expr, mut suffix } = suffix_expr {
+					if let Expr::SuffixExpr(SuffixExpr { expr, mut suffix }) = suffix_expr {
 						let last = suffix.pop();
 						if let Some(Suffix::Call(args)) = last {
 							return Stat::FunctionCall(FunctionCall {
@@ -423,10 +423,10 @@ fn new_suffix_expr(expr: Expr, suffix: Vec<Suffix>) -> Expr {
 		return expr;
 	}
 
-	Expr::SuffixExpr {
+	Expr::SuffixExpr(SuffixExpr {
 		expr: Box::new(expr),
 		suffix,
-	}
+	})
 }
 
 /// primary_exp -> Name | '(' expr ')'

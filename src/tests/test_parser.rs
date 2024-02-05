@@ -586,28 +586,28 @@ fn suffix_expr() {
 	let mut tokens = make_tokens(p);
 	assert_eq!(
 		format!("{:?}", parse_suffix_expr(p, &mut tokens)),
-		"SuffixExpr { expr: Name(Name(\"a\")), suffix: [Index(Num(1.0))] }"
+		"SuffixExpr(SuffixExpr { expr: Name(Name(\"a\")), suffix: [Index(Num(1.0))] })"
 	);
 
 	let p = r#"a[1]"#;
 	let mut tokens = make_tokens(p);
 	assert_eq!(
 		format!("{:?}", parse_suffix_expr(p, &mut tokens)),
-		"SuffixExpr { expr: Name(Name(\"a\")), suffix: [Index(Num(1.0))] }"
+		"SuffixExpr(SuffixExpr { expr: Name(Name(\"a\")), suffix: [Index(Num(1.0))] })"
 	);
 
 	let p = r#"a.b.c"#;
 	let mut tokens = make_tokens(p);
 	assert_eq!(
 		format!("{:?}", parse_suffix_expr(p, &mut tokens)),
-		"SuffixExpr { expr: Name(Name(\"a\")), suffix: [Property(Name(\"b\")), Property(Name(\"c\"))] }"
+		"SuffixExpr(SuffixExpr { expr: Name(Name(\"a\")), suffix: [Property(Name(\"b\")), Property(Name(\"c\"))] })"
 	);
 
 	let p = r#"a.b(c).d"#;
 	let mut tokens = make_tokens(p);
 	assert_eq!(
 		format!("{:?}", parse_suffix_expr(p, &mut tokens)),
-		r#"SuffixExpr { expr: Name(Name("a")), suffix: [Property(Name("b")), Call([Name(Name("c"))]), Property(Name("d"))] }"#
+		"SuffixExpr(SuffixExpr { expr: Name(Name(\"a\")), suffix: [Property(Name(\"b\")), Call([Name(Name(\"c\"))]), Property(Name(\"d\"))] })"
 	);
 }
 
@@ -628,6 +628,13 @@ fn stat_call() {
 	assert_eq!(
 		format!("{:?}", parse_statement(p, &mut tokens)),
 		"FunctionCall(FunctionCall { expr: Name(Name(\"print\")), args: [Str(\"hello\"), Str(\"world\")] })"
+	);
+
+	let p = r#"print(test(1))"#;
+	let mut tokens = make_tokens(p);
+	assert_eq!(
+		format!("{:?}", parse_statement(p, &mut tokens)),
+		"FunctionCall(FunctionCall { expr: Name(Name(\"print\")), args: [SuffixExpr(SuffixExpr { expr: Name(Name(\"test\")), suffix: [Call([Num(1.0)])] })] })"
 	);
 }
 

@@ -12,44 +12,46 @@
 // #![allow(clippy::wildcard_imports)]
 // #![allow(clippy::too_many_lines)]
 
+use std::fs;
+
 mod ast;
-// mod ast_print;
+mod ast_print;
+// mod emit;
 mod lexer;
 mod parser;
 mod span;
 mod token;
-// mod visitor;
+mod visitor;
 
 #[cfg(test)]
 mod tests;
 
 fn main() {
-	let input = r#"
-	local x = 1, nil, true, "test", (x + 5*y)
-	local y = {foo = 'foo', bar = false, bizz = 1}
-	print("hello")
-	a = function ()
-		print("ok")
-		return 0
-	end
-	return - 1
-	"#;
+	let input = fs::read_to_string("lua/test.lua").expect("Should have been able to read the file");
 
 	// let input = r#"
-	// a , b = 1
-
+	// local x = 1, nil, true, "test", (x + 5*y)
+	// local y = {foo = 'foo', bar = false, bizz = 1}
+	// print("hello")
+	// a = function (b)
+	// 	print("ok")
+	// 	return 0
+	// end
+	// return - 1
 	// "#;
 
-	let mut ast = parser::parse(input);
+	let mut ast = parser::parse(&input);
+	// dbg!(&ast);
+	println!("----- input:");
 	println!("{input}");
-	dbg!(&ast);
 
 	// let mut printer = ast_print::AstPrinter;
 	// printer.print_ast(&mut ast);
+	println!("----- output:");
 
-	// let lua = mlua::Lua::new();
+	let lua = mlua::Lua::new();
 	// lua.load(input).exec().ok();
 
-	// let ret = lua.load(input).eval::<String>().unwrap();
-	// println!("{ret:?}");
+	let ret = lua.load(input).eval::<String>().unwrap();
+	println!("{ret:?}");
 }

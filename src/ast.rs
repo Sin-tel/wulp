@@ -98,8 +98,6 @@ pub struct FuncName {
 ///       |  tableconstructor | FUNCTION body | suffix_exp
 ///       |  exp binop exp | unop exp
 /// tableconstructor -> `{` [fieldlist] `}`
-/// suffix_exp -> primary_exp { suffix }
-/// primary_exp -> Name | '(' expr ')'
 #[derive(Debug, PartialEq)]
 pub enum Expr {
 	Nil,
@@ -111,7 +109,15 @@ pub enum Expr {
 	BinExp(BinExp),
 	UnExp(UnExp),
 	Name(Name),
-	SuffixExpr { expr: Box<Expr>, suffix: Vec<Suffix> },
+	SuffixExpr(SuffixExpr),
+}
+
+/// suffix_exp -> primary_exp { suffix }
+/// primary_exp -> Name | '(' expr ')'
+#[derive(Debug, PartialEq)]
+pub struct SuffixExpr {
+	pub expr: Box<Expr>,
+	pub suffix: Vec<Suffix>,
 }
 
 /// suffix -> `.` Name
@@ -153,7 +159,7 @@ pub struct FuncBody {
 	pub body: Block,
 }
 
-/// field -> `[` exp `]` | `=` exp | Name `=` exp | exp
+/// field -> `[` exp `]` `=` exp | Name `=` exp | exp
 #[derive(Debug, PartialEq)]
 pub enum Field {
 	Assign(Name, Expr),

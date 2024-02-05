@@ -16,6 +16,10 @@ impl Visitor for AstPrinter {
 		add_branch!("block");
 		node.visit(self);
 	}
+	fn visit_if_block(&mut self, node: &mut IfBlock) {
+		add_branch!("IF");
+		node.visit(self);
+	}
 	fn visit_local_assignment(&mut self, node: &mut LocalAssignment) {
 		add_branch!("local assign");
 		node.visit(self);
@@ -40,17 +44,6 @@ impl Visitor for AstPrinter {
 			node.visit(self);
 		}
 	}
-	fn visit_name(&mut self, node: &mut Name) {
-		add_leaf!("{} (identifier)", node.0);
-	}
-	fn visit_prefix_expr(&mut self, node: &mut PrefixExpr) {
-		if let PrefixExpr::Expr(_) = node {
-			add_branch!("(expr)");
-			node.visit(self);
-		} else {
-			node.visit(self);
-		}
-	}
 	fn visit_expr(&mut self, node: &mut Expr) {
 		match node {
 			Expr::Nil => add_leaf!("nil"),
@@ -65,18 +58,40 @@ impl Visitor for AstPrinter {
 				add_branch!("table");
 				node.visit(self);
 			},
-			// s => unimplemented!("{s:?}"),
-			_ => {
-				node.visit(self);
-			},
+			_ => node.visit(self),
 		}
 	}
+
 	fn visit_bin_expr(&mut self, node: &mut BinExp) {
-		add_branch!("`{}` binary", node.op);
+		add_branch!("`{}` (binop)", node.op);
 		node.visit(self);
 	}
+
 	fn visit_un_expr(&mut self, node: &mut UnExp) {
-		add_branch!("`{}` unary", node.op);
+		add_branch!("`{}` (unop)", node.op);
 		node.visit(self);
+	}
+
+	fn visit_suffix_expr(&mut self, node: &mut SuffixExpr) {
+		add_branch!("expr");
+		node.visit(self);
+	}
+
+	fn visit_suffix(&mut self, node: &mut Suffix) {
+		let s = match node {
+			Suffix::Property(_) => "property",
+			Suffix::Index(_) => "index",
+			Suffix::Call(_) => "call args",
+		};
+		add_branch!("{s}");
+		node.visit(self);
+	}
+	fn visit_field(&mut self, node: &mut Field) {
+		add_branch!("field");
+		node.visit(self);
+	}
+
+	fn visit_name(&mut self, node: &mut Name) {
+		add_leaf!("{} (identifier)", node.0);
 	}
 }
