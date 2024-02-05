@@ -79,17 +79,22 @@ pub fn parse_statement(input: &str, tokens: &mut Tokens) -> Stat {
 		_ => {
 			// Parse a suffix expression, then check if a `==` or `,` follows to parse (multiple) assignment.
 			// If not, it should be a function call.
-			let mut expr = parse_suffix_expr(input, tokens);
+			let suffix_expr = parse_suffix_expr(input, tokens);
 			match tokens.peek().kind {
-				TokenKind::Assign | TokenKind::Comma => Stat::Assignment(parse_assignment(expr, input, tokens)),
+				TokenKind::Assign | TokenKind::Comma => Stat::Assignment(parse_assignment(suffix_expr, input, tokens)),
 				_ => {
-					let last = expr.suffix.pop();
-					if let Some(Suffix::Call(args)) = last {
-						Stat::FunctionCall(FunctionCall { expr, args })
-					} else {
-						let tk = tokens.cur();
-						format_err(&format!("Expected function call but found: {tk}."), tk.span, input)
+					// pop last suffix and check if its a call
+					if let Expr::SuffixExpr { expr, mut suffix } = suffix_expr {
+						let last = suffix.pop();
+						if let Some(Suffix::Call(args)) = last {
+							return Stat::FunctionCall(FunctionCall {
+								expr: new_suffix_expr(*expr, suffix),
+								args,
+							});
+						}
 					}
+					let tk = tokens.cur();
+					format_err(&format!("Expected function call but found: {tk}."), tk.span, input)
 				},
 			}
 		},
@@ -104,7 +109,7 @@ pub fn parse_statement(input: &str, tokens: &mut Tokens) -> Stat {
 
 /// assignment -> vars `=` explist
 /// vars -> suffix_expr {`,` suffix_expr}
-pub fn parse_assignment(first: SuffixExpr, input: &str, tokens: &mut Tokens) -> Assignment {
+pub fn parse_assignment(first: Expr, input: &str, tokens: &mut Tokens) -> Assignment {
 	let mut vars = vec![first];
 
 	while tokens.peek().kind == TokenKind::Comma {
@@ -362,7 +367,7 @@ pub fn parse_simple_exp(input: &str, tokens: &mut Tokens) -> Expr {
 		TokenKind::Str => Expr::Str(parse_string(input, tokens)),
 		TokenKind::Number => Expr::Num(parse_number(input, tokens)),
 		TokenKind::LCurly => Expr::Table(parse_table_constructor(input, tokens)),
-		_ => Expr::SuffixExpr(Box::new(parse_suffix_expr(input, tokens))),
+		_ => parse_suffix_expr(input, tokens),
 	}
 }
 
@@ -382,7 +387,7 @@ pub fn parse_unexp(input: &str, tokens: &mut Tokens) -> Option<Expr> {
 ///         | `[` exp `]`
 ///         | args
 /// args ->  `(` [explist] `)`
-pub fn parse_suffix_expr(input: &str, tokens: &mut Tokens) -> SuffixExpr {
+pub fn parse_suffix_expr(input: &str, tokens: &mut Tokens) -> Expr {
 	let primary = parse_primary_expr(input, tokens);
 
 	let mut suffix = Vec::new();
@@ -409,20 +414,30 @@ pub fn parse_suffix_expr(input: &str, tokens: &mut Tokens) -> SuffixExpr {
 		}
 	}
 
-	// TODO: if suffix is empty just emit a single expr
+	new_suffix_expr(primary, suffix)
+}
 
-	SuffixExpr { exp: primary, suffix }
+// if suffix is empty just emit a single expr
+fn new_suffix_expr(expr: Expr, suffix: Vec<Suffix>) -> Expr {
+	if suffix.is_empty() {
+		return expr;
+	}
+
+	Expr::SuffixExpr {
+		expr: Box::new(expr),
+		suffix,
+	}
 }
 
 /// primary_exp -> Name | '(' expr ')'
-pub fn parse_primary_expr(input: &str, tokens: &mut Tokens) -> PrimaryExpr {
+pub fn parse_primary_expr(input: &str, tokens: &mut Tokens) -> Expr {
 	match tokens.peek().kind {
-		TokenKind::Name => PrimaryExpr::Name(parse_name(input, tokens)),
+		TokenKind::Name => Expr::Name(parse_name(input, tokens)),
 		TokenKind::LParen => {
 			tokens.assert_next(input, TokenKind::LParen);
 			let expr = parse_expr(input, tokens);
 			tokens.assert_next(input, TokenKind::RParen);
-			PrimaryExpr::Expr(Box::new(expr))
+			expr
 		},
 		_ => {
 			let tk = tokens.next();

@@ -76,7 +76,7 @@ pub struct ForIn {
 /// vars '=' explist
 #[derive(Debug, PartialEq)]
 pub struct Assignment {
-	pub vars: Vec<SuffixExpr>,
+	pub vars: Vec<Expr>,
 	pub exprs: Vec<Expr>,
 }
 
@@ -94,17 +94,12 @@ pub struct FuncName {
 	pub method: Option<Name>,
 }
 
-/// primary_exp -> Name | '(' expr ')'
-#[derive(Debug, PartialEq)]
-pub enum PrimaryExpr {
-	Name(Name),
-	Expr(Box<Expr>),
-}
-
 /// expr -> nil | Bool | Numeral | String
 ///       |  tableconstructor | FUNCTION body | suffix_exp
 ///       |  exp binop exp | unop exp
 /// tableconstructor -> `{` [fieldlist] `}`
+/// suffix_exp -> primary_exp { suffix }
+/// primary_exp -> Name | '(' expr ')'
 #[derive(Debug, PartialEq)]
 pub enum Expr {
 	Nil,
@@ -115,14 +110,8 @@ pub enum Expr {
 	Table(Vec<Field>),
 	BinExp(BinExp),
 	UnExp(UnExp),
-	SuffixExpr(Box<SuffixExpr>),
-}
-
-/// suffix_exp -> primary_exp { suffix }
-#[derive(Debug, PartialEq)]
-pub struct SuffixExpr {
-	pub exp: PrimaryExpr,
-	pub suffix: Vec<Suffix>,
+	Name(Name),
+	SuffixExpr { expr: Box<Expr>, suffix: Vec<Suffix> },
 }
 
 /// suffix -> `.` Name
@@ -138,7 +127,7 @@ pub enum Suffix {
 
 #[derive(Debug, PartialEq)]
 pub struct FunctionCall {
-	pub expr: SuffixExpr,
+	pub expr: Expr,
 	pub args: Vec<Expr>,
 }
 
