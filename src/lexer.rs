@@ -111,6 +111,7 @@ impl<'a> Lexer<'a> {
 	}
 
 	// '\'' CONTENT '\'' | ''' CONTENT '"'
+	// TODO: escape sequences
 	fn single_line_string(&mut self) -> Token {
 		let start = self.cursor;
 		let closing = self.eat_char();

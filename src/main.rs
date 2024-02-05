@@ -13,42 +13,43 @@
 // #![allow(clippy::too_many_lines)]
 
 mod ast;
-mod ast_print;
+// mod ast_print;
 mod lexer;
 mod parser;
 mod span;
 mod token;
-mod visitor;
+// mod visitor;
 
 #[cfg(test)]
 mod tests;
 
 fn main() {
-	// let input = r#"
-	// local x = 1, nil, true, "test", (x + 5*y)
-	// local y = {foo = 'foo', bar = false, bizz = 1}
-	// print("hello")
-	// a = function ()
-	// 	print("ok")
-	// 	return 0
-	// end
-	// return - 1
-	// "#;
-
 	let input = r#"
-	local y = {'one', false, 3}
-	return y[1]
+	local x = 1, nil, true, "test", (x + 5*y)
+	local y = {foo = 'foo', bar = false, bizz = 1}
+	print("hello")
+	a = function ()
+		print("ok")
+		return 0
+	end
+	return - 1
 	"#;
+
+	// let input = r#"
+	// a , b = 1
+
+	// "#;
 
 	let mut ast = parser::parse(input);
 	println!("{input}");
 	dbg!(&ast);
 
-	let mut printer = ast_print::AstPrinter;
-	printer.print_ast(&mut ast);
+	// let mut printer = ast_print::AstPrinter;
+	// printer.print_ast(&mut ast);
 
-	let lua = mlua::Lua::new();
-	lua.load(input).exec().ok();
+	// let lua = mlua::Lua::new();
+	// lua.load(input).exec().ok();
+
 	// let ret = lua.load(input).eval::<String>().unwrap();
 	// println!("{ret:?}");
 }

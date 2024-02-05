@@ -1,12 +1,12 @@
 use std::fmt;
 
-/// block ::= {stat} [laststat]
+/// block -> {stat} [laststat]
 #[derive(Debug, PartialEq)]
 pub struct Block {
 	pub stats: Vec<Stat>,
 }
 
-/// stat ::=  vars `=` explist |
+/// stat ->  vars `=` explist |
 ///       functioncall |
 ///       do block end |
 ///       while exp do block end |
@@ -17,10 +17,10 @@ pub struct Block {
 ///       function funcname funcbody |
 ///       local function Name funcbody |
 ///       local names [`=` explist]
-/// laststat ::= return [explist] | break
+/// laststat -> return [explist] | break
 #[derive(Debug, PartialEq)]
 pub enum Stat {
-	Assignment(Assignment), // vars '=' explist
+	Assignment(Assignment),
 	FunctionCall(FunctionCall),
 	DoBlock(Block),
 	WhileBlock(WhileBlock),
@@ -76,7 +76,7 @@ pub struct ForIn {
 /// vars '=' explist
 #[derive(Debug, PartialEq)]
 pub struct Assignment {
-	pub vars: Vec<Var>,
+	pub vars: Vec<SuffixExpr>,
 	pub exprs: Vec<Expr>,
 }
 
@@ -87,38 +87,24 @@ pub struct LocalAssignment {
 	pub exprs: Vec<Expr>, // If vec is empty there is no `=`
 }
 
-/// funcname ::= Name {`.` Name} [`:` Name]
+/// funcname -> Name {`.` Name} [`:` Name]
 #[derive(Debug, PartialEq)]
 pub struct FuncName {
 	pub path: Vec<Name>,
 	pub method: Option<Name>,
 }
 
-/// var ::=  Name | prefixexp `[` exp `]` | prefixexp `.` Name
+/// primary_exp -> Name | '(' expr ')'
 #[derive(Debug, PartialEq)]
-pub enum Var {
+pub enum PrimaryExpr {
 	Name(Name),
-	IndexExpr(IndexExpr),
-	Property(Property),
+	Expr(Box<Expr>),
 }
 
-/// prefixexp `[` exp `]`
-#[derive(Debug, PartialEq)]
-pub struct IndexExpr {
-	pub expr: Box<PrefixExpr>,
-	pub arg: Expr,
-}
-
-/// prefixexp `.` Name
-#[derive(Debug, PartialEq)]
-pub struct Property {
-	pub expr: Box<PrefixExpr>,
-	pub name: Name,
-}
-
-/// exp ::= nil | false | true | Numeral | String | function |
-///         prefixexp | tableconstructor | exp binop exp | unop exp
-/// tableconstructor ::= `{` [fieldlist] `}`
+/// expr -> nil | Bool | Numeral | String
+///       |  tableconstructor | FUNCTION body | suffix_exp
+///       |  exp binop exp | unop exp
+/// tableconstructor -> `{` [fieldlist] `}`
 #[derive(Debug, PartialEq)]
 pub enum Expr {
 	Nil,
@@ -126,25 +112,33 @@ pub enum Expr {
 	Num(f64),
 	Str(String),
 	Lambda(FuncBody),
-	PrefixExp(Box<PrefixExpr>),
 	Table(Vec<Field>),
 	BinExp(BinExp),
 	UnExp(UnExp),
+	SuffixExpr(Box<SuffixExpr>),
 }
 
-/// prefixexp ::= var | functioncall | `(` exp `)`
+/// suffix_exp -> primary_exp { suffix }
 #[derive(Debug, PartialEq)]
-pub enum PrefixExpr {
-	Var(Var),
-	FunctionCall(FunctionCall),
-	Expr(Expr),
+pub struct SuffixExpr {
+	pub exp: PrimaryExpr,
+	pub suffix: Vec<Suffix>,
 }
 
-/// functioncall ::=  prefixexp args | prefixexp `:` Name args
-/// args ::=  `(` [explist] `)`
+/// suffix -> `.` Name
+///         | `[` exp `]`
+///         | args
+/// args ->  `(` [explist] `)`
+#[derive(Debug, PartialEq)]
+pub enum Suffix {
+	Property(Name),
+	Index(Expr),
+	Call(Vec<Expr>),
+}
+
 #[derive(Debug, PartialEq)]
 pub struct FunctionCall {
-	pub expr: Box<PrefixExpr>,
+	pub expr: SuffixExpr,
 	pub args: Vec<Expr>,
 }
 
@@ -162,15 +156,15 @@ pub struct LocalFunctionDef {
 	pub body: FuncBody,
 }
 
-/// funcbody ::= `(` [parlist] `)` block end
-/// parlist ::= names [`,`]
+/// funcbody -> `(` [parlist] `)` block end
+/// parlist -> names [`,`]
 #[derive(Debug, PartialEq)]
 pub struct FuncBody {
 	pub params: Vec<Name>,
 	pub body: Block,
 }
 
-/// field ::= `[` exp `]` | `=` exp | Name `=` exp | exp
+/// field -> `[` exp `]` | `=` exp | Name `=` exp | exp
 #[derive(Debug, PartialEq)]
 pub enum Field {
 	Assign(Name, Expr),
@@ -197,9 +191,6 @@ pub struct UnExp {
 	pub exp: Box<Expr>,
 }
 
-/// binop ::= `+` | `-` | `*` | `/` | `^` | `%` | `..` |
-///       `<` | `<=` | `>` | `>=` | `==` | `~=` |
-///       and | or
 #[derive(Debug, PartialEq)]
 pub enum BinOp {
 	Plus,
@@ -233,7 +224,7 @@ impl BinOp {
 	}
 }
 
-/// unop ::= `-` | not | `#` | `~`
+/// unop -> `-` | not | `#` | `~`
 #[derive(Debug, PartialEq)]
 pub enum UnOp {
 	Minus,

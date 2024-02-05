@@ -20,317 +20,39 @@ pub fn parse(input: &str) -> Block {
 	ast
 }
 
-/// funcname ::= Name {`.` Name} [`:` Name]
-pub fn parse_funcname(input: &str, tokens: &mut Tokens) -> FuncName {
-	let mut path = vec![parse_name(input, tokens)];
-	// if next token is period then loop
-	while tokens.peek().kind == (TokenKind::Period) {
-		tokens.next();
-		path.push(parse_name(input, tokens));
-	}
-	let mut method: Option<Name> = None;
-	if tokens.peek().kind == TokenKind::Colon {
-		tokens.next();
-		method = Some(parse_name(input, tokens));
-	}
-	FuncName { path, method }
+// Block and statement rules
+
+// tokens that can follow after a block
+fn block_follow(tk: Token) -> bool {
+	matches!(
+		tk.kind,
+		TokenKind::End | TokenKind::Else | TokenKind::ElseIf | TokenKind::Eof
+	)
 }
 
-pub fn parse_simple_exp(input: &str, tokens: &mut Tokens) -> Option<Expr> {
-	match tokens.peek().kind {
-		TokenKind::Nil => {
-			tokens.next();
-			Some(Expr::Nil)
-		},
-		TokenKind::True => {
-			tokens.next();
-			Some(Expr::Bool(true))
-		},
-		TokenKind::False => {
-			tokens.next();
-			Some(Expr::Bool(false))
-		},
-		TokenKind::Function => {
-			tokens.next();
-			Some(Expr::Lambda(parse_funcbody(input, tokens)))
-		},
-		TokenKind::Str => Some(Expr::Str(parse_string(input, tokens))),
-		TokenKind::Number => Some(Expr::Num(parse_number(input, tokens))),
-		TokenKind::LCurly => Some(Expr::Table(parse_table_constructor(input, tokens))),
-		_ => None,
-	}
-}
+/// block -> {stat} [laststat]
+pub fn parse_block(input: &str, tokens: &mut Tokens) -> Block {
+	let mut stats = vec![];
 
-pub fn parse_unexp(input: &str, tokens: &mut Tokens) -> Option<Expr> {
-	match tokens.peek().as_un_op() {
-		Some(op) => {
-			tokens.next();
-			let exp = parse_sub_expr(input, tokens, op.priority());
-			Some(Expr::UnExp(UnExp { op, exp: Box::new(exp) }))
-		},
-		None => None,
-	}
-}
-
-pub fn parse_expr(input: &str, tokens: &mut Tokens) -> Expr {
-	parse_sub_expr(input, tokens, 0)
-}
-
-// subexpr ::= (simpleexp | unop subexpr ) { binop subexpr }
-// see: https://github.com/lua/lua/blob/2c32bff60987d38a60a58d4f0123f3783da60a63/lparser.c#L1120-L1156
-// TODO: left / right priority
-pub fn parse_sub_expr(input: &str, tokens: &mut Tokens, min_priority: i32) -> Expr {
-	let mut expression = match parse_unexp(input, tokens) {
-		Some(expr) => expr,
-		None => match parse_simple_exp(input, tokens) {
-			Some(expr) => expr,
-			None => Expr::PrefixExp(Box::new(parse_prefix_exp(input, tokens))),
-		},
-	};
-
-	while let Some(op) = tokens.peek().as_bin_op() {
-		let priority = op.priority();
-		if priority <= min_priority {
-			break;
-		}
-		tokens.next();
-
-		let rhs = parse_sub_expr(input, tokens, priority);
-
-		expression = Expr::BinExp(BinExp {
-			op,
-			lhs: Box::new(expression),
-			rhs: Box::new(rhs),
-		});
-	}
-
-	expression
-}
-
-/// field ::= `[` exp `]` `=` exp | Name `=` exp | exp
-pub fn parse_field(input: &str, tokens: &mut Tokens) -> Field {
-	match tokens.peek().kind {
-		// Name '=' exp
-		TokenKind::Name => {
-			let name = parse_name(input, tokens);
-			tokens.assert_next(input, TokenKind::Assign);
-
-			let expr = parse_expr(input, tokens);
-			Field::Assign(name, expr)
-		},
-		// '[' exp ']' '=' exp
-		TokenKind::LBracket => {
-			tokens.next();
-			let lexpr = parse_expr(input, tokens);
-
-			tokens.assert_next(input, TokenKind::RBracket);
-			tokens.assert_next(input, TokenKind::Assign);
-
-			let rexpr = parse_expr(input, tokens);
-			Field::ExprAssign(lexpr, rexpr)
-		},
-		// exp
-		_ => Field::Expr(parse_expr(input, tokens)),
-	}
-}
-
-/// tableconstructor ::= `{` [fieldlist] `}`
-/// fieldlist ::= field {fieldsep field} [fieldsep]
-/// fieldsep ::= `,` | `;`
-pub fn parse_table_constructor(input: &str, tokens: &mut Tokens) -> Vec<Field> {
-	tokens.assert_next(input, TokenKind::LCurly);
-	if tokens.peek().kind == TokenKind::RCurly {
-		tokens.next();
-		return vec![];
-	};
-
-	let mut fields = vec![];
 	loop {
-		let f = parse_field(input, tokens);
-		fields.push(f);
-
-		match tokens.peek().kind {
-			TokenKind::Comma | TokenKind::SemiColon => {
-				tokens.next();
-				continue;
-			},
-			_ => break,
-		}
-	}
-
-	tokens.assert_next(input, TokenKind::RCurly);
-	fields
-}
-
-/// vars ::= var {`,` var}
-pub fn parse_vars(input: &str, tokens: &mut Tokens) -> Vec<Var> {
-	let mut vars = vec![];
-
-	vars.push(parse_var(input, tokens));
-
-	while tokens.peek().kind == TokenKind::Comma {
-		tokens.next();
-		vars.push(parse_var(input, tokens));
-	}
-
-	vars
-}
-
-/// explist ::= exp {`,` exp}
-pub fn parse_exprs(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
-	let mut exprs = vec![];
-
-	exprs.push(parse_expr(input, tokens));
-
-	while tokens.peek().kind == TokenKind::Comma {
-		tokens.next();
-		exprs.push(parse_expr(input, tokens));
-	}
-
-	exprs
-}
-
-/// args ::=  `(` [explist] `)`
-pub fn parse_args(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
-	tokens.assert_next(input, TokenKind::LParen);
-	if tokens.peek().kind == TokenKind::RParen {
-		tokens.next();
-		return vec![];
-	}
-	let explist = parse_exprs(input, tokens);
-	tokens.assert_next(input, TokenKind::RParen);
-	explist
-}
-
-/// var ::=  Name | prefixexp `[` exp `]` | prefixexp `.` Name
-/// e.g.:
-/// foo
-/// bar[0]
-/// bar.bizz
-pub fn parse_var(input: &str, tokens: &mut Tokens) -> Var {
-	if tokens.peek().kind == TokenKind::Name {
-		let name = parse_name(input, tokens);
-
-		match tokens.peek().kind {
-			TokenKind::LBracket => {
-				tokens.next();
-
-				let expr = parse_expr(input, tokens);
-
-				tokens.assert_next(input, TokenKind::RBracket);
-
-				Var::IndexExpr(IndexExpr {
-					expr: Box::new(PrefixExpr::Var(Var::Name(name))),
-					arg: expr,
-				})
-			},
-			TokenKind::Period => {
-				tokens.next();
-
-				let next_name = parse_name(input, tokens);
-
-				Var::Property(Property {
-					expr: Box::new(PrefixExpr::Var(Var::Name(name))),
-					name: next_name,
-				})
-			},
-			_ => Var::Name(name),
-		}
-	} else {
-		let prefixexp = parse_prefix_exp(input, tokens);
 		let tk = tokens.peek();
+		if block_follow(tk) {
+			break;
+		} else if tk.kind == TokenKind::Return || tk.kind == TokenKind::Break {
+			// These have to be the last statements in a block
+			stats.push(parse_statement(input, tokens));
 
-		match tk.kind {
-			TokenKind::LBracket => {
-				tokens.next();
-
-				let expr = parse_expr(input, tokens);
-
-				tokens.assert_next(input, TokenKind::RBracket);
-
-				Var::IndexExpr(IndexExpr {
-					expr: Box::new(prefixexp),
-					arg: expr,
-				})
-			},
-			TokenKind::Period => {
-				tokens.next();
-				let name = parse_name(input, tokens);
-
-				Var::Property(Property {
-					expr: Box::new(prefixexp),
-					name,
-				})
-			},
-			// TODO: I'm not sure if this is even reachable
-			_ => format_err(&format!("Expected `[` or `.` but found: {tk}."), tk.span, input),
+			// TODO: peek here to check it is the last statement, and produce error
+			return Block { stats };
 		}
+		stats.push(parse_statement(input, tokens));
 	}
+	Block { stats }
 }
 
-/// prefixexp ::= var | functioncall | `(` exp `)`
-// functioncall ::=  prefixexp args | prefixexp `:` Name args
-// var ::=  Name | prefixexp `[` exp `]` | prefixexp `.` Name
-pub fn parse_prefix_exp(input: &str, tokens: &mut Tokens) -> PrefixExpr {
-	// TODO: currently broken -- prefixexp `:` Name args
+pub fn parse_statement(input: &str, tokens: &mut Tokens) -> Stat {
 	let tk = tokens.peek();
-	match tk.kind {
-		TokenKind::LParen => {
-			tokens.next();
-			let expr = PrefixExpr::Expr(parse_expr(input, tokens));
-			tokens.assert_next(input, TokenKind::RParen);
-			expr
-		},
-
-		TokenKind::Name => {
-			let name = parse_name(input, tokens);
-
-			match tokens.peek().kind {
-				TokenKind::LBracket => {
-					tokens.next();
-
-					let expr = parse_expr(input, tokens);
-
-					tokens.assert_next(input, TokenKind::RBracket);
-
-					PrefixExpr::Var(Var::IndexExpr(IndexExpr {
-						expr: Box::new(PrefixExpr::Var(Var::Name(name))),
-						arg: expr,
-					}))
-				},
-				TokenKind::Period => {
-					tokens.next();
-
-					let next_name = parse_name(input, tokens);
-
-					PrefixExpr::Var(Var::Property(Property {
-						expr: Box::new(PrefixExpr::Var(Var::Name(name))),
-						name: next_name,
-					}))
-				},
-				TokenKind::LParen => PrefixExpr::FunctionCall(FunctionCall {
-					expr: Box::new(PrefixExpr::Var(Var::Name(name))),
-					args: parse_args(input, tokens),
-				}),
-				_ => PrefixExpr::Var(Var::Name(name)),
-			}
-		},
-		_ => format_err(&format!("Expected expression but found: {tk}."), tk.span, input),
-	}
-}
-
-pub fn parse_stat(input: &str, tokens: &mut Tokens) -> Stat {
-	// take care of optional semicolon
-	let stat = parse_stat_inner(input, tokens);
-	if tokens.peek().kind == TokenKind::SemiColon {
-		tokens.next();
-	}
-	stat
-}
-
-pub fn parse_stat_inner(input: &str, tokens: &mut Tokens) -> Stat {
-	let tk = tokens.peek();
-	match tk.kind {
+	let stat = match tk.kind {
 		TokenKind::Break => {
 			tokens.next();
 			Stat::Break
@@ -354,28 +76,48 @@ pub fn parse_stat_inner(input: &str, tokens: &mut Tokens) -> Stat {
 				Stat::LocalAssignment(parse_local_assignment(input, tokens))
 			}
 		},
-		TokenKind::Name => {
-			if tokens.peek_n(2).kind == TokenKind::LParen {
-				let name = parse_name(input, tokens);
-				Stat::FunctionCall(FunctionCall {
-					expr: Box::new(PrefixExpr::Var(Var::Name(name))),
-					args: parse_args(input, tokens),
-				})
-			} else {
-				Stat::Assignment(parse_assignment(input, tokens))
+		_ => {
+			// Parse a suffix expression, then check if a `==` or `,` follows to parse (multiple) assignment.
+			// If not, it should be a function call.
+			let mut expr = parse_suffix_expr(input, tokens);
+			match tokens.peek().kind {
+				TokenKind::Assign | TokenKind::Comma => Stat::Assignment(parse_assignment(expr, input, tokens)),
+				_ => {
+					let last = expr.suffix.pop();
+					if let Some(Suffix::Call(args)) = last {
+						Stat::FunctionCall(FunctionCall { expr, args })
+					} else {
+						let tk = tokens.cur();
+						format_err(&format!("Expected function call but found: {tk}."), tk.span, input)
+					}
+				},
 			}
 		},
-		_ => format_err(&format!("Expected statement but found: {tk}."), tk.span, input),
+	};
+
+	// take care of optional semicolon
+	if tokens.peek().kind == TokenKind::SemiColon {
+		tokens.next();
 	}
+	stat
 }
 
-/// vars `=` explist
-pub fn parse_assignment(input: &str, tokens: &mut Tokens) -> Assignment {
-	let vars = parse_vars(input, tokens);
+/// assignment -> vars `=` explist
+/// vars -> suffix_expr {`,` suffix_expr}
+pub fn parse_assignment(first: SuffixExpr, input: &str, tokens: &mut Tokens) -> Assignment {
+	let mut vars = vec![first];
+
+	while tokens.peek().kind == TokenKind::Comma {
+		tokens.next();
+		vars.push(parse_suffix_expr(input, tokens));
+	}
 
 	tokens.assert_next(input, TokenKind::Assign);
 
 	let exprs = parse_exprs(input, tokens);
+
+	// TODO: at this point, none of the lhs vars should end on a Call suffix, since you can't assign there.
+	// We can check for this here, but maybe it makes more sense in a later stage if you have to check it anyway.
 
 	Assignment { vars, exprs }
 }
@@ -415,6 +157,33 @@ pub fn parse_function_def(input: &str, tokens: &mut Tokens) -> FunctionDef {
 	let body = parse_funcbody(input, tokens);
 
 	FunctionDef { name, body }
+}
+
+/// funcname -> Name {`.` Name} [`:` Name]
+pub fn parse_funcname(input: &str, tokens: &mut Tokens) -> FuncName {
+	let mut path = vec![parse_name(input, tokens)];
+	// if next token is period then loop
+	while tokens.peek().kind == (TokenKind::Period) {
+		tokens.next();
+		path.push(parse_name(input, tokens));
+	}
+	let mut method: Option<Name> = None;
+	if tokens.peek().kind == TokenKind::Colon {
+		tokens.next();
+		method = Some(parse_name(input, tokens));
+	}
+	FuncName { path, method }
+}
+
+/// funcbody -> `(` [parlist] `)` block end
+pub fn parse_funcbody(input: &str, tokens: &mut Tokens) -> FuncBody {
+	tokens.assert_next(input, TokenKind::LParen);
+	let params = parse_parlist(input, tokens);
+	tokens.assert_next(input, TokenKind::RParen);
+	let body = parse_block(input, tokens);
+	tokens.assert_next(input, TokenKind::End);
+
+	FuncBody { params, body }
 }
 
 /// for names in explist do block end
@@ -460,26 +229,6 @@ pub fn parse_for_range(input: &str, tokens: &mut Tokens) -> ForRange {
 	}
 }
 
-/// elseif exp then block
-pub fn parse_elseif(input: &str, tokens: &mut Tokens) -> ElseIf {
-	tokens.assert_next(input, TokenKind::ElseIf);
-	let expr = parse_expr(input, tokens);
-	tokens.assert_next(input, TokenKind::Then);
-	let block = parse_block(input, tokens);
-
-	ElseIf { expr, block }
-}
-
-/// else block
-pub fn parse_else_block(input: &str, tokens: &mut Tokens) -> Option<Block> {
-	if tokens.peek().kind == (TokenKind::Else) {
-		tokens.next();
-		Some(parse_block(input, tokens))
-	} else {
-		None
-	}
-}
-
 /// if exp then block {elseif exp then block} [else block] end
 pub fn parse_if_block(input: &str, tokens: &mut Tokens) -> IfBlock {
 	tokens.assert_next(input, TokenKind::If);
@@ -508,6 +257,26 @@ pub fn parse_if_block(input: &str, tokens: &mut Tokens) -> IfBlock {
 	}
 }
 
+/// elseif exp then block
+pub fn parse_elseif(input: &str, tokens: &mut Tokens) -> ElseIf {
+	tokens.assert_next(input, TokenKind::ElseIf);
+	let expr = parse_expr(input, tokens);
+	tokens.assert_next(input, TokenKind::Then);
+	let block = parse_block(input, tokens);
+
+	ElseIf { expr, block }
+}
+
+/// else block
+pub fn parse_else_block(input: &str, tokens: &mut Tokens) -> Option<Block> {
+	if tokens.peek().kind == (TokenKind::Else) {
+		tokens.next();
+		Some(parse_block(input, tokens))
+	} else {
+		None
+	}
+}
+
 /// while exp do block end
 pub fn parse_while_block(input: &str, tokens: &mut Tokens) -> WhileBlock {
 	tokens.assert_next(input, TokenKind::While);
@@ -526,67 +295,226 @@ pub fn parse_do_block(input: &str, tokens: &mut Tokens) -> Block {
 	blk
 }
 
-// tokens that can follow after a block
-fn block_follow(tk: Token) -> bool {
-	matches!(
-		tk.kind,
-		TokenKind::End | TokenKind::Else | TokenKind::ElseIf | TokenKind::Eof
-	)
-}
-
-/// block ::= {stat} [laststat]
-pub fn parse_block(input: &str, tokens: &mut Tokens) -> Block {
-	let mut stats = vec![];
-
-	loop {
-		let tk = tokens.peek();
-		if block_follow(tk) {
-			break;
-		} else if tk.kind == TokenKind::Return || tk.kind == TokenKind::Break {
-			// These have to be the last statements in a block
-			stats.push(parse_stat(input, tokens));
-
-			// TODO: peek here to check it is the last statement, and produce error
-			return Block { stats };
-		}
-		stats.push(parse_stat(input, tokens));
-	}
-	Block { stats }
-}
-
 pub fn parse_return(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
 	tokens.assert_next(input, TokenKind::Return);
 
-	if tokens.peek().kind == TokenKind::SemiColon {
-		tokens.next();
-		return vec![];
-	}
-
-	if block_follow(tokens.peek()) {
+	if block_follow(tokens.peek()) || tokens.peek().kind == TokenKind::SemiColon {
 		return vec![];
 	}
 
 	let exprs = parse_exprs(input, tokens);
 
-	if tokens.peek().kind == TokenKind::SemiColon {
+	exprs
+}
+
+// Expression rules
+
+pub fn parse_expr(input: &str, tokens: &mut Tokens) -> Expr {
+	parse_sub_expr(input, tokens, 0)
+}
+
+// subexpr -> (simpleexp | unop subexpr ) { binop subexpr }
+// see: https://github.com/lua/lua/blob/2c32bff60987d38a60a58d4f0123f3783da60a63/lparser.c#L1120-L1156
+// TODO: left / right priority
+pub fn parse_sub_expr(input: &str, tokens: &mut Tokens, min_priority: i32) -> Expr {
+	let mut expression = match parse_unexp(input, tokens) {
+		Some(expr) => expr,
+		None => parse_simple_exp(input, tokens),
+	};
+
+	while let Some(op) = tokens.peek().as_bin_op() {
+		let priority = op.priority();
+		if priority <= min_priority {
+			break;
+		}
 		tokens.next();
+
+		let rhs = parse_sub_expr(input, tokens, priority);
+
+		expression = Expr::BinExp(BinExp {
+			op,
+			lhs: Box::new(expression),
+			rhs: Box::new(rhs),
+		});
+	}
+
+	expression
+}
+
+pub fn parse_simple_exp(input: &str, tokens: &mut Tokens) -> Expr {
+	match tokens.peek().kind {
+		TokenKind::Nil => {
+			tokens.next();
+			Expr::Nil
+		},
+		TokenKind::True => {
+			tokens.next();
+			Expr::Bool(true)
+		},
+		TokenKind::False => {
+			tokens.next();
+			Expr::Bool(false)
+		},
+		TokenKind::Function => {
+			tokens.next();
+			Expr::Lambda(parse_funcbody(input, tokens))
+		},
+		TokenKind::Str => Expr::Str(parse_string(input, tokens)),
+		TokenKind::Number => Expr::Num(parse_number(input, tokens)),
+		TokenKind::LCurly => Expr::Table(parse_table_constructor(input, tokens)),
+		_ => Expr::SuffixExpr(Box::new(parse_suffix_expr(input, tokens))),
+	}
+}
+
+pub fn parse_unexp(input: &str, tokens: &mut Tokens) -> Option<Expr> {
+	match tokens.peek().as_un_op() {
+		Some(op) => {
+			tokens.next();
+			let exp = parse_sub_expr(input, tokens, op.priority());
+			Some(Expr::UnExp(UnExp { op, exp: Box::new(exp) }))
+		},
+		None => None,
+	}
+}
+
+/// suffix_exp -> primary_exp { suffix }
+/// suffix -> `.` Name
+///         | `[` exp `]`
+///         | args
+/// args ->  `(` [explist] `)`
+pub fn parse_suffix_expr(input: &str, tokens: &mut Tokens) -> SuffixExpr {
+	let primary = parse_primary_expr(input, tokens);
+
+	let mut suffix = Vec::new();
+
+	loop {
+		match tokens.peek().kind {
+			TokenKind::Period => {
+				tokens.next();
+				let name = parse_name(input, tokens);
+
+				suffix.push(Suffix::Property(name));
+			},
+			TokenKind::LBracket => {
+				tokens.next();
+				let exp = parse_expr(input, tokens);
+				tokens.assert_next(input, TokenKind::RBracket);
+
+				suffix.push(Suffix::Index(exp));
+			},
+			TokenKind::LParen => {
+				suffix.push(Suffix::Call(parse_args(input, tokens)));
+			},
+			_ => break,
+		}
+	}
+
+	// TODO: if suffix is empty just emit a single expr
+
+	SuffixExpr { exp: primary, suffix }
+}
+
+/// primary_exp -> Name | '(' expr ')'
+pub fn parse_primary_expr(input: &str, tokens: &mut Tokens) -> PrimaryExpr {
+	match tokens.peek().kind {
+		TokenKind::Name => PrimaryExpr::Name(parse_name(input, tokens)),
+		TokenKind::LParen => {
+			tokens.assert_next(input, TokenKind::LParen);
+			let expr = parse_expr(input, tokens);
+			tokens.assert_next(input, TokenKind::RParen);
+			PrimaryExpr::Expr(Box::new(expr))
+		},
+		_ => {
+			let tk = tokens.next();
+			format_err(&format!("Expected expression but found: {tk}."), tk.span, input)
+		},
+	}
+}
+
+/// Constructors
+
+/// tableconstructor -> `{` [fieldlist] `}`
+/// fieldlist -> field {fieldsep field} [fieldsep]
+/// fieldsep -> `,` | `;`
+pub fn parse_table_constructor(input: &str, tokens: &mut Tokens) -> Vec<Field> {
+	tokens.assert_next(input, TokenKind::LCurly);
+	if tokens.peek().kind == TokenKind::RCurly {
+		tokens.next();
+		return vec![];
+	};
+
+	let mut fields = vec![];
+	loop {
+		let f = parse_field(input, tokens);
+		fields.push(f);
+
+		match tokens.peek().kind {
+			TokenKind::Comma | TokenKind::SemiColon => {
+				tokens.next();
+				continue;
+			},
+			_ => break,
+		}
+	}
+
+	tokens.assert_next(input, TokenKind::RCurly);
+	fields
+}
+
+/// field -> `[` exp `]` `=` exp | Name `=` exp | exp
+pub fn parse_field(input: &str, tokens: &mut Tokens) -> Field {
+	match tokens.peek().kind {
+		// Name '=' exp
+		TokenKind::Name => {
+			let name = parse_name(input, tokens);
+			tokens.assert_next(input, TokenKind::Assign);
+
+			let expr = parse_expr(input, tokens);
+			Field::Assign(name, expr)
+		},
+		// '[' exp ']' '=' exp
+		TokenKind::LBracket => {
+			tokens.next();
+			let lexpr = parse_expr(input, tokens);
+
+			tokens.assert_next(input, TokenKind::RBracket);
+			tokens.assert_next(input, TokenKind::Assign);
+
+			let rexpr = parse_expr(input, tokens);
+			Field::ExprAssign(lexpr, rexpr)
+		},
+		// exp
+		_ => Field::Expr(parse_expr(input, tokens)),
+	}
+}
+
+/// args ->  `(` [explist] `)`
+pub fn parse_args(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
+	tokens.assert_next(input, TokenKind::LParen);
+	if tokens.peek().kind == TokenKind::RParen {
+		tokens.next();
+		return vec![];
+	}
+	let explist = parse_exprs(input, tokens);
+	tokens.assert_next(input, TokenKind::RParen);
+	explist
+}
+
+/// explist -> exp {`,` exp}
+pub fn parse_exprs(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
+	let mut exprs = vec![];
+
+	exprs.push(parse_expr(input, tokens));
+
+	while tokens.peek().kind == TokenKind::Comma {
+		tokens.next();
+		exprs.push(parse_expr(input, tokens));
 	}
 
 	exprs
 }
 
-/// funcbody ::= `(` [parlist] `)` block end
-pub fn parse_funcbody(input: &str, tokens: &mut Tokens) -> FuncBody {
-	tokens.assert_next(input, TokenKind::LParen);
-	let params = parse_parlist(input, tokens);
-	tokens.assert_next(input, TokenKind::RParen);
-	let body = parse_block(input, tokens);
-	tokens.assert_next(input, TokenKind::End);
-
-	FuncBody { params, body }
-}
-
-/// names ::= Name {`,` Name}
+/// names -> Name {`,` Name}
 pub fn parse_names(input: &str, tokens: &mut Tokens) -> Vec<Name> {
 	let mut names = vec![parse_name(input, tokens)];
 
@@ -603,14 +531,11 @@ pub fn parse_names(input: &str, tokens: &mut Tokens) -> Vec<Name> {
 	names
 }
 
-/// parlist ::= names [`,`]
+/// parlist -> names [`,`]
 pub fn parse_parlist(input: &str, tokens: &mut Tokens) -> Vec<Name> {
 	match tokens.peek().kind {
-		// names
 		TokenKind::Name => {
 			let names = parse_names(input, tokens);
-
-			// [',']
 			if tokens.peek().kind == TokenKind::Comma {
 				tokens.next();
 			};
@@ -619,6 +544,8 @@ pub fn parse_parlist(input: &str, tokens: &mut Tokens) -> Vec<Name> {
 		_ => vec![],
 	}
 }
+
+// Simple terminals
 
 // TODO: multi line string currently broken
 fn parse_string(input: &str, tokens: &mut Tokens) -> String {
@@ -629,6 +556,7 @@ fn parse_string(input: &str, tokens: &mut Tokens) -> String {
 			chars.next_back();
 			chars.as_str().to_string() // really?
 		},
+		// TODO: if lexer is working properly, this should be unreachable
 		_ => format_err(&format!("Malformed string: `{}`.", chars.as_str()), tk.span, input),
 	}
 }
