@@ -9,6 +9,7 @@ pub struct Lexer<'a> {
 	bytes: &'a [u8],
 	cursor: usize,
 	eof_done: bool,
+	handle_escape: bool,
 }
 
 impl<'a> Lexer<'a> {
@@ -18,6 +19,7 @@ impl<'a> Lexer<'a> {
 			bytes: input.as_bytes(),
 			cursor: 0,
 			eof_done: false,
+			handle_escape: false,
 		}
 	}
 
@@ -32,11 +34,11 @@ impl<'a> Lexer<'a> {
 		c.map(|b| *b as char)
 	}
 
-	fn peek(&self, n: usize) -> Option<&str> {
-		if self.input.len() <= self.cursor + n {
+	fn peek(&self, n: usize) -> Option<&[u8]> {
+		if self.bytes.len() <= self.cursor + n {
 			None
 		} else {
-			Some(&self.input[self.cursor..self.cursor + n])
+			Some(&self.bytes[self.cursor..self.cursor + n])
 		}
 	}
 
@@ -56,7 +58,7 @@ impl<'a> Lexer<'a> {
 	}
 
 	pub fn match_chars(&mut self, other: &str) -> bool {
-		if self.input.len() < other.len() {
+		if self.bytes.len() < other.len() {
 			return false;
 		}
 		for (c1, c2) in zip(self.bytes[self.cursor..].iter(), other.bytes()) {
@@ -111,17 +113,17 @@ impl<'a> Lexer<'a> {
 	}
 
 	// '\'' CONTENT '\'' | ''' CONTENT '"'
-	// TODO: escape sequences
 	fn single_line_string(&mut self) -> Token {
 		let start = self.cursor;
 		let closing = self.eat_char();
 		loop {
 			match self.eat_char() {
-				Some(e) if Some(e) == closing => break,
+				Some(e) if Some(e) == closing && !self.handle_escape => break,
+				Some('\\') => self.handle_escape = true,
 				Some('\n') | None => {
 					format_err("Failed to close string.", Span::new(start, self.cursor - 1), self.input)
 				},
-				_ => (),
+				_ => self.handle_escape = false,
 			}
 		}
 		let end = self.cursor;
@@ -247,7 +249,7 @@ fn newtoken(kind: TokenKind, start: usize, end: usize) -> Token {
 impl Iterator for Lexer<'_> {
 	type Item = Token;
 	fn next(&mut self) -> Option<Token> {
-		if let Some("--[[") = &self.peek(4) {
+		if self.peek(4) == Some("--[[".as_bytes()) {
 			self.multi_line_comment()
 		} else if let Some(c) = self.cur_char() {
 			use TokenKind::*;
