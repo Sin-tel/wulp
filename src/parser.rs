@@ -92,18 +92,11 @@ pub fn parse_statement_inner(input: &str, tokens: &mut Tokens) -> Stat {
 			match tokens.peek().kind {
 				TokenKind::Assign | TokenKind::Comma => Stat::Assignment(parse_assignment(suffix_expr, input, tokens)),
 				_ => {
-					// pop last suffix and check if its a call
-					if let Expr::SuffixExpr(SuffixExpr { expr, mut suffix }) = suffix_expr {
-						let last = suffix.pop();
-						if let Some(Suffix::Call(args)) = last {
-							return Stat::FunctionCall(FunctionCall {
-								expr: new_suffix_expr(*expr, suffix),
-								args,
-							});
-						}
+					if let Expr::Call(e) = suffix_expr {
+						return Stat::FunctionCall(e);
 					}
-					let tk = tokens.cur();
-					format_err(&format!("Expected function call but found: {tk}."), tk.span, input)
+					let tk = tokens.next();
+					format_err(&format!("Expected `=` but found: {tk}."), tk.span, input)
 				},
 			}
 		},
@@ -396,12 +389,11 @@ pub fn parse_unexp(input: &str, tokens: &mut Tokens) -> Option<Expr> {
 }
 
 /// suffix_exp -> primary_exp { suffix }
+/// primary_exp -> Name | '(' expr ')'
 /// suffix -> `.` Name
 ///         | `[` exp `]`
-///         | args
-/// args ->  `(` [explist] `)`
 pub fn parse_suffix_expr(input: &str, tokens: &mut Tokens) -> Expr {
-	let primary = parse_primary_expr(input, tokens);
+	let mut primary = parse_primary_expr(input, tokens);
 
 	let mut suffix = Vec::new();
 
@@ -421,7 +413,13 @@ pub fn parse_suffix_expr(input: &str, tokens: &mut Tokens) -> Expr {
 				suffix.push(Suffix::Index(exp));
 			},
 			TokenKind::LParen => {
-				suffix.push(Suffix::Call(parse_args(input, tokens)));
+				// Build ast node and continue
+				let args = parse_args(input, tokens);
+				let old_suffix = std::mem::take(&mut suffix);
+				primary = Expr::Call(FunctionCall {
+					expr: Box::new(new_suffix_expr(primary, old_suffix)),
+					args,
+				})
 			},
 			_ => break,
 		}
@@ -435,7 +433,6 @@ fn new_suffix_expr(expr: Expr, suffix: Vec<Suffix>) -> Expr {
 	if suffix.is_empty() {
 		return expr;
 	}
-
 	Expr::SuffixExpr(SuffixExpr {
 		expr: Box::new(expr),
 		suffix,

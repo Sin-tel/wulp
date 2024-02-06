@@ -112,11 +112,7 @@ impl Visitor for EmitLua {
 				self.push_list(t, ", ");
 				self.code.push('}');
 			},
-			Expr::Literal(_) => node.walk(self),
-			Expr::Name(_) => node.walk(self),
-			Expr::SuffixExpr(_) => node.walk(self),
-			Expr::BinExp(_) => node.walk(self),
-			e => unimplemented!("{e:?}"),
+			_ => node.walk(self),
 		}
 	}
 	fn visit_literal(&mut self, node: &mut Literal) {
@@ -154,11 +150,6 @@ impl Visitor for EmitLua {
 				self.code.push('[');
 				node.walk(self);
 				self.code.push(']');
-			},
-			Suffix::Call(args) => {
-				self.code.push('(');
-				self.push_list(args, ", ");
-				self.code.push(')');
 			},
 		};
 	}

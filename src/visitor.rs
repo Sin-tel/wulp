@@ -165,6 +165,7 @@ impl<V: Visitor> VisitNode<V> for Expr {
 			Expr::Lambda(e) => v.visit_function_body(e),
 			Expr::SuffixExpr(e) => v.visit_suffix_expr(e),
 			Expr::Expr(e) => v.visit_expr(e),
+			Expr::Call(e) => v.visit_function_call(e),
 			Expr::Table(t) => {
 				for e in t {
 					v.visit_field(e);
@@ -213,11 +214,6 @@ impl<V: Visitor> VisitNode<V> for Suffix {
 		match self {
 			Suffix::Property(e) => v.visit_name(e),
 			Suffix::Index(e) => v.visit_expr(e),
-			Suffix::Call(args) => {
-				for e in args {
-					v.visit_expr(e);
-				}
-			},
 		}
 	}
 }

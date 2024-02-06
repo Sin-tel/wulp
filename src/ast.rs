@@ -81,7 +81,7 @@ pub struct Assignment {
 
 /// expr ->  literal
 ///       |  tableconstructor | FUNCTION body | suffix_exp
-///       |  exp binop exp | unop exp
+///       |  exp binop exp | unop exp | function_call
 /// tableconstructor -> `{` [fieldlist] `}`
 #[derive(Debug, PartialEq)]
 pub enum Expr {
@@ -92,6 +92,7 @@ pub enum Expr {
 	Lambda(FuncBody),
 	Table(Vec<Field>),
 	SuffixExpr(SuffixExpr),
+	Call(FunctionCall),
 	Expr(Box<Expr>), // bracketed expression
 }
 
@@ -114,18 +115,17 @@ pub struct SuffixExpr {
 
 /// suffix -> `.` Name
 ///         | `[` exp `]`
-///         | args
-/// args ->  `(` [explist] `)`
 #[derive(Debug, PartialEq)]
 pub enum Suffix {
 	Property(Name),
 	Index(Expr),
-	Call(Vec<Expr>),
 }
 
+/// function_call -> suffix_exp args
+/// args ->  `(` [explist] `)`
 #[derive(Debug, PartialEq)]
 pub struct FunctionCall {
-	pub expr: Expr,
+	pub expr: Box<Expr>,
 	pub args: Vec<Expr>,
 }
 

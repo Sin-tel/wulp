@@ -86,7 +86,6 @@ impl Visitor for AstPrinter {
 		let s = match node {
 			Suffix::Property(_) => "property",
 			Suffix::Index(_) => "index",
-			Suffix::Call(_) => "call args",
 		};
 		add_branch!("{s}");
 		node.walk(self);
