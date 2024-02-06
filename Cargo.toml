@@ -8,4 +8,5 @@ edition = "2021"
 memchr = "2.5"
 bytecount = "0.6"
 debug_tree = "0.4"
-mlua = { version = "0.9", features = ["luajit", "module"] }
+# 0.9.5 fails on luajit vendored
+mlua = { version = "0.9.4", features = ["luajit", "vendored"] }

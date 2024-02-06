@@ -30,18 +30,10 @@ mod visitor;
 mod tests;
 
 fn main() {
-	let input = fs::read_to_string("lua/test.lua").expect("Should have been able to read the file");
+	let input = fs::read_to_string("lua/test.lua").unwrap();
 
 	// let input = r#"
-	// -- local x = 1, nil, true, "test", (x + 5*y)
-	// -- local y = {foo = 'foo', bar = false, bizz = 1}
-	// -- print("hello")
-	// -- a = function (b)
-	// -- 	print("ok")
-	// -- 	return 0
-	// -- end
-	// -- return - 1
-	// return a(b,c)
+	// x=5*(2 + 1)
 	// "#;
 
 	let mut ast = parser::parse(&input);
@@ -58,9 +50,11 @@ fn main() {
 	let code = EmitLua::emit(&mut ast);
 	println!("{code}");
 
-	println!("----- execute:");
 	let lua = mlua::Lua::new();
+	println!("----- execute:");
 	let ret = lua.load(code).eval::<String>();
+	println!("{ret:?}");
+	let ret = lua.load(input).eval::<String>();
 	println!("{ret:?}");
 
 	// lua.load(input).exec().ok();

@@ -51,14 +51,23 @@ pub fn parse_block(input: &str, tokens: &mut Tokens) -> Block {
 }
 
 pub fn parse_statement(input: &str, tokens: &mut Tokens) -> Stat {
+	let stat = parse_statement_inner(input, tokens);
+	// take care of optional semicolon
+	if tokens.peek().kind == TokenKind::SemiColon {
+		tokens.next();
+	}
+	stat
+}
+
+pub fn parse_statement_inner(input: &str, tokens: &mut Tokens) -> Stat {
 	let tk = tokens.peek();
-	let stat = match tk.kind {
+	match tk.kind {
 		TokenKind::Break => {
 			tokens.next();
 			Stat::Break
 		},
 		TokenKind::Return => Stat::Return(parse_return(input, tokens)),
-		TokenKind::Do => Stat::DoBlock(parse_do_block(input, tokens)),
+		TokenKind::Do => Stat::Block(parse_do_block(input, tokens)),
 		TokenKind::While => Stat::WhileBlock(parse_while_block(input, tokens)),
 		TokenKind::If => Stat::IfBlock(parse_if_block(input, tokens)),
 		TokenKind::For => {
@@ -77,7 +86,7 @@ pub fn parse_statement(input: &str, tokens: &mut Tokens) -> Stat {
 			}
 		},
 		_ => {
-			// Parse a suffix expression, then check if a `==` or `,` follows to parse (multiple) assignment.
+			// Parse a suffix expression, then check if a `=` or `,` follows to parse (multiple) assignment.
 			// If not, it should be a function call.
 			let suffix_expr = parse_suffix_expr(input, tokens);
 			match tokens.peek().kind {
@@ -98,13 +107,7 @@ pub fn parse_statement(input: &str, tokens: &mut Tokens) -> Stat {
 				},
 			}
 		},
-	};
-
-	// take care of optional semicolon
-	if tokens.peek().kind == TokenKind::SemiColon {
-		tokens.next();
 	}
-	stat
 }
 
 /// assignment -> vars `=` explist
@@ -360,22 +363,22 @@ pub fn parse_simple_exp(input: &str, tokens: &mut Tokens) -> Expr {
 	match tokens.peek().kind {
 		TokenKind::Nil => {
 			tokens.next();
-			Expr::Nil
+			Expr::Literal(Literal::Nil)
 		},
 		TokenKind::True => {
 			tokens.next();
-			Expr::Bool(true)
+			Expr::Literal(Literal::Bool(true))
 		},
 		TokenKind::False => {
 			tokens.next();
-			Expr::Bool(false)
+			Expr::Literal(Literal::Bool(false))
 		},
 		TokenKind::Function => {
 			tokens.next();
 			Expr::Lambda(parse_funcbody(input, tokens))
 		},
-		TokenKind::Str => Expr::Str(parse_string(input, tokens)),
-		TokenKind::Number => Expr::Num(parse_number(input, tokens)),
+		TokenKind::Str => Expr::Literal(parse_string(input, tokens)),
+		TokenKind::Number => Expr::Literal(parse_number(input, tokens)),
 		TokenKind::LCurly => Expr::Table(parse_table_constructor(input, tokens)),
 		_ => parse_suffix_expr(input, tokens),
 	}
@@ -445,7 +448,7 @@ pub fn parse_primary_expr(input: &str, tokens: &mut Tokens) -> Expr {
 		TokenKind::Name => Expr::Name(parse_name(input, tokens)),
 		TokenKind::LParen => {
 			tokens.assert_next(input, TokenKind::LParen);
-			let expr = parse_expr(input, tokens);
+			let expr = Expr::Expr(Box::new(parse_expr(input, tokens)));
 			tokens.assert_next(input, TokenKind::RParen);
 			expr
 		},
@@ -562,24 +565,30 @@ pub fn parse_parlist(input: &str, tokens: &mut Tokens) -> Vec<Name> {
 // Simple terminals
 
 // TODO: multi line string currently broken
-fn parse_string(input: &str, tokens: &mut Tokens) -> String {
+fn parse_string(input: &str, tokens: &mut Tokens) -> Literal {
 	let tk = tokens.next();
 	let mut chars = tk.span.as_str(input).chars();
 	match chars.next() {
 		Some('\'' | '\"') => {
 			chars.next_back();
-			chars.as_str().to_string() // really?
+			Literal::Str(chars.as_str().to_string()) // really?
+		},
+		Some('[') => {
+			chars.next();
+			chars.next_back();
+			chars.next_back();
+			Literal::Str(chars.as_str().to_string()) // really?
 		},
 		// TODO: if lexer is working properly, this should be unreachable
 		_ => format_err(&format!("Malformed string: `{}`.", chars.as_str()), tk.span, input),
 	}
 }
 
-fn parse_number(input: &str, tokens: &mut Tokens) -> f64 {
+fn parse_number(input: &str, tokens: &mut Tokens) -> Literal {
 	let tk = tokens.next();
 	let s = tk.span.as_string(input);
 	match s.parse() {
-		Ok(num) => num,
+		Ok(num) => Literal::Number(num),
 		_ => format_err(&format!("Malformed number: `{s}`."), tk.span, input),
 	}
 }

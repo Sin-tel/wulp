@@ -10,6 +10,9 @@ pub trait Visitor: Sized {
 	fn visit_assignment(&mut self, node: &mut Assignment) {
 		node.visit(self);
 	}
+	fn visit_function_def(&mut self, node: &mut FunctionDef) {
+		node.visit(self);
+	}
 	fn visit_function_call(&mut self, node: &mut FunctionCall) {
 		node.visit(self);
 	}
@@ -37,7 +40,9 @@ pub trait Visitor: Sized {
 	fn visit_field(&mut self, node: &mut Field) {
 		node.visit(self);
 	}
+	// leaf nodes
 	fn visit_name(&mut self, _node: &mut Name) {}
+	fn visit_literal(&mut self, _node: &mut Literal) {}
 }
 
 pub trait VisitNode<V: Visitor> {
@@ -56,6 +61,7 @@ impl<V: Visitor> VisitNode<V> for Stat {
 	fn visit(&mut self, v: &mut V) {
 		match self {
 			Stat::Assignment(s) => v.visit_assignment(s),
+			Stat::FunctionDef(s) => v.visit_function_def(s),
 			Stat::FunctionCall(s) => v.visit_function_call(s),
 			Stat::IfBlock(s) => v.visit_if_block(s),
 			Stat::Return(exprs) => {
@@ -93,6 +99,15 @@ impl<V: Visitor> VisitNode<V> for Assignment {
 	}
 }
 
+impl<V: Visitor> VisitNode<V> for FunctionDef {
+	fn visit(&mut self, v: &mut V) {
+		for e in &mut self.name {
+			v.visit_name(e);
+		}
+		v.visit_function_body(&mut self.body);
+	}
+}
+
 impl<V: Visitor> VisitNode<V> for FunctionCall {
 	fn visit(&mut self, v: &mut V) {
 		v.visit_expr(&mut self.expr);
@@ -114,12 +129,14 @@ impl<V: Visitor> VisitNode<V> for FuncBody {
 impl<V: Visitor> VisitNode<V> for Expr {
 	fn visit(&mut self, v: &mut V) {
 		match self {
-			Expr::Nil | Expr::Bool(_) | Expr::Str(_) | Expr::Num(_) => (),
+			// Expr::Nil | Expr::Bool(_) | Expr::Str(_) | Expr::Num(_) => (),
+			Expr::Literal(e) => v.visit_literal(e),
 			Expr::Name(e) => v.visit_name(e),
 			Expr::BinExp(e) => v.visit_bin_expr(e),
 			Expr::UnExp(e) => v.visit_un_expr(e),
 			Expr::Lambda(e) => v.visit_function_body(e),
 			Expr::SuffixExpr(e) => v.visit_suffix_expr(e),
+			Expr::Expr(e) => v.visit_expr(e),
 			Expr::Table(t) => {
 				for e in t {
 					v.visit_field(e);

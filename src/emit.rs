@@ -16,6 +16,8 @@ impl EmitLua {
 		block.visit(&mut this);
 		this.code
 	}
+
+	// TODO: figure out how to dedup these
 	fn comma_list_expr(&mut self, list: &mut [Expr]) {
 		if let Some((last, elements)) = list.split_last_mut() {
 			for e in elements {
@@ -25,11 +27,29 @@ impl EmitLua {
 			self.visit_expr(last);
 		}
 	}
+	fn comma_list_fields(&mut self, list: &mut [Field]) {
+		if let Some((last, elements)) = list.split_last_mut() {
+			for e in elements {
+				self.visit_field(e);
+				self.code.push_str(", ");
+			}
+			self.visit_field(last);
+		}
+	}
 	fn comma_list_name(&mut self, list: &mut [Name]) {
 		if let Some((last, elements)) = list.split_last_mut() {
 			for e in elements {
 				self.visit_name(e);
 				self.code.push_str(", ");
+			}
+			self.visit_name(last);
+		}
+	}
+	fn dot_list_name(&mut self, list: &mut [Name]) {
+		if let Some((last, elements)) = list.split_last_mut() {
+			for e in elements {
+				self.visit_name(e);
+				self.code.push_str(".");
 			}
 			self.visit_name(last);
 		}
@@ -63,12 +83,29 @@ impl Visitor for EmitLua {
 		self.code.push_str("end");
 	}
 	fn visit_assignment(&mut self, node: &mut Assignment) {
+		if node.local {
+			self.code.push_str("local ");
+		}
 		self.comma_list_expr(&mut node.vars);
-		self.code.push_str(" = ");
-		self.comma_list_expr(&mut node.exprs);
+		if node.exprs.len() > 0 {
+			self.code.push_str(" = ");
+			self.comma_list_expr(&mut node.exprs);
+		}
+	}
+	fn visit_function_def(&mut self, node: &mut FunctionDef) {
+		if node.local {
+			self.code.push_str("local ");
+		}
+		self.code.push_str("function ");
+
+		self.dot_list_name(&mut node.name);
+		self.visit_function_body(&mut node.body);
 	}
 	fn visit_function_call(&mut self, node: &mut FunctionCall) {
-		node.visit(self);
+		self.visit_expr(&mut node.expr);
+		self.code.push('(');
+		self.comma_list_expr(&mut node.args);
+		self.code.push(')');
 	}
 	fn visit_stat(&mut self, node: &mut Stat) {
 		self.indent();
@@ -81,28 +118,44 @@ impl Visitor for EmitLua {
 				node.visit(self);
 			},
 		};
+		self.code.push(';');
 		self.code.push('\n');
 	}
 	fn visit_expr(&mut self, node: &mut Expr) {
 		match node {
-			Expr::Nil => self.code.push_str("nil"),
-			Expr::Num(s) => self.code.push_str(&s.to_string()),
-			Expr::Str(s) => {
-				// TODO: this is kind of a hack lol
-				self.code.push_str(&format!("{s:?}"));
-			},
-			Expr::Bool(s) => self.code.push_str(&s.to_string()),
 			Expr::Lambda(_) => {
 				self.code.push_str("function");
 				node.visit(self);
 			},
+			Expr::Expr(_) => {
+				self.code.push('(');
+				node.visit(self);
+				self.code.push(')');
+			},
+			Expr::Table(t) => {
+				// node.visit(self);
+				self.code.push('{');
+				self.comma_list_fields(t);
+				self.code.push('}');
+			},
+			Expr::Literal(_) => node.visit(self),
 			Expr::Name(_) => node.visit(self),
 			Expr::SuffixExpr(_) => node.visit(self),
 			Expr::BinExp(_) => node.visit(self),
 			e => unimplemented!("{e:?}"),
 		}
 	}
-
+	fn visit_literal(&mut self, node: &mut Literal) {
+		match node {
+			Literal::Nil => self.code.push_str("nil"),
+			Literal::Number(s) => self.code.push_str(&s.to_string()),
+			Literal::Str(s) => {
+				// TODO: this is kind of a hack lol
+				self.code.push_str(&format!("{s:?}"));
+			},
+			Literal::Bool(s) => self.code.push_str(&s.to_string()),
+		}
+	}
 	fn visit_bin_expr(&mut self, node: &mut BinExp) {
 		self.visit_expr(&mut node.lhs);
 		self.code.push(' ');
@@ -110,16 +163,13 @@ impl Visitor for EmitLua {
 		self.code.push(' ');
 		self.visit_expr(&mut node.rhs);
 	}
-
 	fn visit_un_expr(&mut self, node: &mut UnExp) {
 		self.code.push_str(&node.op.to_string());
 		self.visit_expr(&mut node.exp);
 	}
-
 	fn visit_suffix_expr(&mut self, node: &mut SuffixExpr) {
 		node.visit(self);
 	}
-
 	fn visit_suffix(&mut self, node: &mut Suffix) {
 		match node {
 			Suffix::Property(_) => {
@@ -143,11 +193,21 @@ impl Visitor for EmitLua {
 		// node.visit(self);
 		self.visit_block(&mut node.body);
 
+		self.indent();
 		self.code.push_str("end");
 	}
 
 	fn visit_field(&mut self, node: &mut Field) {
-		node.visit(self);
+		match node {
+			Field::Assign(n, e) => {
+				self.visit_name(n);
+				self.code.push_str(" = ");
+				self.visit_expr(e);
+			},
+			Field::Expr(e) => {
+				self.visit_expr(e);
+			},
+		}
 	}
 
 	fn visit_name(&mut self, node: &mut Name) {

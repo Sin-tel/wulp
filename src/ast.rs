@@ -22,7 +22,7 @@ pub struct Block {
 pub enum Stat {
 	Assignment(Assignment),
 	FunctionCall(FunctionCall),
-	DoBlock(Block),
+	Block(Block),
 	WhileBlock(WhileBlock),
 	IfBlock(IfBlock),
 	ForRange(ForRange),
@@ -41,7 +41,7 @@ pub struct IfBlock {
 	pub else_block: Option<Block>,
 }
 
-/// elseif exp then block
+/// if exp then block {elseif exp then block} [else block] end
 #[derive(Debug, PartialEq)]
 pub struct ElseIf {
 	pub expr: Expr,
@@ -79,22 +79,29 @@ pub struct Assignment {
 	pub local: bool,
 }
 
-/// expr -> nil | Bool | Numeral | String
+/// expr ->  literal
 ///       |  tableconstructor | FUNCTION body | suffix_exp
 ///       |  exp binop exp | unop exp
 /// tableconstructor -> `{` [fieldlist] `}`
 #[derive(Debug, PartialEq)]
 pub enum Expr {
-	Nil,
-	Bool(bool),
-	Num(f64),
-	Str(String),
-	Lambda(FuncBody),
-	Table(Vec<Field>),
+	Name(Name),
+	Literal(Literal),
 	BinExp(BinExp),
 	UnExp(UnExp),
-	Name(Name),
+	Lambda(FuncBody),
+	Table(Vec<Field>),
 	SuffixExpr(SuffixExpr),
+	Expr(Box<Expr>), // bracketed expression
+}
+
+/// literal -> nil | Bool | Numeral | String
+#[derive(Debug, PartialEq)]
+pub enum Literal {
+	Nil,
+	Bool(bool),
+	Number(f64),
+	Str(String),
 }
 
 /// suffix_exp -> primary_exp { suffix }
