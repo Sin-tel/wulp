@@ -8,7 +8,7 @@ impl AstPrinter {
 	pub fn print_ast(&mut self, block: &mut Block) {
 		defer_print!();
 		add_branch!("ast");
-		block.visit(self)
+		block.visit(self);
 	}
 }
 
@@ -21,12 +21,8 @@ impl Visitor for AstPrinter {
 		add_branch!("IF");
 		node.visit(self);
 	}
-	fn visit_local_assignment(&mut self, node: &mut LocalAssignment) {
-		add_branch!("local assign");
-		node.visit(self);
-	}
 	fn visit_assignment(&mut self, node: &mut Assignment) {
-		add_branch!("assign");
+		add_branch!("{}", if node.local { "local assign" } else { "assign" });
 		node.visit(self);
 	}
 	fn visit_function_call(&mut self, node: &mut FunctionCall) {
@@ -74,7 +70,7 @@ impl Visitor for AstPrinter {
 	}
 
 	fn visit_suffix_expr(&mut self, node: &mut SuffixExpr) {
-		add_branch!("expr");
+		add_branch!("suffixed");
 		node.visit(self);
 	}
 

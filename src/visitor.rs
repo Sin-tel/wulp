@@ -7,9 +7,6 @@ pub trait Visitor: Sized {
 	fn visit_stat(&mut self, node: &mut Stat) {
 		node.visit(self);
 	}
-	fn visit_local_assignment(&mut self, node: &mut LocalAssignment) {
-		node.visit(self);
-	}
 	fn visit_assignment(&mut self, node: &mut Assignment) {
 		node.visit(self);
 	}
@@ -58,7 +55,6 @@ impl<V: Visitor> VisitNode<V> for Block {
 impl<V: Visitor> VisitNode<V> for Stat {
 	fn visit(&mut self, v: &mut V) {
 		match self {
-			Stat::LocalAssignment(s) => v.visit_local_assignment(s),
 			Stat::Assignment(s) => v.visit_assignment(s),
 			Stat::FunctionCall(s) => v.visit_function_call(s),
 			Stat::IfBlock(s) => v.visit_if_block(s),
@@ -76,22 +72,12 @@ impl<V: Visitor> VisitNode<V> for IfBlock {
 	fn visit(&mut self, v: &mut V) {
 		v.visit_expr(&mut self.expr);
 		v.visit_block(&mut self.block);
-		for _e in &mut self.elseif {
-			unimplemented!();
+		for e in &mut self.elseif {
+			v.visit_expr(&mut e.expr);
+			v.visit_block(&mut e.block);
 		}
 		if let Some(b) = &mut self.else_block {
 			v.visit_block(b);
-		}
-	}
-}
-
-impl<V: Visitor> VisitNode<V> for LocalAssignment {
-	fn visit(&mut self, v: &mut V) {
-		for name in &mut self.names {
-			v.visit_name(name);
-		}
-		for expr in &mut self.exprs {
-			v.visit_expr(expr);
 		}
 	}
 }
@@ -187,7 +173,6 @@ impl<V: Visitor> VisitNode<V> for Field {
 				v.visit_expr(e);
 			},
 			Field::Expr(e) => v.visit_expr(e),
-			Field::ExprAssign(_, _) => unimplemented!(),
 		}
 	}
 }

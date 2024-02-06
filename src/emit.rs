@@ -16,8 +16,7 @@ impl EmitLua {
 		block.visit(&mut this);
 		this.code
 	}
-
-	fn comma_list_expr(&mut self, list: &mut Vec<Expr>) {
+	fn comma_list_expr(&mut self, list: &mut [Expr]) {
 		if let Some((last, elements)) = list.split_last_mut() {
 			for e in elements {
 				self.visit_expr(e);
@@ -26,8 +25,7 @@ impl EmitLua {
 			self.visit_expr(last);
 		}
 	}
-
-	fn comma_list_name(&mut self, list: &mut Vec<Name>) {
+	fn comma_list_name(&mut self, list: &mut [Name]) {
 		if let Some((last, elements)) = list.split_last_mut() {
 			for e in elements {
 				self.visit_name(e);
@@ -36,7 +34,6 @@ impl EmitLua {
 			self.visit_name(last);
 		}
 	}
-
 	fn indent(&mut self) {
 		self.code.push_str(&"  ".repeat(self.indent_level));
 	}
@@ -65,13 +62,7 @@ impl Visitor for EmitLua {
 		self.indent();
 		self.code.push_str("end");
 	}
-	fn visit_local_assignment(&mut self, node: &mut LocalAssignment) {
-		self.code.push_str("local ");
-		node.visit(self);
-		todo!();
-	}
 	fn visit_assignment(&mut self, node: &mut Assignment) {
-		// node.visit(self);
 		self.comma_list_expr(&mut node.vars);
 		self.code.push_str(" = ");
 		self.comma_list_expr(&mut node.exprs);
@@ -84,13 +75,13 @@ impl Visitor for EmitLua {
 		match node {
 			Stat::Return(exprs) => {
 				self.code.push_str("return ");
-				self.comma_list_expr(exprs)
+				self.comma_list_expr(exprs);
 			},
 			_ => {
 				node.visit(self);
 			},
 		};
-		self.code.push_str(";\n");
+		self.code.push('\n');
 	}
 	fn visit_expr(&mut self, node: &mut Expr) {
 		match node {
@@ -98,7 +89,7 @@ impl Visitor for EmitLua {
 			Expr::Num(s) => self.code.push_str(&s.to_string()),
 			Expr::Str(s) => {
 				// TODO: this is kind of a hack lol
-				self.code.push_str(&format!("{:?}", s));
+				self.code.push_str(&format!("{s:?}"));
 			},
 			Expr::Bool(s) => self.code.push_str(&s.to_string()),
 			Expr::Lambda(_) => {
@@ -121,8 +112,8 @@ impl Visitor for EmitLua {
 	}
 
 	fn visit_un_expr(&mut self, node: &mut UnExp) {
-		todo!();
-		// node.visit(self);
+		self.code.push_str(&node.op.to_string());
+		self.visit_expr(&mut node.exp);
 	}
 
 	fn visit_suffix_expr(&mut self, node: &mut SuffixExpr) {
@@ -160,6 +151,6 @@ impl Visitor for EmitLua {
 	}
 
 	fn visit_name(&mut self, node: &mut Name) {
-		self.code.push_str(&node.0)
+		self.code.push_str(&node.0);
 	}
 }

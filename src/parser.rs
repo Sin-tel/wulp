@@ -71,9 +71,9 @@ pub fn parse_statement(input: &str, tokens: &mut Tokens) -> Stat {
 		TokenKind::Function => Stat::FunctionDef(parse_function_def(input, tokens)),
 		TokenKind::Local => {
 			if tokens.peek_n(2).kind == TokenKind::Function {
-				Stat::LocalFunctionDef(parse_local_function_def(input, tokens))
+				Stat::FunctionDef(parse_local_function_def(input, tokens))
 			} else {
-				Stat::LocalAssignment(parse_local_assignment(input, tokens))
+				Stat::Assignment(parse_local_assignment(input, tokens))
 			}
 		},
 		_ => {
@@ -124,14 +124,18 @@ pub fn parse_assignment(first: Expr, input: &str, tokens: &mut Tokens) -> Assign
 	// TODO: at this point, none of the lhs vars should end on a Call suffix, since you can't assign there.
 	// We can check for this here, but maybe it makes more sense in a later stage if you have to check it anyway.
 
-	Assignment { vars, exprs }
+	Assignment {
+		vars,
+		exprs,
+		local: false,
+	}
 }
 
 /// local names [`=` explist]
-pub fn parse_local_assignment(input: &str, tokens: &mut Tokens) -> LocalAssignment {
+pub fn parse_local_assignment(input: &str, tokens: &mut Tokens) -> Assignment {
 	tokens.assert_next(input, TokenKind::Local);
 
-	let names = parse_names(input, tokens);
+	let vars = parse_names(input, tokens).into_iter().map(Expr::Name).collect();
 
 	let exprs = if tokens.peek().kind == TokenKind::Assign {
 		tokens.next();
@@ -140,18 +144,26 @@ pub fn parse_local_assignment(input: &str, tokens: &mut Tokens) -> LocalAssignme
 		vec![]
 	};
 
-	LocalAssignment { names, exprs }
+	Assignment {
+		vars,
+		exprs,
+		local: true,
+	}
 }
 
 /// local function Name funcbody
-pub fn parse_local_function_def(input: &str, tokens: &mut Tokens) -> LocalFunctionDef {
+pub fn parse_local_function_def(input: &str, tokens: &mut Tokens) -> FunctionDef {
 	tokens.assert_next(input, TokenKind::Local);
 	tokens.assert_next(input, TokenKind::Function);
 
-	let name = parse_name(input, tokens);
+	let name = vec![parse_name(input, tokens)];
 	let body = parse_funcbody(input, tokens);
 
-	LocalFunctionDef { name, body }
+	FunctionDef {
+		name,
+		body,
+		local: true,
+	}
 }
 
 /// function funcname funcbody
@@ -161,23 +173,23 @@ pub fn parse_function_def(input: &str, tokens: &mut Tokens) -> FunctionDef {
 	let name = parse_funcname(input, tokens);
 	let body = parse_funcbody(input, tokens);
 
-	FunctionDef { name, body }
+	FunctionDef {
+		name,
+		body,
+		local: false,
+	}
 }
 
 /// funcname -> Name {`.` Name} [`:` Name]
-pub fn parse_funcname(input: &str, tokens: &mut Tokens) -> FuncName {
+pub fn parse_funcname(input: &str, tokens: &mut Tokens) -> Vec<Name> {
 	let mut path = vec![parse_name(input, tokens)];
 	// if next token is period then loop
 	while tokens.peek().kind == (TokenKind::Period) {
 		tokens.next();
 		path.push(parse_name(input, tokens));
 	}
-	let mut method: Option<Name> = None;
-	if tokens.peek().kind == TokenKind::Colon {
-		tokens.next();
-		method = Some(parse_name(input, tokens));
-	}
-	FuncName { path, method }
+
+	path
 }
 
 /// funcbody -> `(` [parlist] `)` block end
@@ -307,9 +319,7 @@ pub fn parse_return(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
 		return vec![];
 	}
 
-	let exprs = parse_exprs(input, tokens);
-
-	exprs
+	parse_exprs(input, tokens)
 }
 
 // Expression rules
@@ -486,17 +496,6 @@ pub fn parse_field(input: &str, tokens: &mut Tokens) -> Field {
 
 			let expr = parse_expr(input, tokens);
 			Field::Assign(name, expr)
-		},
-		// '[' exp ']' '=' exp
-		TokenKind::LBracket => {
-			tokens.next();
-			let lexpr = parse_expr(input, tokens);
-
-			tokens.assert_next(input, TokenKind::RBracket);
-			tokens.assert_next(input, TokenKind::Assign);
-
-			let rexpr = parse_expr(input, tokens);
-			Field::ExprAssign(lexpr, rexpr)
 		},
 		// exp
 		_ => Field::Expr(parse_expr(input, tokens)),

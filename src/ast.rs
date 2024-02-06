@@ -28,8 +28,6 @@ pub enum Stat {
 	ForRange(ForRange),
 	ForIn(ForIn),
 	FunctionDef(FunctionDef),
-	LocalFunctionDef(LocalFunctionDef),
-	LocalAssignment(LocalAssignment),
 	Break,
 	Return(Vec<Expr>),
 }
@@ -78,20 +76,7 @@ pub struct ForIn {
 pub struct Assignment {
 	pub vars: Vec<Expr>,
 	pub exprs: Vec<Expr>,
-}
-
-/// local names [`=` explist]
-#[derive(Debug, PartialEq)]
-pub struct LocalAssignment {
-	pub names: Vec<Name>,
-	pub exprs: Vec<Expr>, // If vec is empty there is no `=`
-}
-
-/// funcname -> Name {`.` Name} [`:` Name]
-#[derive(Debug, PartialEq)]
-pub struct FuncName {
-	pub path: Vec<Name>,
-	pub method: Option<Name>,
+	pub local: bool,
 }
 
 /// expr -> nil | Bool | Numeral | String
@@ -140,15 +125,9 @@ pub struct FunctionCall {
 /// function funcname funcbody
 #[derive(Debug, PartialEq)]
 pub struct FunctionDef {
-	pub name: FuncName,
+	pub name: Vec<Name>,
 	pub body: FuncBody,
-}
-
-/// local function Name funcbody
-#[derive(Debug, PartialEq)]
-pub struct LocalFunctionDef {
-	pub name: Name,
-	pub body: FuncBody,
+	pub local: bool,
 }
 
 /// funcbody -> `(` [parlist] `)` block end
@@ -159,11 +138,10 @@ pub struct FuncBody {
 	pub body: Block,
 }
 
-/// field -> `[` exp `]` `=` exp | Name `=` exp | exp
+/// field -> Name `=` exp | exp
 #[derive(Debug, PartialEq)]
 pub enum Field {
 	Assign(Name, Expr),
-	ExprAssign(Expr, Expr),
 	Expr(Expr),
 }
 
@@ -242,7 +220,7 @@ impl fmt::Display for BinOp {
 			match self {
 				BinOp::Pow => "^",
 				BinOp::Mul => "*",
-				BinOp::Div => "*",
+				BinOp::Div => "/",
 				BinOp::Mod => "%",
 				BinOp::Plus => "+",
 				BinOp::Minus => "-",
@@ -250,7 +228,7 @@ impl fmt::Display for BinOp {
 				BinOp::Lt => "<",
 				BinOp::Gt => ">",
 				BinOp::Lte => "<=",
-				BinOp::Gte => "<=",
+				BinOp::Gte => ">=",
 				BinOp::Eq => "==",
 				BinOp::Neq => "~=",
 				BinOp::And => "and",

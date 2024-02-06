@@ -282,16 +282,14 @@ fn functiondef() {
 	assert_eq!(
 		parse_function_def(p, &mut tokens),
 		(FunctionDef {
-			name: FuncName {
-				path: vec![Name(String::from("foo"))],
-				method: None,
-			},
+			name: vec![Name(String::from("foo"))],
 			body: FuncBody {
 				params: vec![],
 				body: Block {
 					stats: vec![Stat::Return(vec![])]
 				}
-			}
+			},
+			local: false,
 		})
 	);
 }
@@ -309,18 +307,6 @@ fn table_constructor() {
 			Field::Assign(Name(String::from("bar")), Expr::Bool(false)),
 			Field::Assign(Name(String::from("bizz")), Expr::Num(1f64)),
 		]
-	);
-
-	let p = r#"{[nil] = false, [2] = 1}"#;
-	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = Tokens::new(tokens);
-
-	assert_eq!(
-		parse_expr(p, &mut tokens),
-		(Expr::Table(vec![
-			Field::ExprAssign(Expr::Nil, Expr::Bool(false)),
-			Field::ExprAssign(Expr::Num(2f64), Expr::Num(1f64)),
-		]))
 	);
 
 	let p = r#"{}"#;
@@ -451,17 +437,15 @@ fn statement() {
 	assert_eq!(
 		parse_statement(p, &mut tokens),
 		Stat::FunctionDef(FunctionDef {
-			name: FuncName {
-				path: vec![Name(String::from("foo"))],
-				method: None,
-			},
+			name: vec![Name(String::from("foo"))],
 			body: FuncBody {
 				params: vec![Name(String::from("a"))],
 
 				body: Block {
 					stats: vec![Stat::Return(vec![])]
 				}
-			}
+			},
+			local: false,
 		})
 	);
 
@@ -470,14 +454,15 @@ fn statement() {
 	let mut tokens = Tokens::new(tokens);
 	assert_eq!(
 		parse_statement(p, &mut tokens),
-		Stat::LocalFunctionDef(LocalFunctionDef {
-			name: Name(String::from("bar")),
+		Stat::FunctionDef(FunctionDef {
+			name: vec![Name(String::from("bar"))],
 			body: FuncBody {
 				params: vec![],
 				body: Block {
 					stats: vec![Stat::Return(vec![])]
 				}
-			}
+			},
+			local: true
 		})
 	);
 
@@ -486,13 +471,14 @@ fn statement() {
 	let mut tokens = Tokens::new(tokens);
 	assert_eq!(
 		parse_statement(p, &mut tokens),
-		Stat::LocalAssignment(LocalAssignment {
-			names: vec![
-				Name(String::from("foo")),
-				Name(String::from("bar")),
-				Name(String::from("buzz"))
+		Stat::Assignment(Assignment {
+			vars: vec![
+				Expr::Name(Name(String::from("foo"))),
+				Expr::Name(Name(String::from("bar"))),
+				Expr::Name(Name(String::from("buzz")))
 			],
 			exprs: vec![Expr::Nil, Expr::Num(10f64), Expr::Str(String::from("word"))],
+			local: true,
 		})
 	);
 }
@@ -520,13 +506,7 @@ fn funcname() {
 	let tokens: Vec<_> = Lexer::new(p).collect();
 	let mut tokens = Tokens::new(tokens);
 
-	assert_eq!(
-		parse_funcname(p, &mut tokens),
-		FuncName {
-			path: vec![Name("abc".to_string())],
-			method: None,
-		}
-	);
+	assert_eq!(parse_funcname(p, &mut tokens), vec![Name("abc".to_string())],);
 
 	let p = r#"abc.bar1"#;
 	let tokens: Vec<_> = Lexer::new(p).collect();
@@ -534,22 +514,7 @@ fn funcname() {
 
 	assert_eq!(
 		parse_funcname(p, &mut tokens),
-		FuncName {
-			path: vec![Name("abc".to_string()), Name("bar1".to_string())],
-			method: None,
-		}
-	);
-
-	let p = r#"abc.bar1:mno"#;
-	let tokens: Vec<_> = Lexer::new(p).collect();
-	let mut tokens = Tokens::new(tokens);
-
-	assert_eq!(
-		parse_funcname(p, &mut tokens),
-		FuncName {
-			path: vec![Name("abc".to_string()), Name("bar1".to_string())],
-			method: Some(Name("mno".to_string())),
-		}
+		vec![Name("abc".to_string()), Name("bar1".to_string())]
 	);
 }
 
@@ -617,7 +582,7 @@ fn stat_assign() {
 	let mut tokens = make_tokens(p);
 	assert_eq!(
 		format!("{:?}", parse_statement(p, &mut tokens)),
-		"Assignment(Assignment { vars: [Name(Name(\"a\")), Name(Name(\"c\"))], exprs: [Num(1.0), Num(2.0)] })"
+		"Assignment(Assignment { vars: [Name(Name(\"a\")), Name(Name(\"c\"))], exprs: [Num(1.0), Num(2.0)], local: false })"
 	);
 }
 
@@ -644,6 +609,6 @@ fn stat_single_local() {
 	let mut tokens = make_tokens(p);
 	assert_eq!(
 		format!("{:?}", parse_statement(p, &mut tokens)),
-		"LocalAssignment(LocalAssignment { names: [Name(\"x\")], exprs: [] })"
+		"Assignment(Assignment { vars: [Name(Name(\"x\"))], exprs: [], local: true })"
 	);
 }

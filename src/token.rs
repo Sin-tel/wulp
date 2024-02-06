@@ -185,7 +185,7 @@ impl fmt::Display for TokenKind {
 				Gt => "`>`",
 				Hash => "`#`",
 				SemiColon => "`;`",
-				Colon => "`:",
+				Colon => "`:`",
 				Str => "string",
 				Number => "number",
 				Name => "identifier",

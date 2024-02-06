@@ -4,13 +4,15 @@
 #![warn(clippy::explicit_iter_loop)]
 #![warn(clippy::items_after_statements)]
 #![warn(clippy::redundant_else)]
+#![warn(clippy::match_same_arms)]
 #![deny(unreachable_patterns)]
-//
+
 // #![warn(clippy::pedantic)]
 // #![allow(clippy::similar_names)]
 // #![allow(clippy::enum_glob_use)]
 // #![allow(clippy::wildcard_imports)]
 // #![allow(clippy::too_many_lines)]
+// #![allow(clippy::doc_markdown)]
 
 use crate::emit::EmitLua;
 use std::fs;
@@ -48,9 +50,9 @@ fn main() {
 	println!("----- input:");
 	println!("{input}");
 
-	// println!("----- AST:");
-	// let mut printer = ast_print::AstPrinter;
-	// printer.print_ast(&mut ast);
+	println!("----- AST:");
+	let mut printer = ast_print::AstPrinter;
+	printer.print_ast(&mut ast);
 
 	println!("----- emitted code:");
 	let code = EmitLua::emit(&mut ast);
