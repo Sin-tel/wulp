@@ -13,45 +13,21 @@ impl EmitLua {
 			indent_level: 0,
 		};
 		// this.visit_block(block);
-		block.visit(&mut this);
+		block.walk(&mut this);
 		this.code
 	}
 
-	// TODO: figure out how to dedup these
-	fn comma_list_expr(&mut self, list: &mut [Expr]) {
-		if let Some((last, elements)) = list.split_last_mut() {
-			for e in elements {
-				self.visit_expr(e);
-				self.code.push_str(", ");
+	fn push_list<V>(&mut self, list: &mut [V], punctuation: &str)
+	where
+		V: VisitNode<Self>,
+	{
+		let mut list = list.iter_mut();
+		if let Some(e) = list.next() {
+			e.visit(self);
+			for e in list {
+				self.code.push_str(punctuation);
+				e.visit(self);
 			}
-			self.visit_expr(last);
-		}
-	}
-	fn comma_list_fields(&mut self, list: &mut [Field]) {
-		if let Some((last, elements)) = list.split_last_mut() {
-			for e in elements {
-				self.visit_field(e);
-				self.code.push_str(", ");
-			}
-			self.visit_field(last);
-		}
-	}
-	fn comma_list_name(&mut self, list: &mut [Name]) {
-		if let Some((last, elements)) = list.split_last_mut() {
-			for e in elements {
-				self.visit_name(e);
-				self.code.push_str(", ");
-			}
-			self.visit_name(last);
-		}
-	}
-	fn dot_list_name(&mut self, list: &mut [Name]) {
-		if let Some((last, elements)) = list.split_last_mut() {
-			for e in elements {
-				self.visit_name(e);
-				self.code.push_str(".");
-			}
-			self.visit_name(last);
 		}
 	}
 	fn indent(&mut self) {
@@ -62,7 +38,7 @@ impl EmitLua {
 impl Visitor for EmitLua {
 	fn visit_block(&mut self, node: &mut Block) {
 		self.indent_level += 1;
-		node.visit(self);
+		node.walk(self);
 		self.indent_level -= 1;
 	}
 	fn visit_if_block(&mut self, node: &mut IfBlock) {
@@ -78,7 +54,6 @@ impl Visitor for EmitLua {
 
 			self.visit_block(b);
 		}
-
 		self.indent();
 		self.code.push_str("end");
 	}
@@ -86,10 +61,10 @@ impl Visitor for EmitLua {
 		if node.local {
 			self.code.push_str("local ");
 		}
-		self.comma_list_expr(&mut node.vars);
+		self.push_list(&mut node.vars, ", ");
 		if node.exprs.len() > 0 {
 			self.code.push_str(" = ");
-			self.comma_list_expr(&mut node.exprs);
+			self.push_list(&mut node.exprs, ", ");
 		}
 	}
 	fn visit_function_def(&mut self, node: &mut FunctionDef) {
@@ -98,13 +73,13 @@ impl Visitor for EmitLua {
 		}
 		self.code.push_str("function ");
 
-		self.dot_list_name(&mut node.name);
+		self.push_list(&mut node.name, ".");
 		self.visit_function_body(&mut node.body);
 	}
 	fn visit_function_call(&mut self, node: &mut FunctionCall) {
 		self.visit_expr(&mut node.expr);
 		self.code.push('(');
-		self.comma_list_expr(&mut node.args);
+		self.push_list(&mut node.args, ", ");
 		self.code.push(')');
 	}
 	fn visit_stat(&mut self, node: &mut Stat) {
@@ -112,10 +87,10 @@ impl Visitor for EmitLua {
 		match node {
 			Stat::Return(exprs) => {
 				self.code.push_str("return ");
-				self.comma_list_expr(exprs);
+				self.push_list(exprs, ", ");
 			},
 			_ => {
-				node.visit(self);
+				node.walk(self);
 			},
 		};
 		self.code.push(';');
@@ -125,23 +100,22 @@ impl Visitor for EmitLua {
 		match node {
 			Expr::Lambda(_) => {
 				self.code.push_str("function");
-				node.visit(self);
+				node.walk(self);
 			},
 			Expr::Expr(_) => {
 				self.code.push('(');
-				node.visit(self);
+				node.walk(self);
 				self.code.push(')');
 			},
 			Expr::Table(t) => {
-				// node.visit(self);
 				self.code.push('{');
-				self.comma_list_fields(t);
+				self.push_list(t, ", ");
 				self.code.push('}');
 			},
-			Expr::Literal(_) => node.visit(self),
-			Expr::Name(_) => node.visit(self),
-			Expr::SuffixExpr(_) => node.visit(self),
-			Expr::BinExp(_) => node.visit(self),
+			Expr::Literal(_) => node.walk(self),
+			Expr::Name(_) => node.walk(self),
+			Expr::SuffixExpr(_) => node.walk(self),
+			Expr::BinExp(_) => node.walk(self),
 			e => unimplemented!("{e:?}"),
 		}
 	}
@@ -168,18 +142,22 @@ impl Visitor for EmitLua {
 		self.visit_expr(&mut node.exp);
 	}
 	fn visit_suffix_expr(&mut self, node: &mut SuffixExpr) {
-		node.visit(self);
+		node.walk(self);
 	}
 	fn visit_suffix(&mut self, node: &mut Suffix) {
 		match node {
 			Suffix::Property(_) => {
 				self.code.push('.');
-				node.visit(self);
+				node.walk(self);
 			},
-			Suffix::Index(_) => unimplemented!(),
+			Suffix::Index(_) => {
+				self.code.push('[');
+				node.walk(self);
+				self.code.push(']');
+			},
 			Suffix::Call(args) => {
 				self.code.push('(');
-				self.comma_list_expr(args);
+				self.push_list(args, ", ");
 				self.code.push(')');
 			},
 		};
@@ -187,10 +165,9 @@ impl Visitor for EmitLua {
 
 	fn visit_function_body(&mut self, node: &mut FuncBody) {
 		self.code.push('(');
-		self.comma_list_name(&mut node.params);
+		self.push_list(&mut node.params, ", ");
 		self.code.push_str(")\n");
 
-		// node.visit(self);
 		self.visit_block(&mut node.body);
 
 		self.indent();

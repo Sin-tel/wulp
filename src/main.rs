@@ -15,6 +15,7 @@
 // #![allow(clippy::doc_markdown)]
 
 use crate::emit::EmitLua;
+use mlua::prelude::LuaResult;
 use std::fs;
 
 mod ast;
@@ -30,11 +31,11 @@ mod visitor;
 mod tests;
 
 fn main() {
-	let input = fs::read_to_string("lua/test.lua").unwrap();
+	// let input = fs::read_to_string("lua/lists.lua").unwrap();
 
-	// let input = r#"
-	// x=5*(2 + 1)
-	// "#;
+	let input = r#"
+	x = x.y.z
+	"#;
 
 	let mut ast = parser::parse(&input);
 	// dbg!(&ast);
@@ -52,10 +53,19 @@ fn main() {
 
 	let lua = mlua::Lua::new();
 	println!("----- execute:");
-	let ret = lua.load(code).eval::<String>();
-	println!("{ret:?}");
-	let ret = lua.load(input).eval::<String>();
-	println!("{ret:?}");
+	let res = lua.load(code).into_function();
+	// let res = lua.load(code).eval::<String>();
+	display_return(res);
 
-	// lua.load(input).exec().ok();
+	let res = lua.load(input).into_function();
+	// let res = lua.load(input).eval::<String>();
+	display_return(res);
+}
+
+fn display_return<V: std::fmt::Debug>(res: LuaResult<V>) {
+	if let Err(e) = res {
+		println!("{}", e);
+	} else {
+		println!("{:?}", res.unwrap());
+	}
 }
