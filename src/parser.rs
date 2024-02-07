@@ -77,10 +77,10 @@ pub fn parse_statement_inner(input: &str, tokens: &mut Tokens) -> Stat {
 				Stat::ForIn(parse_for_in(input, tokens))
 			}
 		},
-		TokenKind::Function => Stat::FunctionDef(parse_function_def(input, tokens)),
+		TokenKind::Function => Stat::FnDef(parse_fn_def(input, tokens)),
 		TokenKind::Local => {
 			if tokens.peek_n(2).kind == TokenKind::Function {
-				Stat::FunctionDef(parse_local_function_def(input, tokens))
+				Stat::FnDef(parse_local_fn_def(input, tokens))
 			} else {
 				Stat::Assignment(parse_local_assignment(input, tokens))
 			}
@@ -105,7 +105,7 @@ pub fn parse_statement_inner(input: &str, tokens: &mut Tokens) -> Stat {
 	}
 }
 
-/// assignment -> vars `=` explist
+/// assignment -> vars `=` expr_list
 /// vars -> suffix_expr {`,` suffix_expr}
 pub fn parse_assignment(first: Expr, input: &str, tokens: &mut Tokens) -> Assignment {
 	let mut vars = vec![first];
@@ -129,7 +129,7 @@ pub fn parse_assignment(first: Expr, input: &str, tokens: &mut Tokens) -> Assign
 	}
 }
 
-/// local names [`=` explist]
+/// local names [`=` expr_list]
 pub fn parse_local_assignment(input: &str, tokens: &mut Tokens) -> Assignment {
 	tokens.assert_next(input, TokenKind::Local);
 
@@ -149,37 +149,37 @@ pub fn parse_local_assignment(input: &str, tokens: &mut Tokens) -> Assignment {
 	}
 }
 
-/// local function Name funcbody
-pub fn parse_local_function_def(input: &str, tokens: &mut Tokens) -> FunctionDef {
+/// local function Name fn_body
+pub fn parse_local_fn_def(input: &str, tokens: &mut Tokens) -> FnDef {
 	tokens.assert_next(input, TokenKind::Local);
 	tokens.assert_next(input, TokenKind::Function);
 
 	let name = vec![parse_name(input, tokens)];
-	let body = parse_funcbody(input, tokens);
+	let body = parse_fn_body(input, tokens);
 
-	FunctionDef {
+	FnDef {
 		name,
 		body,
 		local: true,
 	}
 }
 
-/// function funcname funcbody
-pub fn parse_function_def(input: &str, tokens: &mut Tokens) -> FunctionDef {
+/// function fn_name fn_body
+pub fn parse_fn_def(input: &str, tokens: &mut Tokens) -> FnDef {
 	tokens.assert_next(input, TokenKind::Function);
 
-	let name = parse_funcname(input, tokens);
-	let body = parse_funcbody(input, tokens);
+	let name = parse_fn_name(input, tokens);
+	let body = parse_fn_body(input, tokens);
 
-	FunctionDef {
+	FnDef {
 		name,
 		body,
 		local: false,
 	}
 }
 
-/// funcname -> Name {`.` Name} [`:` Name]
-pub fn parse_funcname(input: &str, tokens: &mut Tokens) -> Vec<Name> {
+/// fn_name -> Name {`.` Name} [`:` Name]
+pub fn parse_fn_name(input: &str, tokens: &mut Tokens) -> Vec<Name> {
 	let mut path = vec![parse_name(input, tokens)];
 	// if next token is period then loop
 	while tokens.peek().kind == (TokenKind::Period) {
@@ -190,18 +190,18 @@ pub fn parse_funcname(input: &str, tokens: &mut Tokens) -> Vec<Name> {
 	path
 }
 
-/// funcbody -> `(` [parlist] `)` block end
-pub fn parse_funcbody(input: &str, tokens: &mut Tokens) -> FuncBody {
+/// fn_body -> `(` [parlist] `)` block end
+pub fn parse_fn_body(input: &str, tokens: &mut Tokens) -> FnBody {
 	tokens.assert_next(input, TokenKind::LParen);
 	let params = parse_parlist(input, tokens);
 	tokens.assert_next(input, TokenKind::RParen);
 	let body = parse_block(input, tokens);
 	tokens.assert_next(input, TokenKind::End);
 
-	FuncBody { params, body }
+	FnBody { params, body }
 }
 
-/// for names in explist do block end
+/// for names in expr_list do block end
 pub fn parse_for_in(input: &str, tokens: &mut Tokens) -> ForIn {
 	tokens.assert_next(input, TokenKind::For);
 
@@ -215,20 +215,20 @@ pub fn parse_for_in(input: &str, tokens: &mut Tokens) -> ForIn {
 	ForIn { names, exprs, block }
 }
 
-/// for Name `=` exp `,` exp [`,` exp] do block end
+/// for Name `=` expr `,` expr [`,` expr] do block end
 pub fn parse_for_range(input: &str, tokens: &mut Tokens) -> ForRange {
 	tokens.assert_next(input, TokenKind::For);
 
 	let name = parse_name(input, tokens);
 
 	tokens.assert_next(input, TokenKind::Assign);
-	let exp_start = parse_expr(input, tokens);
+	let expr_start = parse_expr(input, tokens);
 
 	tokens.assert_next(input, TokenKind::Comma);
 
-	let exp_end = parse_expr(input, tokens);
+	let expr_end = parse_expr(input, tokens);
 
-	let exp_step = if tokens.peek().kind == TokenKind::Comma {
+	let expr_step = if tokens.peek().kind == TokenKind::Comma {
 		tokens.next();
 		Some(parse_expr(input, tokens))
 	} else {
@@ -239,12 +239,12 @@ pub fn parse_for_range(input: &str, tokens: &mut Tokens) -> ForRange {
 
 	ForRange {
 		name,
-		exprs: (exp_start, exp_end, exp_step),
+		exprs: (expr_start, expr_end, expr_step),
 		block,
 	}
 }
 
-/// if exp then block {elseif exp then block} [else block] end
+/// if expr then block {elseif expr then block} [else block] end
 pub fn parse_if_block(input: &str, tokens: &mut Tokens) -> IfBlock {
 	tokens.assert_next(input, TokenKind::If);
 
@@ -272,7 +272,7 @@ pub fn parse_if_block(input: &str, tokens: &mut Tokens) -> IfBlock {
 	}
 }
 
-/// elseif exp then block
+/// elseif expr then block
 pub fn parse_elseif(input: &str, tokens: &mut Tokens) -> ElseIf {
 	tokens.assert_next(input, TokenKind::ElseIf);
 	let expr = parse_expr(input, tokens);
@@ -292,7 +292,7 @@ pub fn parse_else_block(input: &str, tokens: &mut Tokens) -> Option<Block> {
 	}
 }
 
-/// while exp do block end
+/// while expr do block end
 pub fn parse_while_block(input: &str, tokens: &mut Tokens) -> WhileBlock {
 	tokens.assert_next(input, TokenKind::While);
 
@@ -305,9 +305,9 @@ pub fn parse_while_block(input: &str, tokens: &mut Tokens) -> WhileBlock {
 /// do block end
 pub fn parse_do_block(input: &str, tokens: &mut Tokens) -> Block {
 	tokens.assert_next(input, TokenKind::Do);
-	let blk = parse_block(input, tokens);
+	let block = parse_block(input, tokens);
 	tokens.assert_next(input, TokenKind::End);
-	blk
+	block
 }
 
 pub fn parse_return(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
@@ -326,13 +326,13 @@ pub fn parse_expr(input: &str, tokens: &mut Tokens) -> Expr {
 	parse_sub_expr(input, tokens, 0)
 }
 
-// subexpr -> (simpleexp | unop subexpr ) { binop subexpr }
+// subexpr -> (simpleexpr | unop subexpr ) { binop subexpr }
 // see: https://github.com/lua/lua/blob/2c32bff60987d38a60a58d4f0123f3783da60a63/lparser.c#L1120-L1156
 // TODO: left / right priority
 pub fn parse_sub_expr(input: &str, tokens: &mut Tokens, min_priority: i32) -> Expr {
 	let mut expression = match parse_unexp(input, tokens) {
 		Some(expr) => expr,
-		None => parse_simple_exp(input, tokens),
+		None => parse_simple_expr(input, tokens),
 	};
 
 	while let Some(op) = tokens.peek().as_bin_op() {
@@ -344,7 +344,7 @@ pub fn parse_sub_expr(input: &str, tokens: &mut Tokens, min_priority: i32) -> Ex
 
 		let rhs = parse_sub_expr(input, tokens, priority);
 
-		expression = Expr::BinExp(BinExp {
+		expression = Expr::BinExpr(BinExpr {
 			op,
 			lhs: Box::new(expression),
 			rhs: Box::new(rhs),
@@ -354,7 +354,7 @@ pub fn parse_sub_expr(input: &str, tokens: &mut Tokens, min_priority: i32) -> Ex
 	expression
 }
 
-pub fn parse_simple_exp(input: &str, tokens: &mut Tokens) -> Expr {
+pub fn parse_simple_expr(input: &str, tokens: &mut Tokens) -> Expr {
 	match tokens.peek().kind {
 		TokenKind::Nil => {
 			tokens.next();
@@ -370,7 +370,7 @@ pub fn parse_simple_exp(input: &str, tokens: &mut Tokens) -> Expr {
 		},
 		TokenKind::Function => {
 			tokens.next();
-			Expr::Lambda(parse_funcbody(input, tokens))
+			Expr::Lambda(parse_fn_body(input, tokens))
 		},
 		TokenKind::Str => Expr::Literal(parse_string(input, tokens)),
 		TokenKind::Number => Expr::Literal(parse_number(input, tokens)),
@@ -383,17 +383,20 @@ pub fn parse_unexp(input: &str, tokens: &mut Tokens) -> Option<Expr> {
 	match tokens.peek().as_un_op() {
 		Some(op) => {
 			tokens.next();
-			let exp = parse_sub_expr(input, tokens, op.priority());
-			Some(Expr::UnExp(UnExp { op, exp: Box::new(exp) }))
+			let expr = parse_sub_expr(input, tokens, op.priority());
+			Some(Expr::UnExpr(UnExpr {
+				op,
+				expr: Box::new(expr),
+			}))
 		},
 		None => None,
 	}
 }
 
-/// suffix_exp -> primary_exp { suffix }
-/// primary_exp -> Name | '(' expr ')'
+/// suffix_expr -> primary_expr { suffix }
+/// primary_expr -> Name | '(' expr ')'
 /// suffix -> `.` Name
-///         | `[` exp `]`
+///         | `[` expr `]`
 pub fn parse_suffix_expr(input: &str, tokens: &mut Tokens) -> Expr {
 	let mut primary = parse_primary_expr(input, tokens);
 
@@ -409,10 +412,10 @@ pub fn parse_suffix_expr(input: &str, tokens: &mut Tokens) -> Expr {
 			},
 			TokenKind::LBracket => {
 				tokens.next();
-				let exp = parse_expr(input, tokens);
+				let expr = parse_expr(input, tokens);
 				tokens.assert_next(input, TokenKind::RBracket);
 
-				suffix.push(Suffix::Index(exp));
+				suffix.push(Suffix::Index(expr));
 			},
 			TokenKind::LParen => {
 				// Build ast node and continue
@@ -441,7 +444,7 @@ fn new_suffix_expr(expr: Expr, suffix: Vec<Suffix>) -> Expr {
 	})
 }
 
-/// primary_exp -> Name | '(' expr ')'
+/// primary_expr -> Name | '(' expr ')'
 pub fn parse_primary_expr(input: &str, tokens: &mut Tokens) -> Expr {
 	match tokens.peek().kind {
 		TokenKind::Name => Expr::Name(parse_name(input, tokens)),
@@ -490,10 +493,10 @@ pub fn parse_table_constructor(input: &str, tokens: &mut Tokens) -> Vec<Field> {
 	fields
 }
 
-/// field -> `[` exp `]` `=` exp | Name `=` exp | exp
+/// field -> `[` expr `]` `=` expr | Name `=` expr | exp
 pub fn parse_field(input: &str, tokens: &mut Tokens) -> Field {
 	match tokens.peek().kind {
-		// Name '=' exp
+		// Name '=' expr
 		TokenKind::Name => {
 			let name = parse_name(input, tokens);
 			tokens.assert_next(input, TokenKind::Assign);
@@ -501,24 +504,24 @@ pub fn parse_field(input: &str, tokens: &mut Tokens) -> Field {
 			let expr = parse_expr(input, tokens);
 			Field::Assign(name, expr)
 		},
-		// exp
+		// expr
 		_ => Field::Expr(parse_expr(input, tokens)),
 	}
 }
 
-/// args ->  `(` [explist] `)`
+/// args ->  `(` [expr_list] `)`
 pub fn parse_args(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
 	tokens.assert_next(input, TokenKind::LParen);
 	if tokens.peek().kind == TokenKind::RParen {
 		tokens.next();
 		return vec![];
 	}
-	let explist = parse_exprs(input, tokens);
+	let expr_list = parse_exprs(input, tokens);
 	tokens.assert_next(input, TokenKind::RParen);
-	explist
+	expr_list
 }
 
-/// explist -> exp {`,` exp}
+/// expr_list -> expr {`,` expr}
 pub fn parse_exprs(input: &str, tokens: &mut Tokens) -> Vec<Expr> {
 	let mut exprs = vec![];
 

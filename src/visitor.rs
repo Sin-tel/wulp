@@ -10,25 +10,25 @@ pub trait Visitor: Sized {
 	fn visit_assignment(&mut self, node: &mut Assignment) {
 		node.walk(self);
 	}
-	fn visit_function_def(&mut self, node: &mut FunctionDef) {
+	fn visit_fn_def(&mut self, node: &mut FnDef) {
 		node.walk(self);
 	}
-	fn visit_function_call(&mut self, node: &mut Call) {
+	fn visit_fn_call(&mut self, node: &mut Call) {
 		node.walk(self);
 	}
 	fn visit_if_block(&mut self, node: &mut IfBlock) {
 		node.walk(self);
 	}
-	fn visit_function_body(&mut self, node: &mut FuncBody) {
+	fn visit_fn_body(&mut self, node: &mut FnBody) {
 		node.walk(self);
 	}
 	fn visit_expr(&mut self, node: &mut Expr) {
 		node.walk(self);
 	}
-	fn visit_bin_expr(&mut self, node: &mut BinExp) {
+	fn visit_bin_expr(&mut self, node: &mut BinExpr) {
 		node.walk(self);
 	}
-	fn visit_un_expr(&mut self, node: &mut UnExp) {
+	fn visit_un_expr(&mut self, node: &mut UnExpr) {
 		node.walk(self);
 	}
 	fn visit_suffix_expr(&mut self, node: &mut SuffixExpr) {
@@ -72,8 +72,8 @@ impl<V: Visitor> VisitNode<V> for Stat {
 	fn walk(&mut self, v: &mut V) {
 		match self {
 			Stat::Assignment(s) => v.visit_assignment(s),
-			Stat::FunctionDef(s) => v.visit_function_def(s),
-			Stat::Call(s) => v.visit_function_call(s),
+			Stat::FnDef(s) => v.visit_fn_def(s),
+			Stat::Call(s) => v.visit_fn_call(s),
 			Stat::IfBlock(s) => v.visit_if_block(s),
 			Stat::Return(exprs) => {
 				for e in exprs.iter_mut() {
@@ -116,21 +116,21 @@ impl<V: Visitor> VisitNode<V> for Assignment {
 	}
 }
 
-impl<V: Visitor> VisitNode<V> for FunctionDef {
+impl<V: Visitor> VisitNode<V> for FnDef {
 	fn visit(&mut self, v: &mut V) {
-		v.visit_function_def(self)
+		v.visit_fn_def(self)
 	}
 	fn walk(&mut self, v: &mut V) {
 		for e in &mut self.name {
 			v.visit_name(e);
 		}
-		v.visit_function_body(&mut self.body);
+		v.visit_fn_body(&mut self.body);
 	}
 }
 
 impl<V: Visitor> VisitNode<V> for Call {
 	fn visit(&mut self, v: &mut V) {
-		v.visit_function_call(self)
+		v.visit_fn_call(self)
 	}
 	fn walk(&mut self, v: &mut V) {
 		v.visit_expr(&mut self.expr);
@@ -140,9 +140,9 @@ impl<V: Visitor> VisitNode<V> for Call {
 	}
 }
 
-impl<V: Visitor> VisitNode<V> for FuncBody {
+impl<V: Visitor> VisitNode<V> for FnBody {
 	fn visit(&mut self, v: &mut V) {
-		v.visit_function_body(self)
+		v.visit_fn_body(self)
 	}
 	fn walk(&mut self, v: &mut V) {
 		for e in &mut self.params {
@@ -160,12 +160,12 @@ impl<V: Visitor> VisitNode<V> for Expr {
 		match self {
 			Expr::Literal(e) => v.visit_literal(e),
 			Expr::Name(e) => v.visit_name(e),
-			Expr::BinExp(e) => v.visit_bin_expr(e),
-			Expr::UnExp(e) => v.visit_un_expr(e),
-			Expr::Lambda(e) => v.visit_function_body(e),
+			Expr::BinExpr(e) => v.visit_bin_expr(e),
+			Expr::UnExpr(e) => v.visit_un_expr(e),
+			Expr::Lambda(e) => v.visit_fn_body(e),
 			Expr::SuffixExpr(e) => v.visit_suffix_expr(e),
 			Expr::Expr(e) => v.visit_expr(e),
-			Expr::Call(e) => v.visit_function_call(e),
+			Expr::Call(e) => v.visit_fn_call(e),
 			Expr::Table(t) => {
 				for e in t {
 					v.visit_field(e);
@@ -175,7 +175,7 @@ impl<V: Visitor> VisitNode<V> for Expr {
 	}
 }
 
-impl<V: Visitor> VisitNode<V> for BinExp {
+impl<V: Visitor> VisitNode<V> for BinExpr {
 	fn visit(&mut self, v: &mut V) {
 		v.visit_bin_expr(self)
 	}
@@ -185,12 +185,12 @@ impl<V: Visitor> VisitNode<V> for BinExp {
 	}
 }
 
-impl<V: Visitor> VisitNode<V> for UnExp {
+impl<V: Visitor> VisitNode<V> for UnExpr {
 	fn visit(&mut self, v: &mut V) {
 		v.visit_un_expr(self)
 	}
 	fn walk(&mut self, v: &mut V) {
-		v.visit_expr(&mut self.exp);
+		v.visit_expr(&mut self.expr);
 	}
 }
 

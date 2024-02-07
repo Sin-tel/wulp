@@ -6,18 +6,18 @@ pub struct Block {
 	pub stats: Vec<Stat>,
 }
 
-/// stat ->  vars `=` explist |
-///       functioncall |
-///       do block end |
-///       while exp do block end |
-///       repeat block until exp |
-///       if exp then block {elseif exp then block} [else block] end |
-///       for Name `=` exp `,` exp [`,` exp] do block end |
-///       for names in explist do block end |
-///       function funcname funcbody |
-///       local function Name funcbody |
-///       local names [`=` explist]
-/// laststat -> return [explist] | break
+/// stat -> vars `=` expr_list
+///       | functioncall
+///       | do block end
+///       | while expr do block end
+///       | repeat block until expr
+///       | if expr then block {elseif expr then block} [else block] end
+///       | for Name `=` expr `,` expr [`,` exp] do block end
+///       | for names in expr_list do block end
+///       | function fn_name fn_body
+///       | local function Name fn_body
+///       | local names [`=` expr_list]
+/// laststat -> return [expr_list] | break
 #[derive(Debug, PartialEq)]
 pub enum Stat {
 	Assignment(Assignment),
@@ -27,12 +27,12 @@ pub enum Stat {
 	IfBlock(IfBlock),
 	ForRange(ForRange),
 	ForIn(ForIn),
-	FunctionDef(FunctionDef),
+	FnDef(FnDef),
 	Break,
 	Return(Vec<Expr>),
 }
 
-/// if exp then block {elseif exp then block} [else block] end
+/// if expr then block {elseif expr then block} [else block] end
 #[derive(Debug, PartialEq)]
 pub struct IfBlock {
 	pub expr: Expr,
@@ -47,14 +47,14 @@ pub struct ElseIf {
 	pub block: Block,
 }
 
-/// while exp do block end
+/// while expr do block end
 #[derive(Debug, PartialEq)]
 pub struct WhileBlock {
 	pub expr: Expr,
 	pub block: Block,
 }
 
-/// for Name `=` exp `,` exp [`,` exp] do block end
+/// for Name `=` expr `,` expr [`,` expr] do block end
 #[derive(Debug, PartialEq)]
 pub struct ForRange {
 	pub name: Name,
@@ -62,7 +62,7 @@ pub struct ForRange {
 	pub block: Block,
 }
 
-/// for names in explist do block end
+/// for names in expr_list do block end
 #[derive(Debug, PartialEq)]
 pub struct ForIn {
 	pub names: Vec<Name>,
@@ -70,7 +70,7 @@ pub struct ForIn {
 	pub block: Block,
 }
 
-/// vars '=' explist
+/// vars '=' expr_list
 #[derive(Debug, PartialEq)]
 pub struct Assignment {
 	pub vars: Vec<Expr>,
@@ -79,16 +79,16 @@ pub struct Assignment {
 }
 
 /// expr ->  literal
-///       |  tableconstructor | FUNCTION body | suffix_exp
-///       |  exp binop exp | unop exp | function_call
+///       |  tableconstructor | FUNCTION body | suffix_expr
+///       |  expr binop expr | unop expr | fn_call
 /// tableconstructor -> `{` [fieldlist] `}`
 #[derive(Debug, PartialEq)]
 pub enum Expr {
 	Name(Name),
 	Literal(Literal),
-	BinExp(BinExp),
-	UnExp(UnExp),
-	Lambda(FuncBody),
+	BinExpr(BinExpr),
+	UnExpr(UnExpr),
+	Lambda(FnBody),
 	Table(Vec<Field>),
 	SuffixExpr(SuffixExpr),
 	Call(Call),
@@ -104,8 +104,8 @@ pub enum Literal {
 	Str(String),
 }
 
-/// suffix_exp -> primary_exp { suffix }
-/// primary_exp -> Name | '(' expr ')'
+/// suffix_expr -> primary_expr { suffix }
+/// primary_expr -> Name | '(' expr ')'
 #[derive(Debug, PartialEq)]
 pub struct SuffixExpr {
 	pub expr: Box<Expr>,
@@ -113,38 +113,38 @@ pub struct SuffixExpr {
 }
 
 /// suffix -> `.` Name
-///         | `[` exp `]`
+///         | `[` expr `]`
 #[derive(Debug, PartialEq)]
 pub enum Suffix {
 	Property(Name),
 	Index(Expr),
 }
 
-/// function_call -> suffix_exp args
-/// args ->  `(` [explist] `)`
+/// fn_call -> suffix_expr args
+/// args ->  `(` [expr_list] `)`
 #[derive(Debug, PartialEq)]
 pub struct Call {
 	pub expr: Box<Expr>,
 	pub args: Vec<Expr>,
 }
 
-/// function funcname funcbody
+/// function fn_name fn_body
 #[derive(Debug, PartialEq)]
-pub struct FunctionDef {
+pub struct FnDef {
 	pub name: Vec<Name>,
-	pub body: FuncBody,
+	pub body: FnBody,
 	pub local: bool,
 }
 
-/// funcbody -> `(` [parlist] `)` block end
+/// fn_body -> `(` [parlist] `)` block end
 /// parlist -> names [`,`]
 #[derive(Debug, PartialEq)]
-pub struct FuncBody {
+pub struct FnBody {
 	pub params: Vec<Name>,
 	pub body: Block,
 }
 
-/// field -> Name `=` exp | exp
+/// field -> expr | Name `=` expr
 #[derive(Debug, PartialEq)]
 pub enum Field {
 	Assign(Name, Expr),
@@ -155,19 +155,19 @@ pub enum Field {
 #[derive(PartialEq, Debug)]
 pub struct Name(pub String);
 
-/// exp binop exp
+/// expr binop expr
 #[derive(Debug, PartialEq)]
-pub struct BinExp {
+pub struct BinExpr {
 	pub op: BinOp,
 	pub lhs: Box<Expr>,
 	pub rhs: Box<Expr>,
 }
 
-/// unop exp
+/// unop expr
 #[derive(Debug, PartialEq)]
-pub struct UnExp {
+pub struct UnExpr {
 	pub op: UnOp,
-	pub exp: Box<Expr>,
+	pub expr: Box<Expr>,
 }
 
 #[derive(Debug, PartialEq)]

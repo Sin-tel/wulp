@@ -25,11 +25,11 @@ impl Visitor for AstPrinter {
 		add_branch!("{}", if node.local { "local assign" } else { "assign" });
 		node.walk(self);
 	}
-	fn visit_function_def(&mut self, node: &mut FunctionDef) {
+	fn visit_fn_def(&mut self, node: &mut FnDef) {
 		add_branch!("{}", if node.local { "local function" } else { "function" });
 		node.walk(self);
 	}
-	fn visit_function_call(&mut self, node: &mut Call) {
+	fn visit_fn_call(&mut self, node: &mut Call) {
 		add_branch!("call");
 		node.walk(self);
 	}
@@ -67,12 +67,12 @@ impl Visitor for AstPrinter {
 		}
 	}
 
-	fn visit_bin_expr(&mut self, node: &mut BinExp) {
+	fn visit_bin_expr(&mut self, node: &mut BinExpr) {
 		add_branch!("`{}` (binop)", node.op);
 		node.walk(self);
 	}
 
-	fn visit_un_expr(&mut self, node: &mut UnExp) {
+	fn visit_un_expr(&mut self, node: &mut UnExpr) {
 		add_branch!("`{}` (unop)", node.op);
 		node.walk(self);
 	}

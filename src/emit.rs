@@ -67,16 +67,16 @@ impl Visitor for EmitLua {
 			self.push_list(&mut node.exprs, ", ");
 		}
 	}
-	fn visit_function_def(&mut self, node: &mut FunctionDef) {
+	fn visit_fn_def(&mut self, node: &mut FnDef) {
 		if node.local {
 			self.code.push_str("local ");
 		}
 		self.code.push_str("function ");
 
 		self.push_list(&mut node.name, ".");
-		self.visit_function_body(&mut node.body);
+		self.visit_fn_body(&mut node.body);
 	}
-	fn visit_function_call(&mut self, node: &mut Call) {
+	fn visit_fn_call(&mut self, node: &mut Call) {
 		self.visit_expr(&mut node.expr);
 		self.code.push('(');
 		self.push_list(&mut node.args, ", ");
@@ -126,16 +126,16 @@ impl Visitor for EmitLua {
 			Literal::Bool(s) => self.code.push_str(&s.to_string()),
 		}
 	}
-	fn visit_bin_expr(&mut self, node: &mut BinExp) {
+	fn visit_bin_expr(&mut self, node: &mut BinExpr) {
 		self.visit_expr(&mut node.lhs);
 		self.code.push(' ');
 		self.code.push_str(&node.op.to_string());
 		self.code.push(' ');
 		self.visit_expr(&mut node.rhs);
 	}
-	fn visit_un_expr(&mut self, node: &mut UnExp) {
+	fn visit_un_expr(&mut self, node: &mut UnExpr) {
 		self.code.push_str(&node.op.to_string());
-		self.visit_expr(&mut node.exp);
+		self.visit_expr(&mut node.expr);
 	}
 	fn visit_suffix_expr(&mut self, node: &mut SuffixExpr) {
 		node.walk(self);
@@ -154,7 +154,7 @@ impl Visitor for EmitLua {
 		};
 	}
 
-	fn visit_function_body(&mut self, node: &mut FuncBody) {
+	fn visit_fn_body(&mut self, node: &mut FnBody) {
 		self.code.push('(');
 		self.push_list(&mut node.params, ", ");
 		self.code.push_str(")\n");
