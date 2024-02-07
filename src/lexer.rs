@@ -5,20 +5,54 @@ use std::iter::zip;
 
 #[derive(Debug)]
 pub struct Lexer<'a> {
-	input: &'a str,
-	bytes: &'a [u8],
-	cursor: usize,
-	eof_done: bool,
-	handle_escape: bool,
+	lexer: LexIter<'a>,
+	peeked: Option<Option<Token>>,
 }
 
+// This is mostly copypasta from peekable in std
 impl<'a> Lexer<'a> {
 	pub fn new(input: &'a str) -> Self {
 		Lexer {
+			lexer: LexIter::new(input),
+			peeked: None,
+		}
+	}
+	pub fn next(&mut self) -> Token {
+		let token = match self.peeked.take() {
+			Some(v) => v,
+			None => self.lexer.next(),
+		};
+		self.filter(token)
+	}
+	pub fn peek(&mut self) -> Token {
+		let token = *self.peeked.get_or_insert_with(|| self.lexer.next());
+		self.filter(token)
+	}
+	fn filter(&mut self, token: Option<Token>) -> Token {
+		match token {
+			Some(tk) => tk,
+			None => Token {
+				kind: TokenKind::Eof,
+				span: Span::at(self.lexer.cursor - 1), // point to last character
+			},
+		}
+	}
+}
+
+#[derive(Debug)]
+pub struct LexIter<'a> {
+	input: &'a str,
+	bytes: &'a [u8],
+	pub cursor: usize,
+	handle_escape: bool,
+}
+
+impl<'a> LexIter<'a> {
+	pub fn new(input: &'a str) -> Self {
+		LexIter {
 			input,
 			bytes: input.as_bytes(),
 			cursor: 0,
-			eof_done: false,
 			handle_escape: false,
 		}
 	}
@@ -32,14 +66,6 @@ impl<'a> Lexer<'a> {
 		self.cursor += 1;
 
 		c.map(|b| *b as char)
-	}
-
-	fn peek(&self, n: usize) -> Option<&[u8]> {
-		if self.bytes.len() <= self.cursor + n {
-			None
-		} else {
-			Some(&self.bytes[self.cursor..self.cursor + n])
-		}
 	}
 
 	fn peek_is_number(&mut self) -> bool {
@@ -69,31 +95,6 @@ impl<'a> Lexer<'a> {
 		true
 	}
 
-	// '--[[' CONTENT ']]--'
-	fn multi_line_comment(&mut self) -> Option<Token> {
-		let start = self.cursor;
-
-		self.eat_chars(4);
-
-		let mut comment = String::new();
-
-		loop {
-			if self.match_chars("]]--") {
-				self.eat_chars(4);
-				let end = self.cursor;
-				break Some(Token {
-					kind: TokenKind::Comment,
-					span: Span { start, end },
-				});
-			} else if let Some(c) = self.eat_char() {
-				comment.push(c);
-			} else {
-				break None;
-			}
-		}
-	}
-
-	// '--' CONTENT '\n'?
 	fn single_line_comment(&mut self) -> Token {
 		let start = self.cursor;
 		self.eat_chars(2);
@@ -183,20 +184,16 @@ impl<'a> Lexer<'a> {
 			"nil" => TokenKind::Nil,
 			"not" => TokenKind::Not,
 			"for" => TokenKind::For,
-			"do" => TokenKind::Do,
 			"in" => TokenKind::In,
-			"function" => TokenKind::Function,
+			"fn" => TokenKind::Fn,
 			"break" => TokenKind::Break,
 			"return" => TokenKind::Return,
 			"while" => TokenKind::While,
 			"or" => TokenKind::Or,
 			"and" => TokenKind::And,
-			"end" => TokenKind::End,
 			"if" => TokenKind::If,
-			"then" => TokenKind::Then,
 			"elseif" => TokenKind::ElseIf,
 			"else" => TokenKind::Else,
-			"local" => TokenKind::Local,
 			_ => TokenKind::Name,
 		};
 
@@ -248,12 +245,10 @@ fn newtoken(kind: TokenKind, start: usize, end: usize) -> Token {
 	}
 }
 
-impl Iterator for Lexer<'_> {
+impl Iterator for LexIter<'_> {
 	type Item = Token;
 	fn next(&mut self) -> Option<Token> {
-		if self.peek(4) == Some("--[[".as_bytes()) {
-			self.multi_line_comment()
-		} else if let Some(c) = self.cur_char() {
+		if let Some(c) = self.cur_char() {
 			use TokenKind::*;
 			let start = self.cursor;
 			let next = self.next_char();
@@ -293,7 +288,12 @@ impl Iterator for Lexer<'_> {
 				},
 				'.' if self.peek_is_number() => Some(self.number()),
 				'0'..='9' => Some(self.number()),
-				'-' if next == Some('-') => Some(self.single_line_comment()),
+				'/' if next == Some('/') => {
+					// skip!
+					// Some(self.single_line_comment())
+					self.single_line_comment();
+					self.next()
+				},
 				'-' => {
 					if self.peek_is_number() {
 						return Some(self.number());
@@ -392,7 +392,7 @@ impl Iterator for Lexer<'_> {
 					let end = self.cursor;
 					Some(newtoken(Pow, start, end))
 				},
-				'~' if next == Some('=') => {
+				'!' if next == Some('=') => {
 					self.eat_chars(2);
 					let end = self.cursor;
 					Some(newtoken(Neq, start, end))
@@ -403,14 +403,8 @@ impl Iterator for Lexer<'_> {
 					panic!("{msg}");
 				},
 			}
-		} else if self.eof_done {
-			None
 		} else {
-			self.eof_done = true;
-			Some(Token {
-				kind: TokenKind::Eof,
-				span: Span::at(self.cursor - 1), // point to last character
-			})
+			None
 		}
 	}
 }

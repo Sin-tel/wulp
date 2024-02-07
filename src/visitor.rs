@@ -19,6 +19,12 @@ pub trait Visitor: Sized {
 	fn visit_if_block(&mut self, node: &mut IfBlock) {
 		node.walk(self);
 	}
+	fn visit_for_block(&mut self, node: &mut ForBlock) {
+		node.walk(self);
+	}
+	fn visit_while_block(&mut self, node: &mut WhileBlock) {
+		node.walk(self);
+	}
 	fn visit_fn_body(&mut self, node: &mut FnBody) {
 		node.walk(self);
 	}
@@ -67,7 +73,7 @@ impl<V: Visitor> VisitNode<V> for Block {
 
 impl<V: Visitor> VisitNode<V> for Stat {
 	fn visit(&mut self, v: &mut V) {
-		v.visit_stat(self)
+		v.visit_stat(self);
 	}
 	fn walk(&mut self, v: &mut V) {
 		match self {
@@ -75,19 +81,22 @@ impl<V: Visitor> VisitNode<V> for Stat {
 			Stat::FnDef(s) => v.visit_fn_def(s),
 			Stat::Call(s) => v.visit_fn_call(s),
 			Stat::IfBlock(s) => v.visit_if_block(s),
+			Stat::ForBlock(s) => v.visit_for_block(s),
+			Stat::Block(s) => v.visit_block(s),
+			Stat::WhileBlock(s) => v.visit_while_block(s),
+			Stat::Break => (),
 			Stat::Return(exprs) => {
 				for e in exprs.iter_mut() {
 					v.visit_expr(e);
 				}
 			},
-			s => unimplemented!("{s:?}"),
 		}
 	}
 }
 
 impl<V: Visitor> VisitNode<V> for IfBlock {
 	fn visit(&mut self, v: &mut V) {
-		v.visit_if_block(self)
+		v.visit_if_block(self);
 	}
 	fn walk(&mut self, v: &mut V) {
 		v.visit_expr(&mut self.expr);
@@ -102,9 +111,34 @@ impl<V: Visitor> VisitNode<V> for IfBlock {
 	}
 }
 
+impl<V: Visitor> VisitNode<V> for ForBlock {
+	fn visit(&mut self, v: &mut V) {
+		v.visit_for_block(self);
+	}
+	fn walk(&mut self, v: &mut V) {
+		for n in &mut self.names {
+			v.visit_name(n);
+		}
+		for e in &mut self.exprs {
+			v.visit_expr(e);
+		}
+		v.visit_block(&mut self.block);
+	}
+}
+
+impl<V: Visitor> VisitNode<V> for WhileBlock {
+	fn visit(&mut self, v: &mut V) {
+		v.visit_while_block(self);
+	}
+	fn walk(&mut self, v: &mut V) {
+		v.visit_expr(&mut self.expr);
+		v.visit_block(&mut self.block);
+	}
+}
+
 impl<V: Visitor> VisitNode<V> for Assignment {
 	fn visit(&mut self, v: &mut V) {
-		v.visit_assignment(self)
+		v.visit_assignment(self);
 	}
 	fn walk(&mut self, v: &mut V) {
 		for e in &mut self.vars {
@@ -118,7 +152,7 @@ impl<V: Visitor> VisitNode<V> for Assignment {
 
 impl<V: Visitor> VisitNode<V> for FnDef {
 	fn visit(&mut self, v: &mut V) {
-		v.visit_fn_def(self)
+		v.visit_fn_def(self);
 	}
 	fn walk(&mut self, v: &mut V) {
 		for e in &mut self.name {
@@ -130,7 +164,7 @@ impl<V: Visitor> VisitNode<V> for FnDef {
 
 impl<V: Visitor> VisitNode<V> for Call {
 	fn visit(&mut self, v: &mut V) {
-		v.visit_fn_call(self)
+		v.visit_fn_call(self);
 	}
 	fn walk(&mut self, v: &mut V) {
 		v.visit_expr(&mut self.expr);
@@ -142,7 +176,7 @@ impl<V: Visitor> VisitNode<V> for Call {
 
 impl<V: Visitor> VisitNode<V> for FnBody {
 	fn visit(&mut self, v: &mut V) {
-		v.visit_fn_body(self)
+		v.visit_fn_body(self);
 	}
 	fn walk(&mut self, v: &mut V) {
 		for e in &mut self.params {
@@ -154,7 +188,7 @@ impl<V: Visitor> VisitNode<V> for FnBody {
 
 impl<V: Visitor> VisitNode<V> for Expr {
 	fn visit(&mut self, v: &mut V) {
-		v.visit_expr(self)
+		v.visit_expr(self);
 	}
 	fn walk(&mut self, v: &mut V) {
 		match self {
@@ -177,7 +211,7 @@ impl<V: Visitor> VisitNode<V> for Expr {
 
 impl<V: Visitor> VisitNode<V> for BinExpr {
 	fn visit(&mut self, v: &mut V) {
-		v.visit_bin_expr(self)
+		v.visit_bin_expr(self);
 	}
 	fn walk(&mut self, v: &mut V) {
 		v.visit_expr(&mut self.lhs);
@@ -187,7 +221,7 @@ impl<V: Visitor> VisitNode<V> for BinExpr {
 
 impl<V: Visitor> VisitNode<V> for UnExpr {
 	fn visit(&mut self, v: &mut V) {
-		v.visit_un_expr(self)
+		v.visit_un_expr(self);
 	}
 	fn walk(&mut self, v: &mut V) {
 		v.visit_expr(&mut self.expr);
@@ -196,7 +230,7 @@ impl<V: Visitor> VisitNode<V> for UnExpr {
 
 impl<V: Visitor> VisitNode<V> for SuffixExpr {
 	fn visit(&mut self, v: &mut V) {
-		v.visit_suffix_expr(self)
+		v.visit_suffix_expr(self);
 	}
 	fn walk(&mut self, v: &mut V) {
 		v.visit_expr(&mut self.expr);
@@ -208,7 +242,7 @@ impl<V: Visitor> VisitNode<V> for SuffixExpr {
 
 impl<V: Visitor> VisitNode<V> for Suffix {
 	fn visit(&mut self, v: &mut V) {
-		v.visit_suffix(self)
+		v.visit_suffix(self);
 	}
 	fn walk(&mut self, v: &mut V) {
 		match self {
@@ -220,7 +254,7 @@ impl<V: Visitor> VisitNode<V> for Suffix {
 
 impl<V: Visitor> VisitNode<V> for Field {
 	fn visit(&mut self, v: &mut V) {
-		v.visit_field(self)
+		v.visit_field(self);
 	}
 	fn walk(&mut self, v: &mut V) {
 		match self {
@@ -235,6 +269,6 @@ impl<V: Visitor> VisitNode<V> for Field {
 
 impl<V: Visitor> VisitNode<V> for Name {
 	fn visit(&mut self, v: &mut V) {
-		v.visit_name(self)
+		v.visit_name(self);
 	}
 }

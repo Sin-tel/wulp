@@ -15,8 +15,6 @@ pub struct Block {
 ///       | for Name `=` expr `,` expr [`,` exp] do block end
 ///       | for names in expr_list do block end
 ///       | function fn_name fn_body
-///       | local function Name fn_body
-///       | local names [`=` expr_list]
 /// laststat -> return [expr_list] | break
 #[derive(Debug, PartialEq)]
 pub enum Stat {
@@ -25,8 +23,7 @@ pub enum Stat {
 	Block(Block),
 	WhileBlock(WhileBlock),
 	IfBlock(IfBlock),
-	ForRange(ForRange),
-	ForIn(ForIn),
+	ForBlock(ForBlock),
 	FnDef(FnDef),
 	Break,
 	Return(Vec<Expr>),
@@ -54,17 +51,9 @@ pub struct WhileBlock {
 	pub block: Block,
 }
 
-/// for Name `=` expr `,` expr [`,` expr] do block end
-#[derive(Debug, PartialEq)]
-pub struct ForRange {
-	pub name: Name,
-	pub exprs: (Expr, Expr, Option<Expr>),
-	pub block: Block,
-}
-
 /// for names in expr_list do block end
 #[derive(Debug, PartialEq)]
-pub struct ForIn {
+pub struct ForBlock {
 	pub names: Vec<Name>,
 	pub exprs: Vec<Expr>,
 	pub block: Block,

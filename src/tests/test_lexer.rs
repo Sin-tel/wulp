@@ -6,7 +6,7 @@ use crate::token::*;
 fn whitespace() {
 	let ws = "  ";
 
-	let mut lex = Lexer::new(ws);
+	let mut lex = LexIter::new(ws);
 	lex.next();
 
 	assert_eq!(lex.next(), None);
@@ -14,9 +14,9 @@ fn whitespace() {
 
 #[test]
 fn single_line_comment() {
-	let single_line_comment = "-- This is an example lua comment";
+	let single_line_comment = "// This is an example lua comment";
 
-	let mut lex = Lexer::new(single_line_comment);
+	let mut lex = LexIter::new(single_line_comment);
 
 	assert_eq!(
 		lex.next(),
@@ -28,24 +28,9 @@ fn single_line_comment() {
 }
 
 #[test]
-fn multi_line_comment() {
-	let multi_line_comment = "--[[ multi-line comment ]]--";
-
-	let mut lex = Lexer::new(multi_line_comment);
-
-	assert_eq!(
-		lex.next(),
-		Some(Token {
-			kind: TokenKind::Comment,
-			span: Span { start: 0, end: 28 }
-		})
-	)
-}
-
-#[test]
 fn single_line_string() {
 	let single_quote = r#"'example string'"#;
-	let mut lex = Lexer::new(single_quote);
+	let mut lex = LexIter::new(single_quote);
 	assert_eq!(
 		lex.next(),
 		Some(Token {
@@ -55,7 +40,7 @@ fn single_line_string() {
 	);
 
 	let double_quote = r#""example string""#;
-	let mut lex = Lexer::new(double_quote);
+	let mut lex = LexIter::new(double_quote);
 	assert_eq!(
 		lex.next(),
 		Some(Token {
@@ -68,7 +53,7 @@ fn single_line_string() {
 #[test]
 fn multi_line_string() {
 	let multi_line = "[[ This is a multi-line string ]]";
-	let mut lex = Lexer::new(multi_line);
+	let mut lex = LexIter::new(multi_line);
 	assert_eq!(
 		lex.next(),
 		Some(Token {
@@ -83,14 +68,9 @@ fn basic_assignment() {
 	use TokenKind::*;
 
 	let nil_assignment = r#"x =nil"#;
-	let actual: Vec<_> = Lexer::new(nil_assignment).map(|tk| tk.kind).collect();
+	let actual: Vec<_> = LexIter::new(nil_assignment).map(|tk| tk.kind).collect();
 
-	assert_eq!(actual, vec![Name, Assign, Nil, Eof]);
-
-	let p = r#"local _x = 1"#;
-	let actual: Vec<_> = Lexer::new(p).map(|tk| tk.kind).collect();
-
-	assert_eq!(actual, vec![Local, Name, Assign, Number, Eof]);
+	assert_eq!(actual, vec![Name, Assign, Nil]);
 }
 
 #[test]
@@ -99,57 +79,57 @@ fn assignment() {
 
 	let string_assignment = r#"x = 'foo'"#;
 
-	let lex = Lexer::new(string_assignment);
+	let lex = LexIter::new(string_assignment);
 	let actual: Vec<_> = lex.map(|tk| tk.kind).collect();
-	assert_eq!(actual, vec![Name, Assign, Str, Eof]);
+	assert_eq!(actual, vec![Name, Assign, Str]);
 
 	let bool_assignment = r#"x = false"#;
-	let lex = Lexer::new(bool_assignment);
+	let lex = LexIter::new(bool_assignment);
 	let actual: Vec<_> = lex.map(|tk| tk.kind).collect();
 
-	assert_eq!(actual, vec![Name, Assign, False, Eof]);
+	assert_eq!(actual, vec![Name, Assign, False]);
 
 	let var_assignment = r#"x = y"#;
-	let lex = Lexer::new(var_assignment);
+	let lex = LexIter::new(var_assignment);
 	let actual: Vec<_> = lex.map(|tk| tk.kind).collect();
-	assert_eq!(actual, vec![Name, Assign, Name, Eof]);
+	assert_eq!(actual, vec![Name, Assign, Name]);
 }
 
 #[test]
 fn string_concat() {
 	let p = r#"'foo' .. bar"#;
 
-	let actual: Vec<_> = Lexer::new(p).map(|tk| tk.kind).collect();
+	let actual: Vec<_> = LexIter::new(p).map(|tk| tk.kind).collect();
 
 	use TokenKind::*;
-	assert_eq!(actual, vec![Str, Concat, Name, Eof])
+	assert_eq!(actual, vec![Str, Concat, Name])
 }
 
 #[test]
 fn not_expressions() {
 	let p = r#"not true"#;
 
-	let actual: Vec<_> = Lexer::new(p).map(|tk| tk.kind).collect();
+	let actual: Vec<_> = LexIter::new(p).map(|tk| tk.kind).collect();
 
 	use TokenKind::*;
-	assert_eq!(actual, vec![Not, True, Eof])
+	assert_eq!(actual, vec![Not, True])
 }
 
 #[test]
 fn empty_table() {
 	let p = r#"x = {}"#;
 
-	let actual: Vec<_> = Lexer::new(p).map(|tk| tk.kind).collect();
+	let actual: Vec<_> = LexIter::new(p).map(|tk| tk.kind).collect();
 
 	use TokenKind::*;
-	assert_eq!(actual, vec![Name, Assign, LCurly, RCurly, Eof]);
+	assert_eq!(actual, vec![Name, Assign, LCurly, RCurly]);
 }
 
 #[test]
 #[should_panic(expected = "Failed to close string.")]
 fn string_fail() {
 	let p = r#"'hello"#;
-	let _: Vec<_> = Lexer::new(p).collect();
+	let _: Vec<_> = LexIter::new(p).collect();
 }
 
 #[test]
@@ -157,12 +137,12 @@ fn string_fail() {
 fn string_fail2() {
 	let p = r#""hello
 	""#;
-	let _: Vec<_> = Lexer::new(p).collect();
+	let _: Vec<_> = LexIter::new(p).collect();
 }
 
 #[test]
 #[should_panic(expected = "Unexpected token: `$`")]
 fn bad_char() {
 	let p = r#"let x = $100"#;
-	let _: Vec<_> = Lexer::new(p).collect();
+	let _: Vec<_> = LexIter::new(p).collect();
 }

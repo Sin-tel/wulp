@@ -31,7 +31,7 @@ impl EmitLua {
 		}
 	}
 	fn indent(&mut self) {
-		self.code.push_str(&"  ".repeat(self.indent_level));
+		self.code.push_str(&"\t".repeat(self.indent_level));
 	}
 }
 
@@ -57,12 +57,41 @@ impl Visitor for EmitLua {
 		self.indent();
 		self.code.push_str("end");
 	}
+	fn visit_while_block(&mut self, node: &mut WhileBlock) {
+		self.code.push_str("while ");
+		self.visit_expr(&mut node.expr);
+		self.code.push_str(" do\n");
+
+		self.visit_block(&mut node.block);
+
+		self.indent();
+		self.code.push_str("end");
+	}
+	fn visit_for_block(&mut self, node: &mut ForBlock) {
+		self.code.push_str("for ");
+		// self.push_list(&mut node.names, ", ");
+
+		assert!(node.names.len() == 1);
+		self.code.push_str("_, ");
+		self.visit_name(&mut node.names[0]);
+
+		// self.code.push_str(" in ");
+		self.code.push_str(" in ipairs(");
+		self.push_list(&mut node.exprs, ", ");
+		self.code.push(')');
+		self.code.push_str(" do\n");
+
+		self.visit_block(&mut node.block);
+
+		self.indent();
+		self.code.push_str("end");
+	}
 	fn visit_assignment(&mut self, node: &mut Assignment) {
 		if node.local {
 			self.code.push_str("local ");
 		}
 		self.push_list(&mut node.vars, ", ");
-		if node.exprs.len() > 0 {
+		if !node.exprs.is_empty() {
 			self.code.push_str(" = ");
 			self.push_list(&mut node.exprs, ", ");
 		}
@@ -88,6 +117,15 @@ impl Visitor for EmitLua {
 			Stat::Return(exprs) => {
 				self.code.push_str("return ");
 				self.push_list(exprs, ", ");
+			},
+			Stat::Break => {
+				self.code.push_str("break");
+			},
+			Stat::Block(_) => {
+				self.code.push_str("do\n");
+				node.walk(self);
+				self.indent();
+				self.code.push_str("end");
 			},
 			_ => {
 				node.walk(self);

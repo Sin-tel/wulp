@@ -6,6 +6,7 @@
 #![warn(clippy::redundant_else)]
 #![warn(clippy::match_same_arms)]
 #![deny(unreachable_patterns)]
+#![allow(clippy::enum_variant_names)]
 
 // #![warn(clippy::pedantic)]
 // #![allow(clippy::similar_names)]
@@ -31,23 +32,23 @@ mod visitor;
 mod tests;
 
 fn main() {
-	// let input = fs::read_to_string("lua/lists.lua").unwrap();
+	let filename = "lua/basic.blua";
+	let input = fs::read_to_string(filename).unwrap();
 
-	let input = r#"
-	local var = ((x or y)().y[1])(a,b[1]);
-	var = ((x or y)().y[1])(a,b[1]);
-	((x or y)().y[1])(a,b[1])
-	"#;
+	// let input = r#"
+	// var = ((x or y)().y[1])(a,b[1]);
+	// ((x or y)().y[1])(a,b[1])
+	// "#;
 
 	let mut ast = parser::parse(&input);
 	// dbg!(&ast);
 
-	println!("----- input:");
-	println!("{input}");
-
 	println!("----- AST:");
 	let mut printer = ast_print::AstPrinter;
 	printer.print_ast(&mut ast);
+
+	println!("----- input:");
+	println!("{input}");
 
 	println!("----- emitted code:");
 	let code = EmitLua::emit(&mut ast);
@@ -55,19 +56,19 @@ fn main() {
 
 	let lua = mlua::Lua::new();
 	println!("----- execute:");
-	let res = lua.load(code).into_function();
+	// let res = lua.load(code).into_function();
 	// let res = lua.load(code).eval::<String>();
-	display_return(res);
 
-	let res = lua.load(input).into_function();
-	// let res = lua.load(input).eval::<String>();
+	let mut chunk = lua.load(code);
+	chunk = chunk.set_name(filename);
+	let res = chunk.exec();
 	display_return(res);
 }
 
 fn display_return<V: std::fmt::Debug>(res: LuaResult<V>) {
 	if let Err(e) = res {
-		println!("{}", e);
+		println!("{e}");
 	} else {
-		println!("{:?}", res.unwrap());
+		// println!("{:?}", res.unwrap());
 	}
 }

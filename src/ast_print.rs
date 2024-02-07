@@ -18,7 +18,11 @@ impl Visitor for AstPrinter {
 		node.walk(self);
 	}
 	fn visit_if_block(&mut self, node: &mut IfBlock) {
-		add_branch!("IF");
+		add_branch!("if");
+		node.walk(self);
+	}
+	fn visit_for_block(&mut self, node: &mut ForBlock) {
+		add_branch!("for");
 		node.walk(self);
 	}
 	fn visit_assignment(&mut self, node: &mut Assignment) {
