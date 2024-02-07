@@ -592,14 +592,14 @@ fn stat_call() {
 	let mut tokens = make_tokens(p);
 	assert_eq!(
 		format!("{:?}", parse_statement(p, &mut tokens)),
-		"FunctionCall(FunctionCall { expr: Name(Name(\"print\")), args: [Str(\"hello\"), Str(\"world\")] })"
+		"Call(Call { expr: Name(Name(\"print\")), args: [Str(\"hello\"), Str(\"world\")] })"
 	);
 
 	let p = r#"print(test(1))"#;
 	let mut tokens = make_tokens(p);
 	assert_eq!(
 		format!("{:?}", parse_statement(p, &mut tokens)),
-		"FunctionCall(FunctionCall { expr: Name(Name(\"print\")), args: [SuffixExpr(SuffixExpr { expr: Name(Name(\"test\")), suffix: [Call([Num(1.0)])] })] })"
+		"Call(Call { expr: Name(Name(\"print\")), args: [SuffixExpr(SuffixExpr { expr: Name(Name(\"test\")), suffix: [Call([Num(1.0)])] })] })"
 	);
 }
 

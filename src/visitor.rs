@@ -13,7 +13,7 @@ pub trait Visitor: Sized {
 	fn visit_function_def(&mut self, node: &mut FunctionDef) {
 		node.walk(self);
 	}
-	fn visit_function_call(&mut self, node: &mut FunctionCall) {
+	fn visit_function_call(&mut self, node: &mut Call) {
 		node.walk(self);
 	}
 	fn visit_if_block(&mut self, node: &mut IfBlock) {
@@ -73,7 +73,7 @@ impl<V: Visitor> VisitNode<V> for Stat {
 		match self {
 			Stat::Assignment(s) => v.visit_assignment(s),
 			Stat::FunctionDef(s) => v.visit_function_def(s),
-			Stat::FunctionCall(s) => v.visit_function_call(s),
+			Stat::Call(s) => v.visit_function_call(s),
 			Stat::IfBlock(s) => v.visit_if_block(s),
 			Stat::Return(exprs) => {
 				for e in exprs.iter_mut() {
@@ -128,7 +128,7 @@ impl<V: Visitor> VisitNode<V> for FunctionDef {
 	}
 }
 
-impl<V: Visitor> VisitNode<V> for FunctionCall {
+impl<V: Visitor> VisitNode<V> for Call {
 	fn visit(&mut self, v: &mut V) {
 		v.visit_function_call(self)
 	}

@@ -29,8 +29,8 @@ impl Visitor for AstPrinter {
 		add_branch!("{}", if node.local { "local function" } else { "function" });
 		node.walk(self);
 	}
-	fn visit_function_call(&mut self, node: &mut FunctionCall) {
-		add_branch!("function call");
+	fn visit_function_call(&mut self, node: &mut Call) {
+		add_branch!("call");
 		node.walk(self);
 	}
 	fn visit_stat(&mut self, node: &mut Stat) {

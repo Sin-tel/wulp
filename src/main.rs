@@ -34,9 +34,9 @@ fn main() {
 	// let input = fs::read_to_string("lua/lists.lua").unwrap();
 
 	let input = r#"
-	local var = ((x or y)().y[1])(a,b[1])[2];
-	var = ((x or y)().y[1])(a,b[1])[2];
-	((x or y)().y[1])(a,b[1])[2]
+	local var = ((x or y)().y[1])(a,b[1]);
+	var = ((x or y)().y[1])(a,b[1]);
+	((x or y)().y[1])(a,b[1])
 	"#;
 
 	let mut ast = parser::parse(&input);

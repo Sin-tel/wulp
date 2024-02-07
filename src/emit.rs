@@ -76,7 +76,7 @@ impl Visitor for EmitLua {
 		self.push_list(&mut node.name, ".");
 		self.visit_function_body(&mut node.body);
 	}
-	fn visit_function_call(&mut self, node: &mut FunctionCall) {
+	fn visit_function_call(&mut self, node: &mut Call) {
 		self.visit_expr(&mut node.expr);
 		self.code.push('(');
 		self.push_list(&mut node.args, ", ");

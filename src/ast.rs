@@ -21,7 +21,7 @@ pub struct Block {
 #[derive(Debug, PartialEq)]
 pub enum Stat {
 	Assignment(Assignment),
-	FunctionCall(FunctionCall),
+	Call(Call),
 	Block(Block),
 	WhileBlock(WhileBlock),
 	IfBlock(IfBlock),
@@ -41,7 +41,6 @@ pub struct IfBlock {
 	pub else_block: Option<Block>,
 }
 
-/// if exp then block {elseif exp then block} [else block] end
 #[derive(Debug, PartialEq)]
 pub struct ElseIf {
 	pub expr: Expr,
@@ -92,7 +91,7 @@ pub enum Expr {
 	Lambda(FuncBody),
 	Table(Vec<Field>),
 	SuffixExpr(SuffixExpr),
-	Call(FunctionCall),
+	Call(Call),
 	Expr(Box<Expr>), // bracketed expression
 }
 
@@ -124,7 +123,7 @@ pub enum Suffix {
 /// function_call -> suffix_exp args
 /// args ->  `(` [explist] `)`
 #[derive(Debug, PartialEq)]
-pub struct FunctionCall {
+pub struct Call {
 	pub expr: Box<Expr>,
 	pub args: Vec<Expr>,
 }

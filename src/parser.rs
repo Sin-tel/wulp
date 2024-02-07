@@ -93,7 +93,7 @@ pub fn parse_statement_inner(input: &str, tokens: &mut Tokens) -> Stat {
 				TokenKind::Assign | TokenKind::Comma => Stat::Assignment(parse_assignment(suffix_expr, input, tokens)),
 				_ => {
 					if let Expr::Call(e) = suffix_expr {
-						return Stat::FunctionCall(e);
+						return Stat::Call(e);
 					}
 					let tk = tokens.next();
 					format_err(&format!("Expected `=` but found: {tk}."), tk.span, input)
@@ -416,7 +416,7 @@ pub fn parse_suffix_expr(input: &str, tokens: &mut Tokens) -> Expr {
 				// Build ast node and continue
 				let args = parse_args(input, tokens);
 				let old_suffix = std::mem::take(&mut suffix);
-				primary = Expr::Call(FunctionCall {
+				primary = Expr::Call(Call {
 					expr: Box::new(new_suffix_expr(primary, old_suffix)),
 					args,
 				})
