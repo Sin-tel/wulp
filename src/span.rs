@@ -40,7 +40,7 @@ fn line_col(input: &str, pos: usize) -> (usize, usize) {
 	}
 }
 
-pub fn format_err(message: &str, span: Span, input: &str) -> ! {
+pub fn format_err(message: &str, span: Span, input: &str) {
 	// TODO: this only works properly if the span is one line
 
 	let (startl, startc, endl, endc) = span.line_col(input);
@@ -79,5 +79,5 @@ pub fn format_err(message: &str, span: Span, input: &str) -> ! {
 	// eprintln!("{} |", spaces);
 	eprintln!();
 
-	panic!("{}", message);
+	// panic!("{}", message);
 }

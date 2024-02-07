@@ -121,7 +121,9 @@ impl<'a> Lexer<'a> {
 				Some(e) if Some(e) == closing && !self.handle_escape => break,
 				Some('\\') => self.handle_escape = true,
 				Some('\n') | None => {
-					format_err("Failed to close string.", Span::new(start, self.cursor - 1), self.input)
+					let msg = "Failed to close string.";
+					format_err(msg, Span::new(start, self.cursor - 1), self.input);
+					panic!("{msg}");
 				},
 				_ => self.handle_escape = false,
 			}
@@ -396,7 +398,9 @@ impl Iterator for Lexer<'_> {
 					Some(newtoken(Neq, start, end))
 				},
 				tk => {
-					format_err(&format!("Unexpected token: `{tk}`"), Span::at(self.cursor), self.input);
+					let msg = format!("Unexpected token: `{tk}`");
+					format_err(&msg, Span::at(self.cursor), self.input);
+					panic!("{msg}");
 				},
 			}
 		} else if self.eof_done {

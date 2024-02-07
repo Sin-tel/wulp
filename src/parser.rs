@@ -96,7 +96,9 @@ pub fn parse_statement_inner(input: &str, tokens: &mut Tokens) -> Stat {
 						return Stat::Call(e);
 					}
 					let tk = tokens.next();
-					format_err(&format!("Expected `=` but found: {tk}."), tk.span, input)
+					let msg = format!("Expected `=` but found: {tk}.");
+					format_err(&msg, tk.span, input);
+					panic!("{msg}");
 				},
 			}
 		},
@@ -451,7 +453,9 @@ pub fn parse_primary_expr(input: &str, tokens: &mut Tokens) -> Expr {
 		},
 		_ => {
 			let tk = tokens.next();
-			format_err(&format!("Expected expression but found: {tk}."), tk.span, input)
+			let msg = format!("Expected expression but found: {tk}.");
+			format_err(&msg, tk.span, input);
+			panic!("{msg}");
 		},
 	}
 }
@@ -577,7 +581,11 @@ fn parse_string(input: &str, tokens: &mut Tokens) -> Literal {
 			Literal::Str(chars.as_str().to_string()) // really?
 		},
 		// TODO: if lexer is working properly, this should be unreachable
-		_ => format_err(&format!("Malformed string: `{}`.", chars.as_str()), tk.span, input),
+		_ => {
+			let msg = format!("Malformed string: `{}`.", chars.as_str());
+			format_err(&msg, tk.span, input);
+			panic!("{msg}");
+		},
 	}
 }
 
@@ -586,7 +594,11 @@ fn parse_number(input: &str, tokens: &mut Tokens) -> Literal {
 	let s = tk.span.as_string(input);
 	match s.parse() {
 		Ok(num) => Literal::Number(num),
-		_ => format_err(&format!("Malformed number: `{s}`."), tk.span, input),
+		_ => {
+			let msg = format!("Malformed number: `{s}`.");
+			format_err(&msg, tk.span, input);
+			panic!("{msg}");
+		},
 	}
 }
 

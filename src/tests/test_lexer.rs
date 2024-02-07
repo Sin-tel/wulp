@@ -156,7 +156,7 @@ fn string_fail() {
 #[should_panic(expected = "Failed to close string.")]
 fn string_fail2() {
 	let p = r#""hello
-	\""#;
+	""#;
 	let _: Vec<_> = Lexer::new(p).collect();
 }
 
