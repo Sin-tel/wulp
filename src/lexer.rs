@@ -6,7 +6,7 @@ use std::iter::zip;
 #[derive(Debug)]
 pub struct Lexer<'a> {
 	lexer: LexIter<'a>,
-	peeked: Option<Option<Token>>,
+	peeked: Option<Token>,
 }
 
 // This is mostly copypasta from peekable in std
@@ -18,18 +18,28 @@ impl<'a> Lexer<'a> {
 		}
 	}
 	pub fn next(&mut self) -> Token {
-		let token = match self.peeked.take() {
+		match self.peeked.take() {
 			Some(v) => v,
-			None => self.lexer.next(),
-		};
-		self.filter(token)
+			None => self.filter_next(),
+		}
 	}
 	pub fn peek(&mut self) -> Token {
-		let token = *self.peeked.get_or_insert_with(|| self.lexer.next());
-		self.filter(token)
+		match self.peeked {
+			Some(token) => token,
+			None => {
+				let token = self.filter_next();
+				self.peeked = Some(token);
+				token
+			},
+		}
 	}
-	fn filter(&mut self, token: Option<Token>) -> Token {
-		match token {
+	fn filter_next(&mut self) -> Token {
+		// consume token, filter out comment, add end of file
+		match self.lexer.next() {
+			Some(Token {
+				kind: TokenKind::Comment,
+				..
+			}) => self.filter_next(),
 			Some(tk) => tk,
 			None => Token {
 				kind: TokenKind::Eof,
@@ -288,12 +298,7 @@ impl Iterator for LexIter<'_> {
 				},
 				'.' if self.peek_is_number() => Some(self.number()),
 				'0'..='9' => Some(self.number()),
-				'/' if next == Some('/') => {
-					// skip!
-					// Some(self.single_line_comment())
-					self.single_line_comment();
-					self.next()
-				},
+				'/' if next == Some('/') => Some(self.single_line_comment()),
 				'-' => {
 					if self.peek_is_number() {
 						return Some(self.number());
