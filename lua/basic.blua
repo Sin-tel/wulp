@@ -1,5 +1,6 @@
 // factorial function
 fn fact(n) {
+// fact = fn(n) {
 	assert(n >= 0);
 	if n != 0 { 
 		return n * fact(n - 1)

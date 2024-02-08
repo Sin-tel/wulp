@@ -1,0 +1,14 @@
+f = fn() {}
+x = fn() {}
+y = fn() {}
+
+// ambiguous
+f()
+(x or y)()
+
+// ok
+// f();
+// (x or y)()
+
+// ok
+// f()(x or y)()
