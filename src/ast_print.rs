@@ -72,12 +72,12 @@ impl Visitor for AstPrinter {
 	}
 
 	fn visit_bin_expr(&mut self, node: &mut BinExpr) {
-		add_branch!("`{}` (binop)", node.op);
+		add_branch!("`{:?}` (binop)", node.op);
 		node.walk(self);
 	}
 
 	fn visit_un_expr(&mut self, node: &mut UnExpr) {
-		add_branch!("`{}` (unop)", node.op);
+		add_branch!("`{:?}` (unop)", node.op);
 		node.walk(self);
 	}
 

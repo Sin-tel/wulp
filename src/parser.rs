@@ -30,7 +30,6 @@ pub fn parse_block(input: &str, tokens: &mut Lexer) -> Block {
 	block
 }
 
-/// block -> {stat}
 pub fn parse_block_inner(input: &str, tokens: &mut Lexer) -> Block {
 	let mut stats = vec![];
 	loop {
@@ -38,8 +37,8 @@ pub fn parse_block_inner(input: &str, tokens: &mut Lexer) -> Block {
 			TokenKind::RCurly | TokenKind::Eof => break,
 			TokenKind::Return | TokenKind::Break => {
 				// These have to be the last statements in a block
-				stats.push(parse_statement(input, tokens));
 				// TODO: peek here to check it is the last statement, and produce error
+				stats.push(parse_statement(input, tokens));
 				return Block { stats };
 			},
 			_ => stats.push(parse_statement(input, tokens)),
@@ -90,8 +89,6 @@ pub fn parse_statement_inner(input: &str, tokens: &mut Lexer) -> Stat {
 	}
 }
 
-/// assignment -> vars `=` expr_list
-/// vars -> suffix_expr {`,` suffix_expr}
 pub fn parse_assignment(first: Expr, input: &str, tokens: &mut Lexer) -> Assignment {
 	let mut vars = vec![first];
 
@@ -115,7 +112,6 @@ pub fn parse_assignment(first: Expr, input: &str, tokens: &mut Lexer) -> Assignm
 	}
 }
 
-/// function fn_name fn_body
 pub fn parse_fn_def(input: &str, tokens: &mut Lexer) -> FnDef {
 	assert_next(input, tokens, TokenKind::Fn);
 
@@ -129,7 +125,6 @@ pub fn parse_fn_def(input: &str, tokens: &mut Lexer) -> FnDef {
 	}
 }
 
-/// fn_name -> Name {`.` Name} [`:` Name]
 pub fn parse_fn_name(input: &str, tokens: &mut Lexer) -> Vec<Name> {
 	let mut path = vec![parse_name(input, tokens)];
 	// if next token is period then loop
@@ -141,7 +136,6 @@ pub fn parse_fn_name(input: &str, tokens: &mut Lexer) -> Vec<Name> {
 	path
 }
 
-/// fn_body -> `(` [parlist] `)` block end
 pub fn parse_fn_body(input: &str, tokens: &mut Lexer) -> FnBody {
 	assert_next(input, tokens, TokenKind::LParen);
 	let params = parse_parlist(input, tokens);
@@ -152,7 +146,6 @@ pub fn parse_fn_body(input: &str, tokens: &mut Lexer) -> FnBody {
 	FnBody { params, body }
 }
 
-/// for names in expr_list do block end
 pub fn parse_for_block(input: &str, tokens: &mut Lexer) -> ForBlock {
 	assert_next(input, tokens, TokenKind::For);
 
@@ -166,7 +159,6 @@ pub fn parse_for_block(input: &str, tokens: &mut Lexer) -> ForBlock {
 	ForBlock { names, exprs, block }
 }
 
-/// if expr then block {elseif expr then block} [else block] end
 pub fn parse_if_block(input: &str, tokens: &mut Lexer) -> IfBlock {
 	assert_next(input, tokens, TokenKind::If);
 
@@ -190,7 +182,6 @@ pub fn parse_if_block(input: &str, tokens: &mut Lexer) -> IfBlock {
 	}
 }
 
-/// elseif expr then block
 pub fn parse_elseif(input: &str, tokens: &mut Lexer) -> ElseIf {
 	assert_next(input, tokens, TokenKind::ElseIf);
 	let expr = parse_expr(input, tokens);
@@ -199,7 +190,6 @@ pub fn parse_elseif(input: &str, tokens: &mut Lexer) -> ElseIf {
 	ElseIf { expr, block }
 }
 
-/// else block
 pub fn parse_else_block(input: &str, tokens: &mut Lexer) -> Option<Block> {
 	if tokens.peek().kind == (TokenKind::Else) {
 		tokens.next();
@@ -209,7 +199,6 @@ pub fn parse_else_block(input: &str, tokens: &mut Lexer) -> Option<Block> {
 	}
 }
 
-/// while expr do block end
 pub fn parse_while_block(input: &str, tokens: &mut Lexer) -> WhileBlock {
 	assert_next(input, tokens, TokenKind::While);
 
@@ -234,8 +223,6 @@ pub fn parse_expr(input: &str, tokens: &mut Lexer) -> Expr {
 	parse_sub_expr(input, tokens, 0)
 }
 
-// subexpr -> (simpleexpr | unop subexpr ) { binop subexpr }
-// see: https://github.com/lua/lua/blob/2c32bff60987d38a60a58d4f0123f3783da60a63/lparser.c#L1120-L1156
 // TODO: left / right priority
 pub fn parse_sub_expr(input: &str, tokens: &mut Lexer, min_priority: i32) -> Expr {
 	let mut expression = match parse_unexp(input, tokens) {
@@ -301,10 +288,6 @@ pub fn parse_unexp(input: &str, tokens: &mut Lexer) -> Option<Expr> {
 	}
 }
 
-/// suffix_expr -> prefix { suffix }
-/// prefix -> primary_expr | fn_call
-/// suffix -> `.` Name
-///         | `[` expr `]`
 pub fn parse_suffix_expr(input: &str, tokens: &mut Lexer) -> Expr {
 	let mut primary = parse_primary_expr(input, tokens);
 
@@ -351,7 +334,6 @@ fn new_suffix_expr(expr: Expr, suffix: Vec<Suffix>) -> Expr {
 	})
 }
 
-/// primary_expr -> Name | '(' expr ')'
 pub fn parse_primary_expr(input: &str, tokens: &mut Lexer) -> Expr {
 	match tokens.peek().kind {
 		TokenKind::Name => Expr::Name(parse_name(input, tokens)),
@@ -372,9 +354,6 @@ pub fn parse_primary_expr(input: &str, tokens: &mut Lexer) -> Expr {
 
 /// Constructors
 
-/// tableconstructor -> `{` [fieldlist] `}`
-/// fieldlist -> field {fieldsep field} [fieldsep]
-/// fieldsep -> `,` | `;`
 pub fn parse_table_constructor(input: &str, tokens: &mut Lexer) -> Vec<Field> {
 	assert_next(input, tokens, TokenKind::LCurly);
 	if tokens.peek().kind == TokenKind::RCurly {
@@ -400,7 +379,6 @@ pub fn parse_table_constructor(input: &str, tokens: &mut Lexer) -> Vec<Field> {
 	fields
 }
 
-/// field -> `[` expr `]` `=` expr | Name `=` expr | exp
 pub fn parse_field(input: &str, tokens: &mut Lexer) -> Field {
 	match tokens.peek().kind {
 		// Name '=' expr
@@ -416,7 +394,6 @@ pub fn parse_field(input: &str, tokens: &mut Lexer) -> Field {
 	}
 }
 
-/// args ->  `(` [expr_list] `)`
 pub fn parse_args(input: &str, tokens: &mut Lexer) -> Vec<Expr> {
 	assert_next(input, tokens, TokenKind::LParen);
 	if tokens.peek().kind == TokenKind::RParen {
@@ -428,7 +405,6 @@ pub fn parse_args(input: &str, tokens: &mut Lexer) -> Vec<Expr> {
 	expr_list
 }
 
-/// expr_list -> expr {`,` expr}
 pub fn parse_exprs(input: &str, tokens: &mut Lexer) -> Vec<Expr> {
 	let mut exprs = vec![];
 
@@ -442,7 +418,6 @@ pub fn parse_exprs(input: &str, tokens: &mut Lexer) -> Vec<Expr> {
 	exprs
 }
 
-/// names -> Name {`,` Name}
 pub fn parse_names(input: &str, tokens: &mut Lexer) -> Vec<Name> {
 	let mut names = vec![parse_name(input, tokens)];
 
@@ -459,7 +434,6 @@ pub fn parse_names(input: &str, tokens: &mut Lexer) -> Vec<Name> {
 	names
 }
 
-/// parlist -> names [`,`]
 pub fn parse_parlist(input: &str, tokens: &mut Lexer) -> Vec<Name> {
 	match tokens.peek().kind {
 		TokenKind::Name => {

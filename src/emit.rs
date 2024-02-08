@@ -170,12 +170,12 @@ impl Visitor for EmitLua {
 	fn visit_bin_expr(&mut self, node: &mut BinExpr) {
 		self.visit_expr(&mut node.lhs);
 		self.code.push(' ');
-		self.code.push_str(&node.op.to_string());
+		self.code.push_str(emit_binop(&node.op));
 		self.code.push(' ');
 		self.visit_expr(&mut node.rhs);
 	}
 	fn visit_un_expr(&mut self, node: &mut UnExpr) {
-		self.code.push_str(&node.op.to_string());
+		self.code.push_str(emit_unop(&node.op));
 		self.visit_expr(&mut node.expr);
 	}
 	fn visit_suffix_expr(&mut self, node: &mut SuffixExpr) {
@@ -221,5 +221,33 @@ impl Visitor for EmitLua {
 
 	fn visit_name(&mut self, node: &mut Name) {
 		self.code.push_str(&self.symbol_table.names[node.id]);
+	}
+}
+
+fn emit_binop(op: &BinOp) -> &'static str {
+	match op {
+		BinOp::Pow => "^",
+		BinOp::Mul => "*",
+		BinOp::Div => "/",
+		BinOp::Mod => "%",
+		BinOp::Plus => "+",
+		BinOp::Minus => "-",
+		BinOp::Concat => "..",
+		BinOp::Lt => "<",
+		BinOp::Gt => ">",
+		BinOp::Lte => "<=",
+		BinOp::Gte => ">=",
+		BinOp::Eq => "==",
+		BinOp::Neq => "~=",
+		BinOp::And => "and",
+		BinOp::Or => "or",
+	}
+}
+
+fn emit_unop(op: &UnOp) -> &'static str {
+	match op {
+		UnOp::Minus => "-",
+		UnOp::Not => "not",
+		UnOp::Len => "#",
 	}
 }
