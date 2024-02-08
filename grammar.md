@@ -1,5 +1,5 @@
-# BNF grammar
 
+```
 file -> statlist
 block -> `{` statlist `}`
 statlist -> {stat} [laststat]
@@ -42,3 +42,4 @@ suffix -> `.` Name
 tableconstructor -> `{` [fieldlist] `}`
 fieldlist -> field {`,` field}
 field -> expr | Name `=` expr
+```
