@@ -103,7 +103,8 @@ impl Visitor for AstPrinter {
 		}
 	}
 
-	fn visit_name(&mut self, node: &mut Name) {
-		add_leaf!("{} (identifier)", node.0);
+	fn visit_name(&mut self, _node: &mut Name) {
+		// add_leaf!("{} (identifier)", node.id);
+		add_leaf!("identifier");
 	}
 }

@@ -16,6 +16,7 @@
 // #![allow(clippy::doc_markdown)]
 
 use crate::emit::EmitLua;
+use crate::scope::ScopeCheck;
 use mlua::prelude::LuaResult;
 use std::fs;
 
@@ -24,6 +25,7 @@ mod ast_print;
 mod emit;
 mod lexer;
 mod parser;
+mod scope;
 mod span;
 mod token;
 mod visitor;
@@ -36,8 +38,11 @@ fn main() {
 	let input = fs::read_to_string(filename).unwrap();
 
 	// let input = r#"
-	// var = ((x or y)().y[1])(a,b[1]);
-	// ((x or y)().y[1])(a,b[1])
+	// x = 1
+	// { y = 2; x = 2}
+	// // print(y)
+	// x = y
+	// y = 1
 	// "#;
 
 	let mut ast = parser::parse(&input);
@@ -47,17 +52,19 @@ fn main() {
 	let mut printer = ast_print::AstPrinter;
 	printer.print_ast(&mut ast);
 
-	println!("----- input:");
-	println!("{input}");
+	let symbol_table = ScopeCheck::visit(&mut ast, &input);
+
+	// println!("----- input:");
+	// println!("{input}");
 
 	println!("----- emitted code:");
-	let code = EmitLua::emit(&mut ast);
+	let code = EmitLua::emit(&mut ast, symbol_table);
 	println!("{code}");
 
 	let lua = mlua::Lua::new();
 	println!("----- execute:");
-	// let res = lua.load(code).into_function();
-	// let res = lua.load(code).eval::<String>();
+	// // let res = lua.load(code).into_function();
+	// // let res = lua.load(code).eval::<String>();
 
 	let mut chunk = lua.load(code);
 	chunk = chunk.set_name(filename);

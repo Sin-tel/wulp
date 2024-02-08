@@ -1,3 +1,4 @@
+use crate::span::Span;
 use std::fmt;
 
 /// block -> {stat} [laststat]
@@ -142,7 +143,10 @@ pub enum Field {
 
 /// Name
 #[derive(PartialEq, Debug)]
-pub struct Name(pub String);
+pub struct Name {
+	pub id: usize,
+	pub span: Span,
+}
 
 /// expr binop expr
 #[derive(Debug, PartialEq)]

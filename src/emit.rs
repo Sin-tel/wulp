@@ -1,18 +1,20 @@
 use crate::ast::*;
+use crate::scope::SymbolTable;
 use crate::visitor::*;
 
 pub struct EmitLua {
 	code: String,
 	indent_level: usize,
+	symbol_table: SymbolTable,
 }
 
 impl EmitLua {
-	pub fn emit(block: &mut Block) -> String {
+	pub fn emit(block: &mut Block, symbol_table: SymbolTable) -> String {
 		let mut this = Self {
 			code: String::new(),
 			indent_level: 0,
+			symbol_table,
 		};
-		// this.visit_block(block);
 		block.walk(&mut this);
 		this.code
 	}
@@ -72,6 +74,7 @@ impl Visitor for EmitLua {
 		// self.push_list(&mut node.names, ", ");
 
 		assert!(node.names.len() == 1);
+		// TODO: for now we only ever emit ipairs. fix up later to work with tables
 		self.code.push_str("_, ");
 		self.visit_name(&mut node.names[0]);
 
@@ -217,6 +220,6 @@ impl Visitor for EmitLua {
 	}
 
 	fn visit_name(&mut self, node: &mut Name) {
-		self.code.push_str(&node.0);
+		self.code.push_str(&self.symbol_table.names[node.id]);
 	}
 }

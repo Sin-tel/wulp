@@ -125,7 +125,7 @@ pub fn parse_fn_def(input: &str, tokens: &mut Lexer) -> FnDef {
 	FnDef {
 		name,
 		body,
-		local: false,
+		local: true, // for now, function defs are always local
 	}
 }
 
@@ -513,9 +513,9 @@ fn parse_number(input: &str, tokens: &mut Lexer) -> Literal {
 }
 
 fn parse_name(input: &str, tokens: &mut Lexer) -> Name {
-	let name = tokens.peek().span.as_string(input);
+	let span = tokens.peek().span;
 	assert_next(input, tokens, TokenKind::Name);
-	Name(name)
+	Name { id: 0, span }
 }
 
 fn assert_next(input: &str, tokens: &mut Lexer, expect: TokenKind) {
