@@ -1,0 +1,18 @@
+// this should print 4, 5
+
+f = (fn(a) {
+  t = {a}
+  return fn () {return t}
+}) (4)
+
+t = 1
+
+print(f()[1])
+f()[1] = 5
+print(f()[1])
+
+// This should fail
+
+// f = fn(s) {return {s}}
+
+// f(s)[1] = 5

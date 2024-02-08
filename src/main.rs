@@ -15,6 +15,7 @@
 // #![allow(clippy::too_many_lines)]
 // #![allow(clippy::doc_markdown)]
 
+use crate::ast_print::AstPrinter;
 use crate::emit::EmitLua;
 use crate::scope::ScopeCheck;
 use mlua::prelude::LuaResult;
@@ -34,28 +35,21 @@ mod visitor;
 mod tests;
 
 fn main() {
-	let filename = "lua/basic.blua";
+	let filename = "lua/assign_call.blua";
 	let input = fs::read_to_string(filename).unwrap();
 
 	// let input = r#"
-	// x = 1
-	// { y = 2; x = 2}
-	// // print(y)
-	// x = y
-	// y = 1
 	// "#;
 
 	let mut ast = parser::parse(&input);
 	// dbg!(&ast);
 
 	println!("----- AST:");
-	let mut printer = ast_print::AstPrinter;
-	printer.print_ast(&mut ast);
+	AstPrinter::print_ast(&mut ast, &input);
 
+	println!("----- input:");
+	println!("{input}");
 	let symbol_table = ScopeCheck::visit(&mut ast, &input);
-
-	// println!("----- input:");
-	// println!("{input}");
 
 	println!("----- emitted code:");
 	let code = EmitLua::emit(&mut ast, symbol_table);

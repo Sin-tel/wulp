@@ -1,5 +1,4 @@
 use crate::span::Span;
-use std::fmt;
 
 #[derive(Debug, PartialEq)]
 pub struct Block {
@@ -82,7 +81,7 @@ pub struct SuffixExpr {
 
 #[derive(Debug, PartialEq)]
 pub enum Suffix {
-	Property(Name),
+	Property(Property),
 	Index(Expr),
 }
 
@@ -107,7 +106,7 @@ pub struct FnBody {
 
 #[derive(Debug, PartialEq)]
 pub enum Field {
-	Assign(Name, Expr),
+	Assign(Property, Expr),
 	Expr(Expr),
 }
 
@@ -115,6 +114,11 @@ pub enum Field {
 pub struct Name {
 	pub id: usize,
 	pub span: Span,
+}
+
+#[derive(PartialEq, Debug)]
+pub struct Property {
+	pub name: String,
 }
 
 #[derive(Debug, PartialEq)]

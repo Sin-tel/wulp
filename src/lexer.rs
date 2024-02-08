@@ -292,7 +292,7 @@ impl Iterator for LexIter<'_> {
 					Some(newtoken(RBracket, start, end))
 				},
 				'A'..='Z' | 'a'..='z' | '_' => Some(self.identifier()),
-				' ' | '\t' | '\n' => {
+				' ' | '\t' | '\n' | '\r' => {
 					self.eat_char();
 					self.next()
 				},

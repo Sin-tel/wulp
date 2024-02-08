@@ -1,4 +1,3 @@
-
 ```
 file -> statlist
 block -> `{` statlist `}`
@@ -25,7 +24,7 @@ parlist -> Name {`,` Name} [`,`]
 expr_list -> expr {`,` expr}
 
 expr -> literal
-      | tableconstructor
+      | table
       | FN fn_body
       | suffix_expr
       | fn_call
@@ -36,10 +35,10 @@ primary_expr -> Name | '(' expr ')'
 literal -> nil | Bool | Numeral | String
 suffix_expr -> prefix { suffix }
 prefix -> primary_expr | fn_call
-suffix -> `.` Name
+suffix -> `.` Property
         | `[` expr `]`
 
-tableconstructor -> `{` [fieldlist] `}`
+table -> `{` [fieldlist] `}`
 fieldlist -> field {`,` field}
-field -> expr | Name `=` expr
+field -> expr | Property `=` expr
 ```

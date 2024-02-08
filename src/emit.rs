@@ -161,7 +161,7 @@ impl Visitor for EmitLua {
 			Literal::Nil => self.code.push_str("nil"),
 			Literal::Number(s) => self.code.push_str(&s.to_string()),
 			Literal::Str(s) => {
-				// TODO: this is kind of a hack lol
+				// TODO: do proper escape sequences
 				self.code.push_str(&format!("{s:?}"));
 			},
 			Literal::Bool(s) => self.code.push_str(&s.to_string()),
@@ -196,6 +196,7 @@ impl Visitor for EmitLua {
 	}
 
 	fn visit_fn_body(&mut self, node: &mut FnBody) {
+		// todo, no newline for short functions
 		self.code.push('(');
 		self.push_list(&mut node.params, ", ");
 		self.code.push_str(")\n");
@@ -209,7 +210,7 @@ impl Visitor for EmitLua {
 	fn visit_field(&mut self, node: &mut Field) {
 		match node {
 			Field::Assign(n, e) => {
-				self.visit_name(n);
+				self.visit_property(n);
 				self.code.push_str(" = ");
 				self.visit_expr(e);
 			},
@@ -221,6 +222,10 @@ impl Visitor for EmitLua {
 
 	fn visit_name(&mut self, node: &mut Name) {
 		self.code.push_str(&self.symbol_table.names[node.id]);
+	}
+
+	fn visit_property(&mut self, node: &mut Property) {
+		self.code.push_str(&node.name);
 	}
 }
 

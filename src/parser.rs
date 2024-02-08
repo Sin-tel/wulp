@@ -1,7 +1,7 @@
 use crate::ast::*;
 use crate::lexer::Lexer;
 use crate::span::format_err;
-use crate::token::TokenKind;
+use crate::token::{Token, TokenKind};
 
 pub fn parse(input: &str) -> Block {
 	let mut tokens = Lexer::new(input);
@@ -97,13 +97,18 @@ pub fn parse_assignment(first: Expr, input: &str, tokens: &mut Lexer) -> Assignm
 		vars.push(parse_suffix_expr(input, tokens));
 	}
 
+	// lhs vars can not be a Call, since those arent lvalues.
+	// TODO: currently points to `=`, put span in expr and point to the offender
+	for v in &vars {
+		if let Expr::Call(_) = v {
+			let msg = format!("Can not assign to a function call.");
+			format_err(&msg, tokens.peek().span, input);
+			panic!("{}", msg);
+		}
+	}
 	assert_next(input, tokens, TokenKind::Assign);
 
 	let exprs = parse_exprs(input, tokens);
-
-	// TODO: none of the lhs vars can be a Call, since those arent lvalues.
-	// We can check for this here,
-	// but maybe it makes more sense in a later stage if you have to check it anyway.
 
 	Assignment {
 		vars,
@@ -297,15 +302,12 @@ pub fn parse_suffix_expr(input: &str, tokens: &mut Lexer) -> Expr {
 		match tokens.peek().kind {
 			TokenKind::Period => {
 				tokens.next();
-				let name = parse_name(input, tokens);
-
-				suffix.push(Suffix::Property(name));
+				suffix.push(Suffix::Property(parse_property(input, tokens)));
 			},
 			TokenKind::LBracket => {
 				tokens.next();
 				let expr = parse_expr(input, tokens);
 				assert_next(input, tokens, TokenKind::RBracket);
-
 				suffix.push(Suffix::Index(expr));
 			},
 			TokenKind::LParen => {
@@ -383,11 +385,22 @@ pub fn parse_field(input: &str, tokens: &mut Lexer) -> Field {
 	match tokens.peek().kind {
 		// Name '=' expr
 		TokenKind::Name => {
-			let name = parse_name(input, tokens);
-			assert_next(input, tokens, TokenKind::Assign);
+			// TODO: this is a bit ugly
+			let name_tk = tokens.next();
 
-			let expr = parse_expr(input, tokens);
-			Field::Assign(name, expr)
+			match tokens.peek().kind {
+				TokenKind::Assign => {
+					tokens.next();
+					let expr = parse_expr(input, tokens);
+					Field::Assign(
+						Property {
+							name: name_tk.span.as_string(input),
+						},
+						expr,
+					)
+				},
+				_ => Field::Expr(Expr::Name(new_name(name_tk))),
+			}
 		},
 		// expr
 		_ => Field::Expr(parse_expr(input, tokens)),
@@ -487,9 +500,22 @@ fn parse_number(input: &str, tokens: &mut Lexer) -> Literal {
 }
 
 fn parse_name(input: &str, tokens: &mut Lexer) -> Name {
-	let span = tokens.peek().span;
+	let name = new_name(tokens.peek());
 	assert_next(input, tokens, TokenKind::Name);
-	Name { id: 0, span }
+	name
+}
+
+fn new_name(token: Token) -> Name {
+	Name {
+		id: 0,
+		span: token.span,
+	}
+}
+
+fn parse_property(input: &str, tokens: &mut Lexer) -> Property {
+	let name = tokens.peek().span.as_string(input);
+	assert_next(input, tokens, TokenKind::Name);
+	Property { name }
 }
 
 fn assert_next(input: &str, tokens: &mut Lexer, expect: TokenKind) {

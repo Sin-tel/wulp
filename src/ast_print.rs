@@ -2,17 +2,20 @@ use crate::ast::*;
 use crate::visitor::*;
 use debug_tree::*;
 
-pub struct AstPrinter;
+pub struct AstPrinter<'a> {
+	input: &'a str,
+}
 
-impl AstPrinter {
-	pub fn print_ast(&mut self, block: &mut Block) {
+impl<'a> AstPrinter<'a> {
+	pub fn print_ast(block: &mut Block, input: &'a str) {
+		let mut printer = Self { input };
 		defer_print!();
 		add_branch!("ast");
-		block.walk(self);
+		block.walk(&mut printer);
 	}
 }
 
-impl Visitor for AstPrinter {
+impl Visitor for AstPrinter<'_> {
 	fn visit_block(&mut self, node: &mut Block) {
 		add_branch!("block");
 		node.walk(self);
@@ -96,15 +99,17 @@ impl Visitor for AstPrinter {
 	}
 	fn visit_field(&mut self, node: &mut Field) {
 		if let Field::Assign(_, _) = node {
-			add_branch!("assign");
+			add_branch!("field assign");
 			node.walk(self);
 		} else {
 			node.walk(self);
 		}
 	}
 
-	fn visit_name(&mut self, _node: &mut Name) {
-		// add_leaf!("{} (identifier)", node.id);
-		add_leaf!("identifier");
+	fn visit_name(&mut self, node: &mut Name) {
+		add_leaf!("{} (identifier)", node.span.as_str(self.input));
+	}
+	fn visit_property(&mut self, node: &mut Property) {
+		add_leaf!("{} (property)", node.name);
 	}
 }

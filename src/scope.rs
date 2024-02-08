@@ -61,6 +61,46 @@ impl<'a> ScopeCheck<'a> {
 		}
 		id.copied()
 	}
+
+	fn make_lvalue(&mut self, var: &mut Expr) -> bool {
+		let mut needs_local = false;
+		match var {
+			Expr::Name(n) => {
+				let name = n.span.as_str(self.input);
+				if self.lookup(name).is_none() {
+					// define a new local
+					self.new_variable(name);
+					needs_local = true
+				}
+				var.visit(self);
+			},
+			Expr::SuffixExpr(SuffixExpr { expr, .. }) => {
+				// indexing and property
+				if self.make_lvalue(expr) {
+					// TODO get span
+					let msg = format!("Undefined variable");
+					// format_err(&msg, node.span, self.input);
+					panic!("{}", &msg);
+				}
+			},
+			Expr::Call(call) => {
+				if self.make_lvalue(&mut call.expr) {
+					// TODO get span
+					let msg = format!("Undefined variable");
+					// format_err(&msg, node.span, self.input);
+					panic!("{}", &msg);
+				}
+				for e in &mut call.args {
+					e.visit(self);
+				}
+			},
+			_ => {
+				unreachable!();
+			},
+		}
+
+		needs_local
+	}
 }
 
 impl<'a> Visitor for ScopeCheck<'a> {
@@ -73,17 +113,21 @@ impl<'a> Visitor for ScopeCheck<'a> {
 	fn visit_for_block(&mut self, node: &mut ForBlock) {
 		self.scope_stack.push(HashMap::new());
 
-		for n in &node.names {
+		for n in &mut node.names {
 			let name = n.span.as_str(self.input);
 			self.new_variable(name);
+			n.visit(self);
 		}
+		for e in &mut node.exprs {
+			e.visit(self);
+		}
+		node.block.visit(self);
 
-		// TODO: elide push in inner block
-		node.walk(self);
 		self.scope_stack.pop();
 	}
 
 	fn visit_fn_def(&mut self, node: &mut FnDef) {
+		// TODO: loop
 		assert!(node.name.len() == 1);
 		let name = node.name[0].span.as_str(self.input);
 
@@ -96,40 +140,39 @@ impl<'a> Visitor for ScopeCheck<'a> {
 
 	fn visit_fn_body(&mut self, node: &mut FnBody) {
 		self.scope_stack.push(HashMap::new());
-		for n in &node.params {
+		for n in &mut node.params {
 			let name = n.span.as_str(self.input);
 			self.new_variable(name);
+			n.visit(self);
 		}
+		node.body.visit(self);
 
-		// TODO: elide push in inner block
-		node.walk(self);
 		self.scope_stack.pop();
 	}
 
 	fn visit_assignment(&mut self, node: &mut Assignment) {
-		// TODO: loop
-		assert!(node.vars.len() == 1);
-		assert!(node.exprs.len() == 1);
-
 		// visit rhs first
-		let expr = &mut node.exprs[0];
-		expr.visit(self);
+		for e in &mut node.exprs {
+			e.visit(self);
+		}
 
 		// now check if we need to define a new variable for the rhs
-		let var = &mut node.vars[0];
-
-		if let Expr::Name(n) = var {
-			let name = n.span.as_str(self.input);
-			if self.lookup(name) == None {
-				// define a new local
-				self.new_variable(name);
-				node.local = true
-			}
-		} else {
-			// TODO: check here if proper lvalue
-			todo!();
+		for var in &mut node.vars {
+			let make_local = self.make_lvalue(var);
+			node.local |= make_local;
 		}
-		var.visit(self);
+	}
+
+	fn visit_field(&mut self, node: &mut Field) {
+		match node {
+			Field::Assign(p, e) => {
+				// rhs first
+				e.visit(self);
+				// this doesn't do anything for now
+				p.visit(self);
+			},
+			Field::Expr(e) => e.visit(self),
+		}
 	}
 
 	fn visit_name(&mut self, node: &mut Name) {
@@ -139,9 +182,10 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		match self.lookup(name) {
 			Some(id) => node.id = id,
 			None => {
-				let msg = format!("Undefined variable: `{}`.", name);
+				let msg = format!("Undefined variable: `{name}`.");
 				format_err(&msg, node.span, self.input);
-				panic!("{msg}");
+				// we can carry on
+				// panic!("{msg}");
 			},
 		}
 	}

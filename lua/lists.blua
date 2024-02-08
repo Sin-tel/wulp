@@ -1,7 +1,20 @@
-x, y, z = 1, { 2, 3, s = 4 }, 5
+x, y, z = 1, { 2, 3, s = 4 }, 5 
+
+i = {
+	j = { {
+		k = {l = fn(){ print("ok") } }, 
+		t = fn () { return { l = fn(a,b){ print("ok",a,b) }}} 
+	} }
+}
+
 i.j[1].k.l()
-x = i.j[1].k(z, y).l(1, 2)
+
+x = i.j[1].t(z, y).l(1, 2)
+
 fn f(a, c, d){
+	u, v, w = 1, 2, 3
 	return u, v, w
 }
+
 f(x, y, z)
+

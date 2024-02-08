@@ -48,6 +48,7 @@ pub trait Visitor: Sized {
 	}
 	// leaf nodes
 	fn visit_name(&mut self, _node: &mut Name) {}
+	fn visit_property(&mut self, _node: &mut Property) {}
 	fn visit_literal(&mut self, _node: &mut Literal) {}
 }
 
@@ -246,7 +247,7 @@ impl<V: Visitor> VisitNode<V> for Suffix {
 	}
 	fn walk(&mut self, v: &mut V) {
 		match self {
-			Suffix::Property(e) => v.visit_name(e),
+			Suffix::Property(e) => v.visit_property(e),
 			Suffix::Index(e) => v.visit_expr(e),
 		}
 	}
@@ -259,7 +260,7 @@ impl<V: Visitor> VisitNode<V> for Field {
 	fn walk(&mut self, v: &mut V) {
 		match self {
 			Field::Assign(n, e) => {
-				v.visit_name(n);
+				v.visit_property(n);
 				v.visit_expr(e);
 			},
 			Field::Expr(e) => v.visit_expr(e),
@@ -270,5 +271,11 @@ impl<V: Visitor> VisitNode<V> for Field {
 impl<V: Visitor> VisitNode<V> for Name {
 	fn visit(&mut self, v: &mut V) {
 		v.visit_name(self);
+	}
+}
+
+impl<V: Visitor> VisitNode<V> for Property {
+	fn visit(&mut self, v: &mut V) {
+		v.visit_property(self);
 	}
 }
