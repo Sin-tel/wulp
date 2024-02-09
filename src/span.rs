@@ -1,3 +1,5 @@
+use std::cmp;
+
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct Span {
 	pub start: usize,
@@ -10,6 +12,12 @@ impl Span {
 	}
 	pub fn at(c: usize) -> Self {
 		Self { start: c, end: c + 1 }
+	}
+	pub fn join(s1: Self, s2: Self) -> Self {
+		Self {
+			start: cmp::min(s1.start, s2.start),
+			end: cmp::max(s1.end, s2.end),
+		}
 	}
 
 	pub fn line_col(&self, input: &str) -> (usize, usize, usize, usize) {

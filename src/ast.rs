@@ -53,7 +53,13 @@ pub struct Assignment {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Expr {
+pub struct Expr {
+	pub span: Span,
+	pub kind: ExprKind,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ExprKind {
 	Name(Name),
 	Literal(Literal),
 	BinExpr(BinExpr),
@@ -112,12 +118,13 @@ pub enum Field {
 
 #[derive(PartialEq, Debug)]
 pub struct Name {
-	pub id: usize,
 	pub span: Span,
+	pub id: usize,
 }
 
 #[derive(PartialEq, Debug)]
 pub struct Property {
+	pub span: Span,
 	pub name: String,
 }
 

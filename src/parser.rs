@@ -1,6 +1,7 @@
 use crate::ast::*;
 use crate::lexer::Lexer;
 use crate::span::format_err;
+use crate::span::Span;
 use crate::token::{Token, TokenKind};
 
 pub fn parse(input: &str) -> Block {
@@ -76,7 +77,11 @@ pub fn parse_statement_inner(input: &str, tokens: &mut Lexer) -> Stat {
 			match tokens.peek().kind {
 				TokenKind::Assign | TokenKind::Comma => Stat::Assignment(parse_assignment(suffix_expr, input, tokens)),
 				_ => {
-					if let Expr::Call(e) = suffix_expr {
+					if let Expr {
+						span: _,
+						kind: ExprKind::Call(e),
+					} = suffix_expr
+					{
 						return Stat::Call(e);
 					}
 					let tk = tokens.next();
@@ -98,11 +103,10 @@ pub fn parse_assignment(first: Expr, input: &str, tokens: &mut Lexer) -> Assignm
 	}
 
 	// lhs vars can not be a Call, since those arent lvalues.
-	// TODO: currently points to `=`, put span in expr and point to the offender
 	for v in &vars {
-		if let Expr::Call(_) = v {
+		if let ExprKind::Call(_) = v.kind {
 			let msg = format!("Can not assign to a function call.");
-			format_err(&msg, tokens.peek().span, input);
+			format_err(&msg, v.span, input);
 			panic!("{}", msg);
 		}
 	}
@@ -242,13 +246,17 @@ pub fn parse_sub_expr(input: &str, tokens: &mut Lexer, min_priority: i32) -> Exp
 		}
 		tokens.next();
 
+		let lhs = expression;
 		let rhs = parse_sub_expr(input, tokens, priority);
 
-		expression = Expr::BinExpr(BinExpr {
-			op,
-			lhs: Box::new(expression),
-			rhs: Box::new(rhs),
-		});
+		expression = Expr {
+			span: Span::join(lhs.span, rhs.span),
+			kind: ExprKind::BinExpr(BinExpr {
+				op,
+				lhs: Box::new(lhs),
+				rhs: Box::new(rhs),
+			}),
+		};
 	}
 
 	expression
@@ -257,37 +265,53 @@ pub fn parse_sub_expr(input: &str, tokens: &mut Lexer, min_priority: i32) -> Exp
 pub fn parse_simple_expr(input: &str, tokens: &mut Lexer) -> Expr {
 	match tokens.peek().kind {
 		TokenKind::Nil => {
-			tokens.next();
-			Expr::Literal(Literal::Nil)
+			let span = tokens.next().span;
+			Expr {
+				span,
+				kind: ExprKind::Literal(Literal::Nil),
+			}
 		},
 		TokenKind::True => {
-			tokens.next();
-			Expr::Literal(Literal::Bool(true))
+			let span = tokens.next().span;
+			Expr {
+				span,
+				kind: ExprKind::Literal(Literal::Bool(true)),
+			}
 		},
 		TokenKind::False => {
-			tokens.next();
-			Expr::Literal(Literal::Bool(false))
+			let span = tokens.next().span;
+			Expr {
+				span,
+				kind: ExprKind::Literal(Literal::Bool(false)),
+			}
 		},
 		TokenKind::Fn => {
-			tokens.next();
-			Expr::Lambda(parse_fn_body(input, tokens))
+			let span = tokens.next().span;
+			Expr {
+				span,
+				kind: ExprKind::Lambda(parse_fn_body(input, tokens)),
+			}
 		},
-		TokenKind::Str => Expr::Literal(parse_string(input, tokens)),
-		TokenKind::Number => Expr::Literal(parse_number(input, tokens)),
-		TokenKind::LCurly => Expr::Table(parse_table_constructor(input, tokens)),
+		TokenKind::Str => parse_string(input, tokens),
+		TokenKind::Number => parse_number(input, tokens),
+		TokenKind::LCurly => parse_table_constructor(input, tokens),
 		_ => parse_suffix_expr(input, tokens),
 	}
 }
 
 pub fn parse_unexp(input: &str, tokens: &mut Lexer) -> Option<Expr> {
-	match tokens.peek().as_un_op() {
+	let tk = tokens.peek();
+	match tk.as_un_op() {
 		Some(op) => {
 			tokens.next();
 			let expr = parse_sub_expr(input, tokens, op.priority());
-			Some(Expr::UnExpr(UnExpr {
-				op,
-				expr: Box::new(expr),
-			}))
+			Some(Expr {
+				span: Span::join(tk.span, expr.span),
+				kind: ExprKind::UnExpr(UnExpr {
+					op,
+					expr: Box::new(expr),
+				}),
+			})
 		},
 		None => None,
 	}
@@ -312,12 +336,20 @@ pub fn parse_suffix_expr(input: &str, tokens: &mut Lexer) -> Expr {
 			},
 			TokenKind::LParen => {
 				// Build ast node and continue
+				assert_next(input, tokens, TokenKind::LParen);
 				let args = parse_args(input, tokens);
+				let end = assert_next(input, tokens, TokenKind::RParen).span;
 				let old_suffix = std::mem::take(&mut suffix);
-				primary = Expr::Call(Call {
-					expr: Box::new(new_suffix_expr(primary, old_suffix)),
-					args,
-				});
+
+				let expr = new_suffix_expr(primary, old_suffix);
+
+				primary = Expr {
+					span: Span::join(expr.span, end),
+					kind: ExprKind::Call(Call {
+						expr: Box::new(expr),
+						args,
+					}),
+				};
 			},
 			_ => break,
 		}
@@ -327,22 +359,42 @@ pub fn parse_suffix_expr(input: &str, tokens: &mut Lexer) -> Expr {
 
 // if suffix is empty just emit a single expr
 fn new_suffix_expr(expr: Expr, suffix: Vec<Suffix>) -> Expr {
-	if suffix.is_empty() {
-		return expr;
+	match suffix.last() {
+		None => expr,
+		Some(s) => {
+			let end = match s {
+				Suffix::Property(p) => p.span.end,
+				// add one to compensate for the ending `]`
+				Suffix::Index(e) => e.span.end + 1,
+			};
+			Expr {
+				span: Span::new(expr.span.start, end),
+				kind: ExprKind::SuffixExpr(SuffixExpr {
+					expr: Box::new(expr),
+					suffix,
+				}),
+			}
+		},
 	}
-	Expr::SuffixExpr(SuffixExpr {
-		expr: Box::new(expr),
-		suffix,
-	})
 }
 
 pub fn parse_primary_expr(input: &str, tokens: &mut Lexer) -> Expr {
 	match tokens.peek().kind {
-		TokenKind::Name => Expr::Name(parse_name(input, tokens)),
+		TokenKind::Name => {
+			let name = parse_name(input, tokens);
+			Expr {
+				span: name.span,
+				kind: ExprKind::Name(name),
+			}
+		},
 		TokenKind::LParen => {
-			assert_next(input, tokens, TokenKind::LParen);
-			let expr = Expr::Expr(Box::new(parse_expr(input, tokens)));
-			assert_next(input, tokens, TokenKind::RParen);
+			let start = assert_next(input, tokens, TokenKind::LParen).span;
+			let inner = parse_expr(input, tokens);
+			let end = assert_next(input, tokens, TokenKind::RParen).span;
+			let expr = Expr {
+				span: Span::join(start, end),
+				kind: ExprKind::Expr(Box::new(inner)),
+			};
 			expr
 		},
 		_ => {
@@ -356,10 +408,18 @@ pub fn parse_primary_expr(input: &str, tokens: &mut Lexer) -> Expr {
 
 /// Constructors
 
-pub fn parse_table_constructor(input: &str, tokens: &mut Lexer) -> Vec<Field> {
-	assert_next(input, tokens, TokenKind::LCurly);
+pub fn parse_table_constructor(input: &str, tokens: &mut Lexer) -> Expr {
+	let start = assert_next(input, tokens, TokenKind::LCurly).span;
+	let fields = parse_fields(input, tokens);
+	let end = assert_next(input, tokens, TokenKind::RCurly).span;
+	Expr {
+		span: Span::join(start, end),
+		kind: ExprKind::Table(fields),
+	}
+}
+
+pub fn parse_fields(input: &str, tokens: &mut Lexer) -> Vec<Field> {
 	if tokens.peek().kind == TokenKind::RCurly {
-		tokens.next();
 		return vec![];
 	};
 
@@ -377,7 +437,6 @@ pub fn parse_table_constructor(input: &str, tokens: &mut Lexer) -> Vec<Field> {
 		}
 	}
 
-	assert_next(input, tokens, TokenKind::RCurly);
 	fields
 }
 
@@ -386,7 +445,7 @@ pub fn parse_field(input: &str, tokens: &mut Lexer) -> Field {
 		// Name '=' expr
 		TokenKind::Name => {
 			// TODO: this is a bit ugly
-			let name_tk = tokens.next();
+			let span = tokens.next().span;
 
 			match tokens.peek().kind {
 				TokenKind::Assign => {
@@ -394,12 +453,19 @@ pub fn parse_field(input: &str, tokens: &mut Lexer) -> Field {
 					let expr = parse_expr(input, tokens);
 					Field::Assign(
 						Property {
-							name: name_tk.span.as_string(input),
+							span,
+							name: span.as_string(input),
 						},
 						expr,
 					)
 				},
-				_ => Field::Expr(Expr::Name(new_name(name_tk))),
+				_ => {
+					let name = new_name(span);
+					Field::Expr(Expr {
+						span,
+						kind: ExprKind::Name(name),
+					})
+				},
 			}
 		},
 		// expr
@@ -408,13 +474,10 @@ pub fn parse_field(input: &str, tokens: &mut Lexer) -> Field {
 }
 
 pub fn parse_args(input: &str, tokens: &mut Lexer) -> Vec<Expr> {
-	assert_next(input, tokens, TokenKind::LParen);
 	if tokens.peek().kind == TokenKind::RParen {
-		tokens.next();
 		return vec![];
 	}
 	let expr_list = parse_exprs(input, tokens);
-	assert_next(input, tokens, TokenKind::RParen);
 	expr_list
 }
 
@@ -463,66 +526,73 @@ pub fn parse_parlist(input: &str, tokens: &mut Lexer) -> Vec<Name> {
 // Simple terminals
 
 // TODO: multi line string currently broken
-fn parse_string(input: &str, tokens: &mut Lexer) -> Literal {
-	let tk = tokens.next();
-	let mut chars = tk.span.as_str(input).chars();
-	match chars.next() {
+fn parse_string(input: &str, tokens: &mut Lexer) -> Expr {
+	let span = tokens.next().span;
+	let mut chars = span.as_str(input).chars();
+	let lit = match chars.next() {
 		Some('\'' | '\"') => {
 			chars.next_back();
-			Literal::Str(chars.as_str().to_string()) // really?
+			Literal::Str(chars.as_str().to_string())
 		},
 		Some('[') => {
 			chars.next();
 			chars.next_back();
 			chars.next_back();
-			Literal::Str(chars.as_str().to_string()) // really?
+			Literal::Str(chars.as_str().to_string())
 		},
 		// TODO: if lexer is working properly, this should be unreachable
 		_ => {
 			let msg = format!("Malformed string: `{}`.", chars.as_str());
-			format_err(&msg, tk.span, input);
+			format_err(&msg, span, input);
 			panic!("{msg}");
 		},
+	};
+
+	Expr {
+		span,
+		kind: ExprKind::Literal(lit),
 	}
 }
 
-fn parse_number(input: &str, tokens: &mut Lexer) -> Literal {
-	let tk = tokens.next();
-	let s = tk.span.as_string(input);
+fn parse_number(input: &str, tokens: &mut Lexer) -> Expr {
+	let span = tokens.next().span;
+	let s = span.as_string(input);
 	match s.parse() {
-		Ok(num) => Literal::Number(num),
+		Ok(num) => Expr {
+			span,
+			kind: ExprKind::Literal(Literal::Number(num)),
+		},
 		_ => {
 			let msg = format!("Malformed number: `{s}`.");
-			format_err(&msg, tk.span, input);
+			format_err(&msg, span, input);
 			panic!("{msg}");
 		},
 	}
 }
 
 fn parse_name(input: &str, tokens: &mut Lexer) -> Name {
-	let name = new_name(tokens.peek());
+	let name = new_name(tokens.peek().span);
 	assert_next(input, tokens, TokenKind::Name);
 	name
 }
 
-fn new_name(token: Token) -> Name {
-	Name {
-		id: 0,
-		span: token.span,
-	}
+fn new_name(span: Span) -> Name {
+	Name { id: 0, span }
 }
 
 fn parse_property(input: &str, tokens: &mut Lexer) -> Property {
-	let name = tokens.peek().span.as_string(input);
+	let span = tokens.peek().span;
+	let name = span.as_string(input);
 	assert_next(input, tokens, TokenKind::Name);
-	Property { name }
+	Property { span, name }
 }
 
-fn assert_next(input: &str, tokens: &mut Lexer, expect: TokenKind) {
+fn assert_next(input: &str, tokens: &mut Lexer, expect: TokenKind) -> Token {
 	let tk = tokens.next();
 	if tk.kind != expect {
 		let msg = format!("Expected {} but found {}.", expect, tk.kind);
 		format_err(&msg, tk.span, input);
 		panic!("{msg}");
 	}
+	tk
 }

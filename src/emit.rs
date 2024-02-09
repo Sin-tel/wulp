@@ -138,17 +138,17 @@ impl Visitor for EmitLua {
 		self.code.push('\n');
 	}
 	fn visit_expr(&mut self, node: &mut Expr) {
-		match node {
-			Expr::Lambda(_) => {
+		match &mut node.kind {
+			ExprKind::Lambda(_) => {
 				self.code.push_str("function");
 				node.walk(self);
 			},
-			Expr::Expr(_) => {
+			ExprKind::Expr(_) => {
 				self.code.push('(');
 				node.walk(self);
 				self.code.push(')');
 			},
-			Expr::Table(t) => {
+			ExprKind::Table(t) => {
 				self.code.push('{');
 				self.push_list(t, ", ");
 				self.code.push('}');

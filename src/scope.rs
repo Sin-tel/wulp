@@ -64,8 +64,8 @@ impl<'a> ScopeCheck<'a> {
 
 	fn make_lvalue(&mut self, var: &mut Expr) -> bool {
 		let mut needs_local = false;
-		match var {
-			Expr::Name(n) => {
+		match &mut var.kind {
+			ExprKind::Name(n) => {
 				let name = n.span.as_str(self.input);
 				if self.lookup(name).is_none() {
 					// define a new local
@@ -74,20 +74,18 @@ impl<'a> ScopeCheck<'a> {
 				}
 				var.visit(self);
 			},
-			Expr::SuffixExpr(SuffixExpr { expr, .. }) => {
+			ExprKind::SuffixExpr(SuffixExpr { expr, .. }) => {
 				// indexing and property
 				if self.make_lvalue(expr) {
-					// TODO get span
 					let msg = format!("Undefined variable");
-					// format_err(&msg, node.span, self.input);
+					format_err(&msg, expr.span, self.input);
 					panic!("{}", &msg);
 				}
 			},
-			Expr::Call(call) => {
+			ExprKind::Call(call) => {
 				if self.make_lvalue(&mut call.expr) {
-					// TODO get span
 					let msg = format!("Undefined variable");
-					// format_err(&msg, node.span, self.input);
+					format_err(&msg, call.expr.span, self.input);
 					panic!("{}", &msg);
 				}
 				for e in &mut call.args {
@@ -133,7 +131,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 
 		// TODO: check that we are not redefining a function?
 		self.new_variable(name);
-		// node is already local
+		assert!(node.local);
 
 		node.walk(self);
 	}

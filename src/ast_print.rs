@@ -53,12 +53,15 @@ impl Visitor for AstPrinter<'_> {
 		}
 	}
 	fn visit_expr(&mut self, node: &mut Expr) {
-		match node {
-			Expr::Lambda(_) => {
+		// let source = node.span.as_string(&self.input);
+		// add_branch!("{:?}", source);
+		// node.walk(self);
+		match node.kind {
+			ExprKind::Lambda(_) => {
 				add_branch!("lambda");
 				node.walk(self);
 			},
-			Expr::Table(_) => {
+			ExprKind::Table(_) => {
 				add_branch!("table");
 				node.walk(self);
 			},

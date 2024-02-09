@@ -192,16 +192,16 @@ impl<V: Visitor> VisitNode<V> for Expr {
 		v.visit_expr(self);
 	}
 	fn walk(&mut self, v: &mut V) {
-		match self {
-			Expr::Literal(e) => v.visit_literal(e),
-			Expr::Name(e) => v.visit_name(e),
-			Expr::BinExpr(e) => v.visit_bin_expr(e),
-			Expr::UnExpr(e) => v.visit_un_expr(e),
-			Expr::Lambda(e) => v.visit_fn_body(e),
-			Expr::SuffixExpr(e) => v.visit_suffix_expr(e),
-			Expr::Expr(e) => v.visit_expr(e),
-			Expr::Call(e) => v.visit_fn_call(e),
-			Expr::Table(t) => {
+		match &mut self.kind {
+			ExprKind::Literal(e) => v.visit_literal(e),
+			ExprKind::Name(e) => v.visit_name(e),
+			ExprKind::BinExpr(e) => v.visit_bin_expr(e),
+			ExprKind::UnExpr(e) => v.visit_un_expr(e),
+			ExprKind::Lambda(e) => v.visit_fn_body(e),
+			ExprKind::SuffixExpr(e) => v.visit_suffix_expr(e),
+			ExprKind::Expr(e) => v.visit_expr(e),
+			ExprKind::Call(e) => v.visit_fn_call(e),
+			ExprKind::Table(t) => {
 				for e in t {
 					v.visit_field(e);
 				}
