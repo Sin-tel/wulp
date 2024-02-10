@@ -70,23 +70,23 @@ impl<'a> ScopeCheck<'a> {
 				if self.lookup(name).is_none() {
 					// define a new local
 					self.new_variable(name);
-					needs_local = true
+					needs_local = true;
 				}
 				var.visit(self);
 			},
 			ExprKind::SuffixExpr(SuffixExpr { expr, .. }) => {
 				// indexing and property
 				if self.make_lvalue(expr) {
-					let msg = format!("Undefined variable");
-					format_err(&msg, expr.span, self.input);
-					panic!("{}", &msg);
+					let msg = "Undefined variable";
+					format_err(msg, expr.span, self.input);
+					panic!("{}", msg);
 				}
 			},
 			ExprKind::Call(call) => {
 				if self.make_lvalue(&mut call.expr) {
-					let msg = format!("Undefined variable");
-					format_err(&msg, call.expr.span, self.input);
-					panic!("{}", &msg);
+					let msg = "Undefined variable";
+					format_err(msg, call.expr.span, self.input);
+					panic!("{}", msg);
 				}
 				for e in &mut call.args {
 					e.visit(self);

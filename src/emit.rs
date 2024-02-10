@@ -108,7 +108,7 @@ impl Visitor for EmitLua {
 		self.visit_name(&mut node.name);
 		for p in &mut node.path {
 			self.code.push('.');
-			self.visit_property(p)
+			self.visit_property(p);
 		}
 		self.visit_fn_body(&mut node.body);
 	}

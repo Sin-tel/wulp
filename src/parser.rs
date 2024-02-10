@@ -105,8 +105,8 @@ pub fn parse_assignment(first: Expr, input: &str, tokens: &mut Lexer) -> Assignm
 	// lhs vars can not be a Call, since those arent lvalues.
 	for v in &vars {
 		if let ExprKind::Call(_) = v.kind {
-			let msg = format!("Can not assign to a function call.");
-			format_err(&msg, v.span, input);
+			let msg = "Can not assign to a function call.";
+			format_err(msg, v.span, input);
 			panic!("{}", msg);
 		}
 	}
@@ -392,11 +392,10 @@ pub fn parse_primary_expr(input: &str, tokens: &mut Lexer) -> Expr {
 			let start = assert_next(input, tokens, TokenKind::LParen).span;
 			let inner = parse_expr(input, tokens);
 			let end = assert_next(input, tokens, TokenKind::RParen).span;
-			let expr = Expr {
+			Expr {
 				span: Span::join(start, end),
 				kind: ExprKind::Expr(Box::new(inner)),
-			};
-			expr
+			}
 		},
 		_ => {
 			let tk = tokens.next();
@@ -490,8 +489,7 @@ pub fn parse_args(input: &str, tokens: &mut Lexer) -> Vec<Expr> {
 	if tokens.peek().kind == TokenKind::RParen {
 		return Vec::new();
 	}
-	let expr_list = parse_exprs(input, tokens);
-	expr_list
+	parse_exprs(input, tokens)
 }
 
 pub fn parse_exprs(input: &str, tokens: &mut Lexer) -> Vec<Expr> {
