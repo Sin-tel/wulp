@@ -1,6 +1,6 @@
 ```
 file -> statlist
-block -> `{` statlist `}`
+block -> `{` statlist `}` | stat | laststat
 statlist -> {stat} [laststat]
 
 stat -> assignment

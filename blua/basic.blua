@@ -1,26 +1,21 @@
 // factorial function
 fn fact(n) {
-// fact = fn(n) {
-	assert(n >= 0);
-	if n != 0 { 
-		return n * fact(n - 1)
-	} else {
-		return 1
-	}
+	assert(n >= 0)
+	if n != 0 return n * fact(n - 1)
+	else return 1
 }
 
-iter = {1,2,3,4,5}
+fn add(a,b) return a + b
 
-for i in iter {
-	print(i, fact(i))
-}
+iter = {1 2; 3 4, 5}
+
+
+for i in iter print(i, fact(i))
 
 i = 4
 while true {
 	print(i, fact(i))
 	i = i - 1
-	if i <= 0 {
-		break
-	}
+	if i <= 0 break
 }
 

@@ -4,7 +4,7 @@ use crate::span::format_err;
 use crate::span::Span;
 use crate::token::{Token, TokenKind};
 
-pub fn parse(input: &str) -> Block {
+pub fn parse(input: &str) -> File {
 	let mut tokens = Lexer::new(input);
 
 	let ast = parse_file(input, &mut tokens);
@@ -12,26 +12,36 @@ pub fn parse(input: &str) -> Block {
 	// make sure we are done
 	let tk = tokens.next();
 	if tk.kind != TokenKind::Eof {
-		format_err(&format!("Expected end of file but found: {tk}."), tk.span, input);
+		let msg = format!("Expected end of file but found: {tk}.");
+		format_err(&msg, tk.span, input);
+		panic!("{}", &msg);
 	}
 	ast
 }
 
 // Block and statement rules
 
-pub fn parse_file(input: &str, tokens: &mut Lexer) -> Block {
-	parse_block_inner(input, tokens)
+pub fn parse_file(input: &str, tokens: &mut Lexer) -> File {
+	let stats = parse_stat_list(input, tokens);
+	File { stats }
 }
 
-/// `{` block `}`
+/// `{` block `}` | statement
 pub fn parse_block(input: &str, tokens: &mut Lexer) -> Block {
-	assert_next(input, tokens, TokenKind::LCurly);
-	let block = parse_block_inner(input, tokens);
-	assert_next(input, tokens, TokenKind::RCurly);
-	block
+	match tokens.peek().kind {
+		TokenKind::LCurly => {
+			tokens.next();
+			let stats = parse_stat_list(input, tokens);
+			assert_next(input, tokens, TokenKind::RCurly);
+			Block { stats }
+		},
+		_ => Block {
+			stats: vec![parse_statement(input, tokens)],
+		},
+	}
 }
 
-pub fn parse_block_inner(input: &str, tokens: &mut Lexer) -> Block {
+pub fn parse_stat_list(input: &str, tokens: &mut Lexer) -> Vec<Stat> {
 	let mut stats = Vec::new();
 	loop {
 		match tokens.peek().kind {
@@ -40,12 +50,12 @@ pub fn parse_block_inner(input: &str, tokens: &mut Lexer) -> Block {
 				// These have to be the last statements in a block
 				// TODO: peek here to check it is the last statement, and produce error
 				stats.push(parse_statement(input, tokens));
-				return Block { stats };
+				return stats;
 			},
 			_ => stats.push(parse_statement(input, tokens)),
 		}
 	}
-	Block { stats }
+	stats
 }
 
 pub fn parse_statement(input: &str, tokens: &mut Lexer) -> Stat {

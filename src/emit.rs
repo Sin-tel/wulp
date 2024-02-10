@@ -9,13 +9,13 @@ pub struct EmitLua {
 }
 
 impl EmitLua {
-	pub fn emit(block: &mut Block, symbol_table: SymbolTable) -> String {
+	pub fn emit(ast: &mut File, symbol_table: SymbolTable) -> String {
 		let mut this = Self {
 			code: String::new(),
 			indent_level: 0,
 			symbol_table,
 		};
-		block.walk(&mut this);
+		this.visit_file(ast);
 		this.code
 	}
 

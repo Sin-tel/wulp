@@ -34,8 +34,8 @@ mod visitor;
 #[cfg(test)]
 mod tests;
 
-fn main() {
-	let filename = "lua/assign_call.blua";
+fn main() -> Result<(), &'static str> {
+	let filename = "blua/assign_call.blua";
 	let input = fs::read_to_string(filename).unwrap();
 
 	// let input = r#"
@@ -49,7 +49,8 @@ fn main() {
 
 	println!("----- input:");
 	println!("{input}");
-	let symbol_table = ScopeCheck::visit(&mut ast, &input);
+
+	let symbol_table = ScopeCheck::visit(&mut ast, &input)?;
 
 	println!("----- emitted code:");
 	let code = EmitLua::emit(&mut ast, symbol_table);
@@ -64,6 +65,8 @@ fn main() {
 	chunk = chunk.set_name(filename);
 	let res = chunk.exec();
 	display_return(res);
+
+	Ok(())
 }
 
 fn display_return<V: std::fmt::Debug>(res: LuaResult<V>) {

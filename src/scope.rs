@@ -22,25 +22,31 @@ pub struct ScopeCheck<'a> {
 	scope_stack: Vec<HashMap<&'a str, usize>>,
 	symbol_table: SymbolTable,
 	input: &'a str,
+	abort: bool,
 }
 
 impl<'a> ScopeCheck<'a> {
-	pub fn visit(ast: &mut Block, input: &'a str) -> SymbolTable {
+	pub fn visit(ast: &mut File, input: &'a str) -> Result<SymbolTable, &'static str> {
 		let mut this = Self {
 			scope_stack: Vec::new(),
 			symbol_table: SymbolTable::new(),
 			input,
+			abort: false,
 		};
 
 		this.scope_stack.push(HashMap::new());
 		for g in GLOBALS {
 			this.new_variable(g);
 		}
-		this.visit_block(ast);
+		this.visit_file(ast);
 		this.scope_stack.pop();
 		assert!(this.scope_stack.is_empty());
 
-		this.symbol_table
+		if this.abort {
+			return Err("Scope checker failed.");
+		}
+
+		Ok(this.symbol_table)
 	}
 
 	fn new_variable(&mut self, name: &'a str) {
@@ -77,16 +83,16 @@ impl<'a> ScopeCheck<'a> {
 			ExprKind::SuffixExpr(expr, _) => {
 				// indexing and property
 				if self.make_lvalue(expr) {
-					let msg = "Undefined variable";
-					format_err(msg, expr.span, self.input);
-					panic!("{}", msg);
+					let msg = format!("Undefined variable: `{}`.", expr.span.as_str(self.input));
+					format_err(&msg, expr.span, self.input);
+					self.abort = true;
 				}
 			},
 			ExprKind::Call(call) => {
 				if self.make_lvalue(&mut call.expr) {
-					let msg = "Undefined variable";
-					format_err(msg, call.expr.span, self.input);
-					panic!("{}", msg);
+					let msg = format!("Undefined variable: `{}`.", call.expr.span.as_str(self.input));
+					format_err(&msg, call.expr.span, self.input);
+					self.abort = true;
 				}
 				for e in &mut call.args {
 					e.visit(self);
@@ -133,6 +139,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 			if resolved {
 				let msg = format!("Function `{name}` already exists.");
 				format_err(&msg, node.name.span, self.input);
+				self.abort = true;
 			} else {
 				self.new_variable(name);
 				node.local = true;
@@ -142,6 +149,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 			if !resolved {
 				let msg = format!("Undefined struct: `{name}`.");
 				format_err(&msg, node.name.span, self.input);
+				self.abort = true;
 			}
 		}
 
@@ -198,8 +206,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 			None => {
 				let msg = format!("Undefined variable: `{name}`.");
 				format_err(&msg, node.span, self.input);
-				// we can carry on
-				// panic!("{msg}");
+				self.abort = true;
 			},
 		}
 	}

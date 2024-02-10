@@ -7,11 +7,11 @@ pub struct AstPrinter<'a> {
 }
 
 impl<'a> AstPrinter<'a> {
-	pub fn print_ast(block: &mut Block, input: &'a str) {
+	pub fn print_ast(ast: &mut File, input: &'a str) {
 		let mut printer = Self { input };
 		defer_print!();
 		add_branch!("ast");
-		block.walk(&mut printer);
+		ast.walk(&mut printer);
 	}
 }
 

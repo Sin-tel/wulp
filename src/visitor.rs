@@ -1,6 +1,9 @@
 use crate::ast::*;
 
 pub trait Visitor: Sized {
+	fn visit_file(&mut self, node: &mut File) {
+		node.walk(self);
+	}
 	fn visit_block(&mut self, node: &mut Block) {
 		node.walk(self);
 	}
@@ -49,6 +52,17 @@ pub trait VisitNode<V: Visitor> {
 	}
 	fn visit(&mut self, _: &mut V) {
 		unreachable!()
+	}
+}
+
+impl<V: Visitor> VisitNode<V> for File {
+	fn visit(&mut self, v: &mut V) {
+		v.visit_file(self);
+	}
+	fn walk(&mut self, v: &mut V) {
+		for s in &mut self.stats {
+			v.visit_stat(s);
+		}
 	}
 }
 

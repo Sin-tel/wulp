@@ -13,5 +13,5 @@ print(f()[1])
 
 // This should fail Undefined variable: `s`.
 
-// f = fn(s) {return {s}}
-// f(s)[1] = 5
+f = fn(s) {return {s}}
+f(s)[1] = 5

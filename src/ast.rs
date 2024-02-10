@@ -1,6 +1,11 @@
 use crate::span::Span;
 
 #[derive(Debug, PartialEq)]
+pub struct File {
+	pub stats: Vec<Stat>,
+}
+
+#[derive(Debug, PartialEq)]
 pub struct Block {
 	pub stats: Vec<Stat>,
 }
