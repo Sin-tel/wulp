@@ -17,6 +17,11 @@ d = fn() {}
 // fails
 print = fn() {}
 
+// fails
+for i in {1 2 3} {
+	i = 2
+}
+
 // shoud fail but currently doesn't
 s = {
 	fn g() {}

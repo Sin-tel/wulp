@@ -6,6 +6,7 @@
 #![warn(clippy::redundant_else)]
 #![warn(clippy::match_same_arms)]
 #![deny(unreachable_patterns)]
+#![warn(clippy::single_match_else)]
 #![allow(clippy::enum_variant_names)]
 
 // #![warn(clippy::pedantic)]
@@ -35,7 +36,7 @@ mod visitor;
 mod tests;
 
 fn main() -> Result<(), String> {
-	let filename = "blua/ambiguous.blua";
+	let filename = "blua/redef.blua";
 	let input = fs::read_to_string(filename).unwrap();
 
 	// let input = r#"

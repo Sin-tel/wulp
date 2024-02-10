@@ -21,13 +21,13 @@ pub fn parse(input: &str) -> File {
 
 // Block and statement rules
 
-pub fn parse_file(input: &str, tokens: &mut Lexer) -> File {
+fn parse_file(input: &str, tokens: &mut Lexer) -> File {
 	let stats = parse_stat_list(input, tokens);
 	File { stats }
 }
 
 /// `{` block `}` | statement
-pub fn parse_block(input: &str, tokens: &mut Lexer) -> Block {
+fn parse_block(input: &str, tokens: &mut Lexer) -> Block {
 	match tokens.peek().kind {
 		TokenKind::LCurly => {
 			tokens.next();
@@ -41,7 +41,7 @@ pub fn parse_block(input: &str, tokens: &mut Lexer) -> Block {
 	}
 }
 
-pub fn parse_stat_list(input: &str, tokens: &mut Lexer) -> Vec<Stat> {
+fn parse_stat_list(input: &str, tokens: &mut Lexer) -> Vec<Stat> {
 	let mut stats = Vec::new();
 	loop {
 		match tokens.peek().kind {
@@ -58,7 +58,7 @@ pub fn parse_stat_list(input: &str, tokens: &mut Lexer) -> Vec<Stat> {
 	stats
 }
 
-pub fn parse_statement(input: &str, tokens: &mut Lexer) -> Stat {
+fn parse_statement(input: &str, tokens: &mut Lexer) -> Stat {
 	let stat = parse_statement_inner(input, tokens);
 	// take care of optional semicolon
 	if tokens.peek().kind == TokenKind::SemiColon {
@@ -67,7 +67,7 @@ pub fn parse_statement(input: &str, tokens: &mut Lexer) -> Stat {
 	stat
 }
 
-pub fn parse_statement_inner(input: &str, tokens: &mut Lexer) -> Stat {
+fn parse_statement_inner(input: &str, tokens: &mut Lexer) -> Stat {
 	let tk = tokens.peek();
 	match tk.kind {
 		TokenKind::Break => {
@@ -106,7 +106,7 @@ pub fn parse_statement_inner(input: &str, tokens: &mut Lexer) -> Stat {
 	}
 }
 
-pub fn parse_assignment(first: Expr, input: &str, tokens: &mut Lexer) -> Assignment {
+fn parse_assignment(first: Expr, input: &str, tokens: &mut Lexer) -> Assignment {
 	let mut vars = vec![first];
 
 	while tokens.peek().kind == TokenKind::Comma {
@@ -133,7 +133,7 @@ pub fn parse_assignment(first: Expr, input: &str, tokens: &mut Lexer) -> Assignm
 	}
 }
 
-pub fn parse_fn_def(input: &str, tokens: &mut Lexer) -> FnDef {
+fn parse_fn_def(input: &str, tokens: &mut Lexer) -> FnDef {
 	assert_next(input, tokens, TokenKind::Fn);
 
 	let (name, path) = parse_fn_name(input, tokens);
@@ -147,7 +147,7 @@ pub fn parse_fn_def(input: &str, tokens: &mut Lexer) -> FnDef {
 	}
 }
 
-pub fn parse_fn_name(input: &str, tokens: &mut Lexer) -> (Name, Vec<Property>) {
+fn parse_fn_name(input: &str, tokens: &mut Lexer) -> (Name, Vec<Property>) {
 	let name = parse_name(input, tokens);
 	let mut path = Vec::new();
 
@@ -158,7 +158,7 @@ pub fn parse_fn_name(input: &str, tokens: &mut Lexer) -> (Name, Vec<Property>) {
 	(name, path)
 }
 
-pub fn parse_fn_body(input: &str, tokens: &mut Lexer) -> FnBody {
+fn parse_fn_body(input: &str, tokens: &mut Lexer) -> FnBody {
 	assert_next(input, tokens, TokenKind::LParen);
 	let params = parse_parlist(input, tokens);
 	assert_next(input, tokens, TokenKind::RParen);
@@ -168,7 +168,7 @@ pub fn parse_fn_body(input: &str, tokens: &mut Lexer) -> FnBody {
 	FnBody { params, body }
 }
 
-pub fn parse_for_block(input: &str, tokens: &mut Lexer) -> ForBlock {
+fn parse_for_block(input: &str, tokens: &mut Lexer) -> ForBlock {
 	assert_next(input, tokens, TokenKind::For);
 
 	let names = parse_names(input, tokens);
@@ -181,7 +181,7 @@ pub fn parse_for_block(input: &str, tokens: &mut Lexer) -> ForBlock {
 	ForBlock { names, exprs, block }
 }
 
-pub fn parse_if_block(input: &str, tokens: &mut Lexer) -> IfBlock {
+fn parse_if_block(input: &str, tokens: &mut Lexer) -> IfBlock {
 	assert_next(input, tokens, TokenKind::If);
 
 	let expr = parse_expr(input, tokens);
@@ -204,7 +204,7 @@ pub fn parse_if_block(input: &str, tokens: &mut Lexer) -> IfBlock {
 	}
 }
 
-pub fn parse_elseif(input: &str, tokens: &mut Lexer) -> ElseIf {
+fn parse_elseif(input: &str, tokens: &mut Lexer) -> ElseIf {
 	assert_next(input, tokens, TokenKind::ElseIf);
 	let expr = parse_expr(input, tokens);
 	let block = parse_block(input, tokens);
@@ -212,7 +212,7 @@ pub fn parse_elseif(input: &str, tokens: &mut Lexer) -> ElseIf {
 	ElseIf { expr, block }
 }
 
-pub fn parse_else_block(input: &str, tokens: &mut Lexer) -> Option<Block> {
+fn parse_else_block(input: &str, tokens: &mut Lexer) -> Option<Block> {
 	if tokens.peek().kind == (TokenKind::Else) {
 		tokens.next();
 		Some(parse_block(input, tokens))
@@ -221,7 +221,7 @@ pub fn parse_else_block(input: &str, tokens: &mut Lexer) -> Option<Block> {
 	}
 }
 
-pub fn parse_while_block(input: &str, tokens: &mut Lexer) -> WhileBlock {
+fn parse_while_block(input: &str, tokens: &mut Lexer) -> WhileBlock {
 	assert_next(input, tokens, TokenKind::While);
 
 	let expr = parse_expr(input, tokens);
@@ -230,7 +230,7 @@ pub fn parse_while_block(input: &str, tokens: &mut Lexer) -> WhileBlock {
 	WhileBlock { expr, block }
 }
 
-pub fn parse_return(input: &str, tokens: &mut Lexer) -> Vec<Expr> {
+fn parse_return(input: &str, tokens: &mut Lexer) -> Vec<Expr> {
 	assert_next(input, tokens, TokenKind::Return);
 
 	match tokens.peek().kind {
@@ -241,12 +241,12 @@ pub fn parse_return(input: &str, tokens: &mut Lexer) -> Vec<Expr> {
 
 // Expression rules
 
-pub fn parse_expr(input: &str, tokens: &mut Lexer) -> Expr {
+fn parse_expr(input: &str, tokens: &mut Lexer) -> Expr {
 	parse_sub_expr(input, tokens, 0)
 }
 
 // TODO: left / right priority
-pub fn parse_sub_expr(input: &str, tokens: &mut Lexer, min_priority: i32) -> Expr {
+fn parse_sub_expr(input: &str, tokens: &mut Lexer, min_priority: i32) -> Expr {
 	let mut expression = match parse_unexp(input, tokens) {
 		Some(expr) => expr,
 		None => parse_simple_expr(input, tokens),
@@ -275,7 +275,7 @@ pub fn parse_sub_expr(input: &str, tokens: &mut Lexer, min_priority: i32) -> Exp
 	expression
 }
 
-pub fn parse_simple_expr(input: &str, tokens: &mut Lexer) -> Expr {
+fn parse_simple_expr(input: &str, tokens: &mut Lexer) -> Expr {
 	match tokens.peek().kind {
 		TokenKind::Nil => {
 			let span = tokens.next().span;
@@ -312,7 +312,7 @@ pub fn parse_simple_expr(input: &str, tokens: &mut Lexer) -> Expr {
 	}
 }
 
-pub fn parse_unexp(input: &str, tokens: &mut Lexer) -> Option<Expr> {
+fn parse_unexp(input: &str, tokens: &mut Lexer) -> Option<Expr> {
 	let tk = tokens.peek();
 	match tk.as_un_op() {
 		Some(op) => {
@@ -330,7 +330,7 @@ pub fn parse_unexp(input: &str, tokens: &mut Lexer) -> Option<Expr> {
 	}
 }
 
-pub fn parse_suffix_expr(input: &str, tokens: &mut Lexer) -> Expr {
+fn parse_suffix_expr(input: &str, tokens: &mut Lexer) -> Expr {
 	let mut primary = parse_primary_expr(input, tokens);
 
 	let mut suffix = Vec::new();
@@ -399,7 +399,7 @@ fn new_suffix_expr(expr: Expr, suffix: Vec<Suffix>) -> Expr {
 	}
 }
 
-pub fn parse_primary_expr(input: &str, tokens: &mut Lexer) -> Expr {
+fn parse_primary_expr(input: &str, tokens: &mut Lexer) -> Expr {
 	match tokens.peek().kind {
 		TokenKind::Name => {
 			let name = parse_name(input, tokens);
@@ -428,7 +428,7 @@ pub fn parse_primary_expr(input: &str, tokens: &mut Lexer) -> Expr {
 
 /// Constructors
 
-pub fn parse_table_constructor(input: &str, tokens: &mut Lexer) -> Expr {
+fn parse_table_constructor(input: &str, tokens: &mut Lexer) -> Expr {
 	let start = assert_next(input, tokens, TokenKind::LCurly).span;
 	let fields = parse_fields(input, tokens);
 	let end = assert_next(input, tokens, TokenKind::RCurly).span;
@@ -438,7 +438,7 @@ pub fn parse_table_constructor(input: &str, tokens: &mut Lexer) -> Expr {
 	}
 }
 
-pub fn parse_fields(input: &str, tokens: &mut Lexer) -> Vec<Field> {
+fn parse_fields(input: &str, tokens: &mut Lexer) -> Vec<Field> {
 	if tokens.peek().kind == TokenKind::RCurly {
 		return Vec::new();
 	};
@@ -464,33 +464,28 @@ pub fn parse_fields(input: &str, tokens: &mut Lexer) -> Vec<Field> {
 	fields
 }
 
-pub fn parse_field(input: &str, tokens: &mut Lexer) -> Field {
+fn parse_field(input: &str, tokens: &mut Lexer) -> Field {
 	match tokens.peek().kind {
 		TokenKind::Name => {
 			// TODO: this is a bit ugly
 			let span = tokens.next().span;
 
-			match tokens.peek().kind {
-				// Name '=' expr
-				TokenKind::Assign => {
-					tokens.next();
-					let expr = parse_expr(input, tokens);
-					Field::Assign(
-						Property {
-							span,
-							name: span.as_string(input),
-						},
-						expr,
-					)
-				},
-				// Expr(Name)
-				_ => {
-					let name = new_name(span);
-					Field::Expr(Expr {
+			if tokens.peek().kind == TokenKind::Assign {
+				tokens.next();
+				let expr = parse_expr(input, tokens);
+				Field::Assign(
+					Property {
 						span,
-						kind: ExprKind::Name(name),
-					})
-				},
+						name: span.as_string(input),
+					},
+					expr,
+				)
+			} else {
+				let name = new_name(span);
+				Field::Expr(Expr {
+					span,
+					kind: ExprKind::Name(name),
+				})
 			}
 		},
 		TokenKind::Fn => {
@@ -505,14 +500,14 @@ pub fn parse_field(input: &str, tokens: &mut Lexer) -> Field {
 	}
 }
 
-pub fn parse_args(input: &str, tokens: &mut Lexer) -> Vec<Expr> {
+fn parse_args(input: &str, tokens: &mut Lexer) -> Vec<Expr> {
 	if tokens.peek().kind == TokenKind::RParen {
 		return Vec::new();
 	}
 	parse_exprs(input, tokens)
 }
 
-pub fn parse_exprs(input: &str, tokens: &mut Lexer) -> Vec<Expr> {
+fn parse_exprs(input: &str, tokens: &mut Lexer) -> Vec<Expr> {
 	let mut exprs = Vec::new();
 
 	exprs.push(parse_expr(input, tokens));
@@ -525,7 +520,7 @@ pub fn parse_exprs(input: &str, tokens: &mut Lexer) -> Vec<Expr> {
 	exprs
 }
 
-pub fn parse_names(input: &str, tokens: &mut Lexer) -> Vec<Name> {
+fn parse_names(input: &str, tokens: &mut Lexer) -> Vec<Name> {
 	let mut names = vec![parse_name(input, tokens)];
 
 	while tokens.peek().kind == TokenKind::Comma {
@@ -541,7 +536,7 @@ pub fn parse_names(input: &str, tokens: &mut Lexer) -> Vec<Name> {
 	names
 }
 
-pub fn parse_parlist(input: &str, tokens: &mut Lexer) -> Vec<Name> {
+fn parse_parlist(input: &str, tokens: &mut Lexer) -> Vec<Name> {
 	match tokens.peek().kind {
 		TokenKind::Name => {
 			let names = parse_names(input, tokens);
@@ -588,16 +583,15 @@ fn parse_string(input: &str, tokens: &mut Lexer) -> Expr {
 fn parse_number(input: &str, tokens: &mut Lexer) -> Expr {
 	let span = tokens.next().span;
 	let s = span.as_string(input);
-	match s.parse() {
-		Ok(num) => Expr {
+	if let Ok(num) = s.parse() {
+		Expr {
 			span,
 			kind: ExprKind::Literal(Literal::Number(num)),
-		},
-		_ => {
-			let msg = format!("Malformed number: `{s}`.");
-			format_err(&msg, span, input);
-			panic!("{msg}");
-		},
+		}
+	} else {
+		let msg = format!("Malformed number: `{s}`.");
+		format_err(&msg, span, input);
+		panic!("{msg}");
 	}
 }
 

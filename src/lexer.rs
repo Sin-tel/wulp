@@ -24,13 +24,12 @@ impl<'a> Lexer<'a> {
 		}
 	}
 	pub fn peek(&mut self) -> Token {
-		match self.peeked {
-			Some(token) => token,
-			None => {
-				let token = self.filter_next();
-				self.peeked = Some(token);
-				token
-			},
+		if let Some(token) = self.peeked {
+			token
+		} else {
+			let token = self.filter_next();
+			self.peeked = Some(token);
+			token
 		}
 	}
 	fn filter_next(&mut self) -> Token {

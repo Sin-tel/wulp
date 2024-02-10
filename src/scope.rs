@@ -94,18 +94,15 @@ impl<'a> ScopeCheck<'a> {
 			ExprKind::Name(n) => {
 				let name = n.span.as_str(self.input);
 
-				match self.lookup(name) {
-					Some(id) => {
-						if self.symbol_table.get(id).is_const {
-							let msg = format!("Constant `{name}` already defined.");
-							format_err(&msg, n.span, self.input);
-							self.errors.push(msg);
-						}
-					},
-					None => {
-						self.new_variable(name, false);
-						needs_local = true;
-					},
+				if let Some(id) = self.lookup(name) {
+					if self.symbol_table.get(id).is_const {
+						let msg = format!("Constant `{name}` already defined.");
+						format_err(&msg, n.span, self.input);
+						self.errors.push(msg);
+					}
+				} else {
+					self.new_variable(name, false);
+					needs_local = true;
 				}
 
 				var.visit(self);
@@ -234,13 +231,12 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		assert!(node.id == 0); // make sure we don't visit twice
 
 		let name = node.span.as_str(self.input);
-		match self.lookup(name) {
-			Some(id) => node.id = id,
-			None => {
-				let msg = format!("Undefined variable: `{name}`.");
-				format_err(&msg, node.span, self.input);
-				self.errors.push(msg);
-			},
+		if let Some(id) = self.lookup(name) {
+			node.id = id;
+		} else {
+			let msg = format!("Undefined variable: `{name}`.");
+			format_err(&msg, node.span, self.input);
+			self.errors.push(msg);
 		}
 	}
 }
