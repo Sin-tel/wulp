@@ -74,7 +74,7 @@ impl<'a> ScopeCheck<'a> {
 				}
 				var.visit(self);
 			},
-			ExprKind::SuffixExpr(SuffixExpr { expr, .. }) => {
+			ExprKind::SuffixExpr(expr, _) => {
 				// indexing and property
 				if self.make_lvalue(expr) {
 					let msg = "Undefined variable";

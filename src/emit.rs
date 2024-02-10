@@ -143,6 +143,17 @@ impl Visitor for EmitLua {
 	}
 	fn visit_expr(&mut self, node: &mut Expr) {
 		match &mut node.kind {
+			ExprKind::BinExpr(e) => {
+				self.visit_expr(&mut e.lhs);
+				self.code.push(' ');
+				self.code.push_str(emit_binop(&e.op));
+				self.code.push(' ');
+				self.visit_expr(&mut e.rhs);
+			},
+			ExprKind::UnExpr(e) => {
+				self.code.push_str(emit_unop(&e.op));
+				self.visit_expr(&mut e.expr);
+			},
 			ExprKind::Lambda(_) => {
 				self.code.push_str("function");
 				node.walk(self);
@@ -170,20 +181,6 @@ impl Visitor for EmitLua {
 			},
 			Literal::Bool(s) => self.code.push_str(&s.to_string()),
 		}
-	}
-	fn visit_bin_expr(&mut self, node: &mut BinExpr) {
-		self.visit_expr(&mut node.lhs);
-		self.code.push(' ');
-		self.code.push_str(emit_binop(&node.op));
-		self.code.push(' ');
-		self.visit_expr(&mut node.rhs);
-	}
-	fn visit_un_expr(&mut self, node: &mut UnExpr) {
-		self.code.push_str(emit_unop(&node.op));
-		self.visit_expr(&mut node.expr);
-	}
-	fn visit_suffix_expr(&mut self, node: &mut SuffixExpr) {
-		node.walk(self);
 	}
 	fn visit_suffix(&mut self, node: &mut Suffix) {
 		match node {

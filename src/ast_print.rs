@@ -53,10 +53,20 @@ impl Visitor for AstPrinter<'_> {
 		}
 	}
 	fn visit_expr(&mut self, node: &mut Expr) {
-		// let source = node.span.as_string(&self.input);
-		// add_branch!("{:?}", source);
-		// node.walk(self);
+		let source = node.span.as_string(&self.input);
 		match node.kind {
+			ExprKind::BinExpr(_) => {
+				add_branch!("{} (binop)", source);
+				node.walk(self);
+			},
+			ExprKind::UnExpr(_) => {
+				add_branch!("{} (unop)", source);
+				node.walk(self);
+			},
+			ExprKind::SuffixExpr(_, _) => {
+				add_branch!("{}", source);
+				node.walk(self);
+			},
 			ExprKind::Lambda(_) => {
 				add_branch!("lambda");
 				node.walk(self);
@@ -76,22 +86,6 @@ impl Visitor for AstPrinter<'_> {
 			Literal::Bool(s) => add_leaf!("{} (bool)", s),
 		}
 	}
-
-	fn visit_bin_expr(&mut self, node: &mut BinExpr) {
-		add_branch!("`{:?}` (binop)", node.op);
-		node.walk(self);
-	}
-
-	fn visit_un_expr(&mut self, node: &mut UnExpr) {
-		add_branch!("`{:?}` (unop)", node.op);
-		node.walk(self);
-	}
-
-	fn visit_suffix_expr(&mut self, node: &mut SuffixExpr) {
-		add_branch!("suffixed");
-		node.walk(self);
-	}
-
 	fn visit_suffix(&mut self, node: &mut Suffix) {
 		let s = match node {
 			Suffix::Property(_) => "property",

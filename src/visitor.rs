@@ -31,15 +31,6 @@ pub trait Visitor: Sized {
 	fn visit_expr(&mut self, node: &mut Expr) {
 		node.walk(self);
 	}
-	fn visit_bin_expr(&mut self, node: &mut BinExpr) {
-		node.walk(self);
-	}
-	fn visit_un_expr(&mut self, node: &mut UnExpr) {
-		node.walk(self);
-	}
-	fn visit_suffix_expr(&mut self, node: &mut SuffixExpr) {
-		node.walk(self);
-	}
 	fn visit_suffix(&mut self, node: &mut Suffix) {
 		node.walk(self);
 	}
@@ -196,48 +187,27 @@ impl<V: Visitor> VisitNode<V> for Expr {
 		match &mut self.kind {
 			ExprKind::Literal(e) => v.visit_literal(e),
 			ExprKind::Name(e) => v.visit_name(e),
-			ExprKind::BinExpr(e) => v.visit_bin_expr(e),
-			ExprKind::UnExpr(e) => v.visit_un_expr(e),
 			ExprKind::Lambda(e) => v.visit_fn_body(e),
-			ExprKind::SuffixExpr(e) => v.visit_suffix_expr(e),
 			ExprKind::Expr(e) => v.visit_expr(e),
 			ExprKind::Call(e) => v.visit_fn_call(e),
+			ExprKind::BinExpr(e) => {
+				v.visit_expr(&mut e.lhs);
+				v.visit_expr(&mut e.rhs);
+			},
+			ExprKind::UnExpr(e) => {
+				v.visit_expr(&mut e.expr);
+			},
+			ExprKind::SuffixExpr(e, suffix) => {
+				v.visit_expr(e);
+				for s in suffix {
+					v.visit_suffix(s);
+				}
+			},
 			ExprKind::Table(t) => {
 				for e in t {
 					v.visit_field(e);
 				}
 			},
-		}
-	}
-}
-
-impl<V: Visitor> VisitNode<V> for BinExpr {
-	fn visit(&mut self, v: &mut V) {
-		v.visit_bin_expr(self);
-	}
-	fn walk(&mut self, v: &mut V) {
-		v.visit_expr(&mut self.lhs);
-		v.visit_expr(&mut self.rhs);
-	}
-}
-
-impl<V: Visitor> VisitNode<V> for UnExpr {
-	fn visit(&mut self, v: &mut V) {
-		v.visit_un_expr(self);
-	}
-	fn walk(&mut self, v: &mut V) {
-		v.visit_expr(&mut self.expr);
-	}
-}
-
-impl<V: Visitor> VisitNode<V> for SuffixExpr {
-	fn visit(&mut self, v: &mut V) {
-		v.visit_suffix_expr(self);
-	}
-	fn walk(&mut self, v: &mut V) {
-		v.visit_expr(&mut self.expr);
-		for s in &mut self.suffix {
-			v.visit_suffix(s);
 		}
 	}
 }

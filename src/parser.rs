@@ -370,10 +370,7 @@ fn new_suffix_expr(expr: Expr, suffix: Vec<Suffix>) -> Expr {
 			};
 			Expr {
 				span: Span::new(expr.span.start, end),
-				kind: ExprKind::SuffixExpr(SuffixExpr {
-					expr: Box::new(expr),
-					suffix,
-				}),
+				kind: ExprKind::SuffixExpr(Box::new(expr), suffix),
 			}
 		},
 	}

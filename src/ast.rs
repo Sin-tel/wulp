@@ -64,10 +64,10 @@ pub enum ExprKind {
 	Literal(Literal),
 	BinExpr(BinExpr),
 	UnExpr(UnExpr),
+	Call(Call),
 	Lambda(FnBody),
 	Table(Vec<Field>),
-	SuffixExpr(SuffixExpr),
-	Call(Call),
+	SuffixExpr(Box<Expr>, Vec<Suffix>),
 	Expr(Box<Expr>), // bracketed expression
 }
 
@@ -77,12 +77,6 @@ pub enum Literal {
 	Bool(bool),
 	Number(f64),
 	Str(String),
-}
-
-#[derive(Debug, PartialEq)]
-pub struct SuffixExpr {
-	pub expr: Box<Expr>,
-	pub suffix: Vec<Suffix>,
 }
 
 #[derive(Debug, PartialEq)]
