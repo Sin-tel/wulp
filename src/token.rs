@@ -6,6 +6,7 @@ use core::fmt;
 pub struct Token {
 	pub kind: TokenKind,
 	pub span: Span,
+	pub line: usize,
 }
 
 #[derive(PartialEq, Debug, Copy, Clone)]

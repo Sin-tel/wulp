@@ -49,6 +49,14 @@ fn line_col(input: &str, pos: usize) -> (usize, usize) {
 }
 
 pub fn format_err(message: &str, span: Span, input: &str) {
+	print_message(message, span, input, "error");
+}
+
+pub fn format_warning(message: &str, span: Span, input: &str) {
+	print_message(message, span, input, "warning");
+}
+
+pub fn print_message(message: &str, span: Span, input: &str, level: &'static str) {
 	// TODO: this only works properly if the span is one line
 
 	let (startl, startc, endl, endc) = span.line_col(input);
@@ -61,7 +69,7 @@ pub fn format_err(message: &str, span: Span, input: &str) {
 	}
 
 	// TODO fix the filename
-	eprintln!("error: src\\file:{startl}: {message}");
+	eprintln!("{level}: src\\file:{startl}: {message}");
 	eprintln!("{spaces} |");
 
 	for l in input.lines().skip(startl - 1) {

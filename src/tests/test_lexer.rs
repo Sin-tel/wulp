@@ -22,7 +22,8 @@ fn single_line_comment() {
 		lex.next(),
 		Some(Token {
 			kind: TokenKind::Comment,
-			span: Span { start: 0, end: 34 }
+			span: Span { start: 0, end: 34 },
+			line: 0
 		})
 	);
 }
@@ -35,7 +36,8 @@ fn single_line_string() {
 		lex.next(),
 		Some(Token {
 			kind: TokenKind::Str,
-			span: Span { start: 0, end: 16 }
+			span: Span { start: 0, end: 16 },
+			line: 0
 		})
 	);
 
@@ -45,7 +47,8 @@ fn single_line_string() {
 		lex.next(),
 		Some(Token {
 			kind: TokenKind::Str,
-			span: Span { start: 0, end: 16 }
+			span: Span { start: 0, end: 16 },
+			line: 0
 		})
 	);
 }
@@ -58,7 +61,8 @@ fn multi_line_string() {
 		lex.next(),
 		Some(Token {
 			kind: TokenKind::Str,
-			span: Span { start: 0, end: 33 }
+			span: Span { start: 0, end: 33 },
+			line: 0
 		})
 	);
 }

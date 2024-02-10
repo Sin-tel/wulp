@@ -44,6 +44,7 @@ impl<'a> Lexer<'a> {
 			None => Token {
 				kind: TokenKind::Eof,
 				span: Span::at(self.lexer.cursor - 1), // point to last character
+				line: self.lexer.line,
 			},
 		}
 	}
@@ -54,6 +55,7 @@ pub struct LexIter<'a> {
 	input: &'a str,
 	bytes: &'a [u8],
 	pub cursor: usize,
+	pub line: usize,
 	handle_escape: bool,
 }
 
@@ -63,23 +65,37 @@ impl<'a> LexIter<'a> {
 			input,
 			bytes: input.as_bytes(),
 			cursor: 0,
+			line: 0,
 			handle_escape: false,
 		}
 	}
 
+	fn newtoken(&self, kind: TokenKind, start: usize, end: usize) -> Token {
+		Token {
+			kind,
+			span: Span { start, end },
+			line: self.line,
+		}
+	}
+
 	fn eat_chars(&mut self, n: usize) {
-		self.cursor += n;
+		for _ in 0..n {
+			self.eat_char();
+		}
 	}
 
 	fn eat_char(&mut self) -> Option<char> {
 		let c = self.bytes.get(self.cursor);
+		if c == Some(&b'\n') {
+			self.line += 1;
+		}
 		self.cursor += 1;
 
 		c.map(|b| *b as char)
 	}
 
 	fn peek_is_number(&mut self) -> bool {
-		if let Some(c) = self.next_char() {
+		if let Some(c) = self.peek_char() {
 			return c.is_ascii_digit();
 		}
 		false
@@ -89,7 +105,7 @@ impl<'a> LexIter<'a> {
 		self.bytes.get(self.cursor).map(|b| *b as char)
 	}
 
-	fn next_char(&self) -> Option<char> {
+	fn peek_char(&self) -> Option<char> {
 		self.bytes.get(self.cursor + 1).map(|b| *b as char)
 	}
 
@@ -117,10 +133,7 @@ impl<'a> LexIter<'a> {
 			}
 		}
 		let end = self.cursor;
-		Token {
-			kind: TokenKind::Comment,
-			span: Span { start, end },
-		}
+		self.newtoken(TokenKind::Comment, start, end)
 	}
 
 	// '\'' CONTENT '\'' | ''' CONTENT '"'
@@ -140,10 +153,7 @@ impl<'a> LexIter<'a> {
 			}
 		}
 		let end = self.cursor;
-		Token {
-			kind: TokenKind::Str,
-			span: Span { start, end },
-		}
+		self.newtoken(TokenKind::Str, start, end)
 	}
 
 	// '[[' CONTENT ']]'
@@ -154,10 +164,7 @@ impl<'a> LexIter<'a> {
 			if self.match_chars("]]") {
 				self.eat_chars(2);
 				let end = self.cursor;
-				break Some(Token {
-					kind: TokenKind::Str,
-					span: Span { start, end },
-				});
+				break Some(self.newtoken(TokenKind::Str, start, end));
 			}
 			match self.eat_char() {
 				Some(_) => (),
@@ -207,7 +214,11 @@ impl<'a> LexIter<'a> {
 			_ => TokenKind::Name,
 		};
 
-		Token { kind, span }
+		Token {
+			kind,
+			span,
+			line: self.line,
+		}
 	}
 
 	// ^-?[0-9](\.[0-9])?
@@ -244,14 +255,8 @@ impl<'a> LexIter<'a> {
 		Token {
 			kind: TokenKind::Number,
 			span,
+			line: self.line,
 		}
-	}
-}
-
-fn newtoken(kind: TokenKind, start: usize, end: usize) -> Token {
-	Token {
-		kind,
-		span: Span { start, end },
 	}
 }
 
@@ -261,7 +266,7 @@ impl Iterator for LexIter<'_> {
 		if let Some(c) = self.cur_char() {
 			use TokenKind::*;
 			let start = self.cursor;
-			let next = self.next_char();
+			let next = self.peek_char();
 
 			match c {
 				'\'' | '"' => Some(self.single_line_string()),
@@ -269,27 +274,27 @@ impl Iterator for LexIter<'_> {
 				'=' if next == Some('=') => {
 					self.eat_chars(2);
 					let end = self.cursor;
-					Some(newtoken(Eq, start, end))
+					Some(self.newtoken(Eq, start, end))
 				},
 				'=' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(newtoken(Assign, start, end))
+					Some(self.newtoken(Assign, start, end))
 				},
 				';' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(newtoken(SemiColon, start, end))
+					Some(self.newtoken(SemiColon, start, end))
 				},
 				'[' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(newtoken(LBracket, start, end))
+					Some(self.newtoken(LBracket, start, end))
 				},
 				']' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(newtoken(RBracket, start, end))
+					Some(self.newtoken(RBracket, start, end))
 				},
 				'A'..='Z' | 'a'..='z' | '_' => Some(self.identifier()),
 				' ' | '\t' | '\n' | '\r' => {
@@ -305,102 +310,102 @@ impl Iterator for LexIter<'_> {
 					}
 					self.eat_char();
 					let end = self.cursor;
-					Some(newtoken(Minus, start, end))
+					Some(self.newtoken(Minus, start, end))
 				},
 				'(' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(newtoken(LParen, start, end))
+					Some(self.newtoken(LParen, start, end))
 				},
 				')' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(newtoken(RParen, start, end))
+					Some(self.newtoken(RParen, start, end))
 				},
 				'{' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(newtoken(LCurly, start, end))
+					Some(self.newtoken(LCurly, start, end))
 				},
 				'}' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(newtoken(RCurly, start, end))
+					Some(self.newtoken(RCurly, start, end))
 				},
 				',' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(newtoken(Comma, start, end))
+					Some(self.newtoken(Comma, start, end))
 				},
 				'.' if next == Some('.') => {
 					self.eat_chars(2);
 					let end = self.cursor;
-					Some(newtoken(Concat, start, end))
+					Some(self.newtoken(Concat, start, end))
 				},
 				'.' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(newtoken(Period, start, end))
+					Some(self.newtoken(Period, start, end))
 				},
 				':' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(newtoken(Colon, start, end))
+					Some(self.newtoken(Colon, start, end))
 				},
 				'<' if next == Some('=') => {
 					self.eat_chars(2);
 					let end = self.cursor;
-					Some(newtoken(Lte, start, end))
+					Some(self.newtoken(Lte, start, end))
 				},
 				'<' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(newtoken(Lt, start, end))
+					Some(self.newtoken(Lt, start, end))
 				},
 				'>' if next == Some('=') => {
 					self.eat_chars(2);
 					let end = self.cursor;
-					Some(newtoken(Gte, start, end))
+					Some(self.newtoken(Gte, start, end))
 				},
 				'>' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(newtoken(Gt, start, end))
+					Some(self.newtoken(Gt, start, end))
 				},
 				'+' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(newtoken(Plus, start, end))
+					Some(self.newtoken(Plus, start, end))
 				},
 				'#' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(newtoken(Hash, start, end))
+					Some(self.newtoken(Hash, start, end))
 				},
 				'*' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(newtoken(Mul, start, end))
+					Some(self.newtoken(Mul, start, end))
 				},
 				'/' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(newtoken(Div, start, end))
+					Some(self.newtoken(Div, start, end))
 				},
 				'%' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(newtoken(Mod, start, end))
+					Some(self.newtoken(Mod, start, end))
 				},
 				'^' => {
 					self.eat_char();
 					let end = self.cursor;
-					Some(newtoken(Pow, start, end))
+					Some(self.newtoken(Pow, start, end))
 				},
 				'!' if next == Some('=') => {
 					self.eat_chars(2);
 					let end = self.cursor;
-					Some(newtoken(Neq, start, end))
+					Some(self.newtoken(Neq, start, end))
 				},
 				tk => {
 					let msg = format!("Unexpected token: `{tk}`");

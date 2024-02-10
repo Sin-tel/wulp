@@ -2,13 +2,13 @@ f = fn() {}
 x = fn() {}
 y = fn() {}
 
+
+// ok
+f();
+(x or y)()
+
+f()(x or y)()
+
 // ambiguous
 f()
 (x or y)()
-
-// ok
-// f();
-// (x or y)()
-
-// ok
-// f()(x or y)()

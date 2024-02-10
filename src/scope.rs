@@ -167,7 +167,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		let lookup = self.lookup(name);
 		if node.path.is_empty() {
 			// plain fn def
-			if let Some(_) = lookup {
+			if lookup.is_some() {
 				let msg = format!("Function `{name}` already defined.");
 				format_err(&msg, node.name.span, self.input);
 				self.errors.push(msg);

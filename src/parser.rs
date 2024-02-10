@@ -1,7 +1,7 @@
 use crate::ast::*;
 use crate::lexer::Lexer;
-use crate::span::format_err;
 use crate::span::Span;
+use crate::span::{format_err, format_warning};
 use crate::token::{Token, TokenKind};
 
 pub fn parse(input: &str) -> File {
@@ -349,9 +349,20 @@ pub fn parse_suffix_expr(input: &str, tokens: &mut Lexer) -> Expr {
 			},
 			TokenKind::LParen => {
 				// Build ast node and continue
+				let start_line = tokens.peek().line;
+
 				assert_next(input, tokens, TokenKind::LParen);
 				let args = parse_args(input, tokens);
 				let end = assert_next(input, tokens, TokenKind::RParen).span;
+
+				// check for ambiguous function call on next line
+				let tk = tokens.peek();
+				if tk.kind == TokenKind::LParen && tk.line != start_line {
+					let msg = "Ambiguous syntax.";
+					format_warning(msg, tk.span, input);
+					eprintln!("note: Add a semicolon to the previous statement if this is intentional.");
+					panic!("{msg}");
+				}
 				let old_suffix = std::mem::take(&mut suffix);
 
 				let expr = new_suffix_expr(primary, old_suffix);

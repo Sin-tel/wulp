@@ -35,7 +35,7 @@ mod visitor;
 mod tests;
 
 fn main() -> Result<(), String> {
-	let filename = "blua/redef.blua";
+	let filename = "blua/ambiguous.blua";
 	let input = fs::read_to_string(filename).unwrap();
 
 	// let input = r#"
