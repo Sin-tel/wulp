@@ -34,8 +34,8 @@ mod visitor;
 #[cfg(test)]
 mod tests;
 
-fn main() -> Result<(), &'static str> {
-	let filename = "blua/assign_call.blua";
+fn main() -> Result<(), String> {
+	let filename = "blua/redef.blua";
 	let input = fs::read_to_string(filename).unwrap();
 
 	// let input = r#"

@@ -1,0 +1,25 @@
+// fails
+fn a() {}
+fn a() {}
+
+// fails
+fn b() {}
+b = fn() {}
+
+// fails
+c = fn() {}
+fn c() {}
+
+// allowed
+d = fn() {}
+d = fn() {}
+
+// fails
+print = fn() {}
+
+// shoud fail but currently doesn't
+s = {
+	fn g() {}
+	fn g() {}
+}
+fn s.g() {}

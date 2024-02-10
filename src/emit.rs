@@ -227,7 +227,7 @@ impl Visitor for EmitLua {
 	}
 
 	fn visit_name(&mut self, node: &mut Name) {
-		self.code.push_str(&self.symbol_table.names[node.id]);
+		self.code.push_str(&self.symbol_table.get(node.id).name);
 	}
 
 	fn visit_property(&mut self, node: &mut Property) {

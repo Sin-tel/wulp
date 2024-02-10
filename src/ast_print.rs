@@ -53,7 +53,7 @@ impl Visitor for AstPrinter<'_> {
 		}
 	}
 	fn visit_expr(&mut self, node: &mut Expr) {
-		let source = node.span.as_string(&self.input);
+		let source = node.span.as_string(self.input);
 		match node.kind {
 			ExprKind::BinExpr(_) => {
 				add_branch!("{} (binop)", source);

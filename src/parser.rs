@@ -94,6 +94,8 @@ pub fn parse_statement_inner(input: &str, tokens: &mut Lexer) -> Stat {
 					{
 						return Stat::Call(e);
 					}
+					// TODO: make this more informative
+					// TODO: check ambiguous syntax
 					let tk = tokens.next();
 					let msg = format!("Expected `=` but found: {tk}.");
 					format_err(&msg, tk.span, input);

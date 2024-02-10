@@ -15,11 +15,6 @@ fn point.set_x(self, x) {
 // fails: test is undefined
 // fn test.f() {}
 
-// fails: redefinition
-// fn f() {}
-// fn f() {}
-
-
 point.set_x(point, 5)
 
 print(point.get_x(point))
