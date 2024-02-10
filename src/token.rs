@@ -48,7 +48,6 @@ pub enum TokenKind {
 	Lte,
 	Lt,
 	Gt,
-	Hash,
 	SemiColon,
 	Colon,
 	Str,
@@ -84,7 +83,6 @@ impl Token {
 		match self.kind {
 			TokenKind::Minus => Some(UnOp::Minus),
 			TokenKind::Not => Some(UnOp::Not),
-			TokenKind::Hash => Some(UnOp::Len),
 			_ => None,
 		}
 	}
@@ -134,7 +132,6 @@ impl fmt::Display for TokenKind {
 				Lte => "`<=`",
 				Lt => "`<`",
 				Gt => "`>`",
-				Hash => "`#`",
 				SemiColon => "`;`",
 				Colon => "`:`",
 				Str => "string",

@@ -1,5 +1,5 @@
 use crate::ast::*;
-use crate::scope::SymbolTable;
+use crate::symbol::SymbolTable;
 use crate::visitor::*;
 
 pub struct EmitLua {
@@ -152,6 +152,7 @@ impl Visitor for EmitLua {
 			},
 			ExprKind::UnExpr(e) => {
 				self.code.push_str(emit_unop(&e.op));
+				self.code.push(' ');
 				self.visit_expr(&mut e.expr);
 			},
 			ExprKind::Lambda(_) => {
@@ -259,6 +260,5 @@ fn emit_unop(op: &UnOp) -> &'static str {
 	match op {
 		UnOp::Minus => "-",
 		UnOp::Not => "not",
-		UnOp::Len => "#",
 	}
 }

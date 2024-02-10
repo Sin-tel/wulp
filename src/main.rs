@@ -19,6 +19,7 @@
 use crate::ast_print::AstPrinter;
 use crate::emit::EmitLua;
 use crate::scope::ScopeCheck;
+use crate::typecheck::TypeCheck;
 use mlua::prelude::LuaResult;
 use std::fs;
 
@@ -29,29 +30,35 @@ mod lexer;
 mod parser;
 mod scope;
 mod span;
+mod symbol;
 mod token;
+mod typecheck;
 mod visitor;
 
 #[cfg(test)]
 mod tests;
 
 fn main() -> Result<(), String> {
-	let filename = "blua/redef.blua";
-	let input = fs::read_to_string(filename).unwrap();
+	let filename = "blua/basic.blua";
+	// let input = fs::read_to_string(filename).unwrap();
 
-	// let input = r#"
-	// "#;
+	let input = r#"
+	x = 5 >= 6
+	y = false
+	print(x and y)
+	"#;
 
 	let mut ast = parser::parse(&input);
 	// dbg!(&ast);
 
-	println!("----- AST:");
-	AstPrinter::print_ast(&mut ast, &input);
-
 	println!("----- input:");
 	println!("{input}");
 
-	let symbol_table = ScopeCheck::visit(&mut ast, &input)?;
+	let mut symbol_table = ScopeCheck::check(&mut ast, &input)?;
+	TypeCheck::check(&mut ast, &input, &mut symbol_table)?;
+
+	println!("----- AST:");
+	AstPrinter::print_ast(&mut ast, &input);
 
 	println!("----- emitted code:");
 	let code = EmitLua::emit(&mut ast, symbol_table);

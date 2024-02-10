@@ -1,42 +1,8 @@
 use crate::ast::*;
 use crate::span::format_err;
+use crate::symbol::{Symbol, SymbolTable};
 use crate::visitor::{VisitNode, Visitor};
 use std::collections::HashMap;
-
-pub const GLOBALS: [&str; 2] = ["print", "assert"];
-
-#[derive(Debug)]
-pub struct Symbol {
-	pub name: String,
-	pub is_const: bool,
-}
-
-#[derive(Debug)]
-pub struct SymbolTable {
-	symbols: Vec<Symbol>,
-}
-
-impl SymbolTable {
-	pub fn new() -> Self {
-		let mut new = SymbolTable { symbols: Vec::new() };
-		new.push("UNKNOWN_SYMBOL", true);
-		new
-	}
-
-	pub fn push(&mut self, name: &str, is_const: bool) -> usize {
-		let id = self.symbols.len();
-		self.symbols.push(Symbol {
-			name: name.to_string(),
-			is_const,
-		});
-
-		id
-	}
-
-	pub fn get(&self, id: usize) -> &Symbol {
-		&self.symbols[id]
-	}
-}
 
 pub struct ScopeCheck<'a> {
 	scope_stack: Vec<HashMap<&'a str, usize>>,
@@ -46,7 +12,7 @@ pub struct ScopeCheck<'a> {
 }
 
 impl<'a> ScopeCheck<'a> {
-	pub fn visit(ast: &mut File, input: &'a str) -> Result<SymbolTable, String> {
+	pub fn check(ast: &mut File, input: &'a str) -> Result<SymbolTable, String> {
 		let mut this = Self {
 			scope_stack: Vec::new(),
 			symbol_table: SymbolTable::new(),
@@ -55,10 +21,11 @@ impl<'a> ScopeCheck<'a> {
 		};
 
 		this.scope_stack.push(HashMap::new());
-		for g in GLOBALS {
-			// const since we can't re-assign std globals
-			this.new_variable(g, true);
-		}
+
+		// TODO: parse std typedef
+		this.new_variable("print", true, Ty::Fn(Box::new(Ty::Nil), vec![Ty::Any]));
+		this.new_variable("assert", true, Ty::Fn(Box::new(Ty::Nil), vec![Ty::Bool]));
+
 		this.visit_file(ast);
 		this.scope_stack.pop();
 		assert!(this.scope_stack.is_empty());
@@ -69,8 +36,9 @@ impl<'a> ScopeCheck<'a> {
 		}
 	}
 
-	fn new_variable(&mut self, name: &'a str, is_const: bool) {
-		let id = self.symbol_table.push(name, is_const);
+	fn new_variable(&mut self, name: &'a str, is_const: bool, ty: Ty) {
+		let symbol = Symbol::new(name, is_const, ty);
+		let id = self.symbol_table.push(symbol);
 		// unwrap: there is always at least one scope
 		let scope = self.scope_stack.last_mut().unwrap();
 		scope.insert(name, id);
@@ -101,7 +69,7 @@ impl<'a> ScopeCheck<'a> {
 						self.errors.push(msg);
 					}
 				} else {
-					self.new_variable(name, false);
+					self.new_variable(name, false, Ty::Any);
 					needs_local = true;
 				}
 
@@ -147,7 +115,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		for n in &mut node.names {
 			let name = n.span.as_str(self.input);
 			// marked as const since we should never assign to loop variable
-			self.new_variable(name, true);
+			self.new_variable(name, true, Ty::Number);
 			n.visit(self);
 		}
 		for e in &mut node.exprs {
@@ -170,7 +138,11 @@ impl<'a> Visitor for ScopeCheck<'a> {
 				self.errors.push(msg);
 			} else {
 				// function defs are always const
-				self.new_variable(name, true);
+				self.new_variable(
+					name,
+					true,
+					Ty::Fn(Box::new(Ty::Any), vec![Ty::Any; node.body.params.len()]),
+				);
 				node.local = true;
 			}
 		} else {
@@ -190,7 +162,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		for n in &mut node.params {
 			let name = n.span.as_str(self.input);
 			// function args are mutable
-			self.new_variable(name, false);
+			self.new_variable(name, false, Ty::Any);
 			n.visit(self);
 		}
 		node.body.visit(self);
@@ -211,6 +183,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		}
 	}
 
+	// TODO: just make this the default order
 	fn visit_field(&mut self, node: &mut Field) {
 		match node {
 			Field::Assign(p, e) => {

@@ -376,11 +376,6 @@ impl Iterator for LexIter<'_> {
 					let end = self.cursor;
 					Some(self.newtoken(Plus, start, end))
 				},
-				'#' => {
-					self.eat_char();
-					let end = self.cursor;
-					Some(self.newtoken(Hash, start, end))
-				},
 				'*' => {
 					self.eat_char();
 					let end = self.cursor;

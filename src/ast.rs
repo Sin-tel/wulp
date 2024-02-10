@@ -77,14 +77,6 @@ pub enum ExprKind {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Literal {
-	Nil,
-	Bool(bool),
-	Number(f64),
-	Str(String),
-}
-
-#[derive(Debug, PartialEq)]
 pub enum Suffix {
 	Property(Property),
 	Index(Expr),
@@ -143,6 +135,26 @@ pub struct UnExpr {
 }
 
 #[derive(Debug, PartialEq)]
+pub enum Literal {
+	Nil,
+	Bool(bool),
+	Number(f64),
+	Str(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Ty {
+	Any,
+	Bottom,
+	// NonNil,
+	Nil,
+	Bool,
+	Str,
+	Number,
+	Fn(Box<Ty>, Vec<Ty>), // ret, args
+}
+
+#[derive(Debug, PartialEq)]
 pub enum BinOp {
 	Plus,
 	Minus,
@@ -165,7 +177,6 @@ pub enum BinOp {
 pub enum UnOp {
 	Minus,
 	Not,
-	Len,
 }
 
 impl BinOp {
