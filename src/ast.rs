@@ -99,7 +99,8 @@ pub struct Call {
 
 #[derive(Debug, PartialEq)]
 pub struct FnDef {
-	pub name: Vec<Name>,
+	pub name: Name,
+	pub path: Vec<Property>,
 	pub body: FnBody,
 	pub local: bool,
 }
@@ -114,6 +115,7 @@ pub struct FnBody {
 pub enum Field {
 	Assign(Property, Expr),
 	Expr(Expr),
+	Fn(Property, FnBody),
 }
 
 #[derive(PartialEq, Debug)]

@@ -18,7 +18,7 @@ vars -> suffix_expr {`,` suffix_expr}
 
 fn_call -> suffix_expr args
 fn_body -> `(` [parlist] `)` block
-fn_name -> Name {`.` Name}
+fn_name -> Name {`.` Property}
 args ->  `(` [expr_list] `)`
 parlist -> Name {`,` Name} [`,`]
 expr_list -> expr {`,` expr}
@@ -39,6 +39,7 @@ suffix -> `.` Property
         | `[` expr `]`
 
 table -> `{` [fieldlist] `}`
-fieldlist -> field {`,` field}
-field -> expr | Property `=` expr
+fieldlist -> field {[sep] field}
+sep -> `,` | `;`
+field -> expr | Property `=` expr | FN Property fn_body
 ```

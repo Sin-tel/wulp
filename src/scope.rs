@@ -125,13 +125,25 @@ impl<'a> Visitor for ScopeCheck<'a> {
 	}
 
 	fn visit_fn_def(&mut self, node: &mut FnDef) {
-		// TODO: loop
-		assert!(node.name.len() == 1);
-		let name = node.name[0].span.as_str(self.input);
+		let name = node.name.span.as_str(self.input);
 
-		// TODO: check that we are not redefining a function?
-		self.new_variable(name);
-		assert!(node.local);
+		let resolved = self.lookup(name).is_some();
+		if node.path.is_empty() {
+			// plain fn def
+			if resolved {
+				let msg = format!("Function `{name}` already exists.");
+				format_err(&msg, node.name.span, self.input);
+			} else {
+				self.new_variable(name);
+				node.local = true;
+			}
+		} else {
+			// fn property on some struct
+			if !resolved {
+				let msg = format!("Undefined struct: `{name}`.");
+				format_err(&msg, node.name.span, self.input);
+			}
+		}
 
 		node.walk(self);
 	}
@@ -170,6 +182,10 @@ impl<'a> Visitor for ScopeCheck<'a> {
 				p.visit(self);
 			},
 			Field::Expr(e) => e.visit(self),
+			Field::Fn(p, f) => {
+				p.visit(self);
+				f.visit(self);
+			},
 		}
 	}
 

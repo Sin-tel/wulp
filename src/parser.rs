@@ -32,7 +32,7 @@ pub fn parse_block(input: &str, tokens: &mut Lexer) -> Block {
 }
 
 pub fn parse_block_inner(input: &str, tokens: &mut Lexer) -> Block {
-	let mut stats = vec![];
+	let mut stats = Vec::new();
 	loop {
 		match tokens.peek().kind {
 			TokenKind::RCurly | TokenKind::Eof => break,
@@ -124,25 +124,26 @@ pub fn parse_assignment(first: Expr, input: &str, tokens: &mut Lexer) -> Assignm
 pub fn parse_fn_def(input: &str, tokens: &mut Lexer) -> FnDef {
 	assert_next(input, tokens, TokenKind::Fn);
 
-	let name = parse_fn_name(input, tokens);
+	let (name, path) = parse_fn_name(input, tokens);
 	let body = parse_fn_body(input, tokens);
 
 	FnDef {
 		name,
+		path,
 		body,
-		local: true, // for now, function defs are always local
+		local: false,
 	}
 }
 
-pub fn parse_fn_name(input: &str, tokens: &mut Lexer) -> Vec<Name> {
-	let mut path = vec![parse_name(input, tokens)];
-	// if next token is period then loop
+pub fn parse_fn_name(input: &str, tokens: &mut Lexer) -> (Name, Vec<Property>) {
+	let name = parse_name(input, tokens);
+	let mut path = Vec::new();
+
 	while tokens.peek().kind == (TokenKind::Period) {
 		tokens.next();
-		path.push(parse_name(input, tokens));
+		path.push(parse_property(input, tokens));
 	}
-
-	path
+	(name, path)
 }
 
 pub fn parse_fn_body(input: &str, tokens: &mut Lexer) -> FnBody {
@@ -175,7 +176,7 @@ pub fn parse_if_block(input: &str, tokens: &mut Lexer) -> IfBlock {
 
 	let block = parse_block(input, tokens);
 
-	let mut elseif = vec![];
+	let mut elseif = Vec::new();
 
 	while tokens.peek().kind == TokenKind::ElseIf {
 		elseif.push(parse_elseif(input, tokens));
@@ -221,7 +222,7 @@ pub fn parse_return(input: &str, tokens: &mut Lexer) -> Vec<Expr> {
 	assert_next(input, tokens, TokenKind::Return);
 
 	match tokens.peek().kind {
-		TokenKind::RCurly | TokenKind::Eof | TokenKind::SemiColon => vec![],
+		TokenKind::RCurly | TokenKind::Eof | TokenKind::SemiColon => Vec::new(),
 		_ => parse_exprs(input, tokens),
 	}
 }
@@ -420,11 +421,14 @@ pub fn parse_table_constructor(input: &str, tokens: &mut Lexer) -> Expr {
 
 pub fn parse_fields(input: &str, tokens: &mut Lexer) -> Vec<Field> {
 	if tokens.peek().kind == TokenKind::RCurly {
-		return vec![];
+		return Vec::new();
 	};
 
-	let mut fields = vec![];
+	let mut fields = Vec::new();
 	loop {
+		if tokens.peek().kind == TokenKind::RCurly {
+			break;
+		}
 		let f = parse_field(input, tokens);
 		fields.push(f);
 
@@ -433,7 +437,8 @@ pub fn parse_fields(input: &str, tokens: &mut Lexer) -> Vec<Field> {
 				tokens.next();
 				continue;
 			},
-			_ => break,
+			_ => (),
+			// _ => break,
 		}
 	}
 
@@ -442,12 +447,12 @@ pub fn parse_fields(input: &str, tokens: &mut Lexer) -> Vec<Field> {
 
 pub fn parse_field(input: &str, tokens: &mut Lexer) -> Field {
 	match tokens.peek().kind {
-		// Name '=' expr
 		TokenKind::Name => {
 			// TODO: this is a bit ugly
 			let span = tokens.next().span;
 
 			match tokens.peek().kind {
+				// Name '=' expr
 				TokenKind::Assign => {
 					tokens.next();
 					let expr = parse_expr(input, tokens);
@@ -459,6 +464,7 @@ pub fn parse_field(input: &str, tokens: &mut Lexer) -> Field {
 						expr,
 					)
 				},
+				// Expr(Name)
 				_ => {
 					let name = new_name(span);
 					Field::Expr(Expr {
@@ -468,21 +474,28 @@ pub fn parse_field(input: &str, tokens: &mut Lexer) -> Field {
 				},
 			}
 		},
-		// expr
+		TokenKind::Fn => {
+			tokens.next();
+
+			let name = parse_property(input, tokens);
+			let body = parse_fn_body(input, tokens);
+
+			Field::Fn(name, body)
+		},
 		_ => Field::Expr(parse_expr(input, tokens)),
 	}
 }
 
 pub fn parse_args(input: &str, tokens: &mut Lexer) -> Vec<Expr> {
 	if tokens.peek().kind == TokenKind::RParen {
-		return vec![];
+		return Vec::new();
 	}
 	let expr_list = parse_exprs(input, tokens);
 	expr_list
 }
 
 pub fn parse_exprs(input: &str, tokens: &mut Lexer) -> Vec<Expr> {
-	let mut exprs = vec![];
+	let mut exprs = Vec::new();
 
 	exprs.push(parse_expr(input, tokens));
 
@@ -519,7 +532,7 @@ pub fn parse_parlist(input: &str, tokens: &mut Lexer) -> Vec<Name> {
 			};
 			names
 		},
-		_ => vec![],
+		_ => Vec::new(),
 	}
 }
 

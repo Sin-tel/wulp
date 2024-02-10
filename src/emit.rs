@@ -105,7 +105,11 @@ impl Visitor for EmitLua {
 		}
 		self.code.push_str("function ");
 
-		self.push_list(&mut node.name, ".");
+		self.visit_name(&mut node.name);
+		for p in &mut node.path {
+			self.code.push('.');
+			self.visit_property(p)
+		}
 		self.visit_fn_body(&mut node.body);
 	}
 	fn visit_fn_call(&mut self, node: &mut Call) {
@@ -209,13 +213,18 @@ impl Visitor for EmitLua {
 
 	fn visit_field(&mut self, node: &mut Field) {
 		match node {
-			Field::Assign(n, e) => {
-				self.visit_property(n);
+			Field::Assign(p, e) => {
+				self.visit_property(p);
 				self.code.push_str(" = ");
 				self.visit_expr(e);
 			},
 			Field::Expr(e) => {
 				self.visit_expr(e);
+			},
+			Field::Fn(p, f) => {
+				self.visit_property(p);
+				self.code.push_str(" = function");
+				self.visit_fn_body(f);
 			},
 		}
 	}

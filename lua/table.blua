@@ -1,0 +1,26 @@
+// defining a struct prototype
+point = {
+	x = 1
+	y = 2
+	fn get_x(self) {
+		return self.x
+	}
+}
+
+// other way to define function on struct
+fn point.set_x(self, x) {
+	self.x = x
+}
+
+// fails: test is undefined
+// fn test.f() {}
+
+// fails: redefinition
+// fn f() {}
+// fn f() {}
+
+
+point.set_x(point, 5)
+
+print(point.get_x(point))
+

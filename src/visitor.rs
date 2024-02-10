@@ -156,8 +156,9 @@ impl<V: Visitor> VisitNode<V> for FnDef {
 		v.visit_fn_def(self);
 	}
 	fn walk(&mut self, v: &mut V) {
-		for e in &mut self.name {
-			v.visit_name(e);
+		v.visit_name(&mut self.name);
+		for p in &mut self.path {
+			v.visit_property(p);
 		}
 		v.visit_fn_body(&mut self.body);
 	}
@@ -259,11 +260,15 @@ impl<V: Visitor> VisitNode<V> for Field {
 	}
 	fn walk(&mut self, v: &mut V) {
 		match self {
-			Field::Assign(n, e) => {
-				v.visit_property(n);
+			Field::Assign(p, e) => {
+				v.visit_property(p);
 				v.visit_expr(e);
 			},
 			Field::Expr(e) => v.visit_expr(e),
+			Field::Fn(p, f) => {
+				v.visit_property(p);
+				v.visit_fn_body(f);
+			},
 		}
 	}
 }
