@@ -73,18 +73,18 @@ impl<'a> TypeCheck<'a> {
 			},
 			ExprKind::UnExpr(e) => {
 				let ty = self.infer_expr(&mut e.expr);
-				if ty == Ty::Bottom {
-					return ty;
-				}
 				match e.op {
 					UnOp::Minus => {
-						if ty == Ty::Num {
-							return ty;
+						if ty <= Ty::Int {
+							return Ty::Int;
+						}
+						if ty <= Ty::Num {
+							return Ty::Num;
 						}
 					},
 					UnOp::Not => {
-						if ty == Ty::Bool {
-							return ty;
+						if ty <= Ty::Bool {
+							return Ty::Bool;
 						}
 					},
 				}
