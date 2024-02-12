@@ -50,10 +50,15 @@ pub enum TokenKind {
 	Gt,
 	SemiColon,
 	Colon,
+	Arrow,
 	Str,
 	Number,
 	Name,
 	Comment,
+	TyNum,
+	TyInt,
+	TyStr,
+	TyBool,
 	Eof,
 }
 
@@ -134,10 +139,15 @@ impl fmt::Display for TokenKind {
 				Gt => "`>`",
 				SemiColon => "`;`",
 				Colon => "`:`",
+				Arrow => "`->`",
 				Str => "string",
 				Number => "number",
 				Name => "identifier",
 				Comment => "comment",
+				TyNum => "num",
+				TyInt => "int",
+				TyStr => "str",
+				TyBool => "bool",
 				Eof => "end of file",
 			}
 		)

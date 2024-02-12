@@ -81,7 +81,8 @@ impl Visitor for AstPrinter<'_> {
 	fn visit_literal(&mut self, node: &mut Literal) {
 		match node {
 			Literal::Nil => add_leaf!("nil"),
-			Literal::Number(s) => add_leaf!("{} (number)", s),
+			Literal::Num(s) => add_leaf!("{} (num)", s),
+			Literal::Int(s) => add_leaf!("{} (int)", s),
 			Literal::Str(s) => add_leaf!("{:?} (string)", s),
 			Literal::Bool(s) => add_leaf!("{} (bool)", s),
 		}

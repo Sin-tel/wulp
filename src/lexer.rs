@@ -210,6 +210,10 @@ impl<'a> LexIter<'a> {
 			"if" => TokenKind::If,
 			"elseif" => TokenKind::ElseIf,
 			"else" => TokenKind::Else,
+			"num" => TokenKind::TyNum,
+			"int" => TokenKind::TyInt,
+			"str" => TokenKind::TyStr,
+			"bool" => TokenKind::TyBool,
 			_ => TokenKind::Name,
 		};
 
@@ -303,6 +307,11 @@ impl Iterator for LexIter<'_> {
 				'.' if self.peek_is_number() => Some(self.number()),
 				'0'..='9' => Some(self.number()),
 				'/' if next == Some('/') => Some(self.single_line_comment()),
+				'-' if next == Some('>') => {
+					self.eat_chars(2);
+					let end = self.cursor;
+					Some(self.newtoken(Arrow, start, end))
+				},
 				'-' => {
 					if self.peek_is_number() {
 						return Some(self.number());

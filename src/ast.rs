@@ -52,9 +52,22 @@ pub struct ForBlock {
 
 #[derive(Debug, PartialEq)]
 pub struct Assignment {
-	pub vars: Vec<Expr>,
+	pub vars: Vec<Var>,
 	pub exprs: Vec<Expr>,
 	pub local: bool,
+	pub span: Span,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Var {
+	Expr(Expr),
+	Typed(Typed),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Typed {
+	pub name: Name,
+	pub ty: Ty,
 }
 
 #[derive(Debug, PartialEq)]
@@ -98,8 +111,15 @@ pub struct FnDef {
 
 #[derive(Debug, PartialEq)]
 pub struct FnBody {
-	pub params: Vec<Name>,
+	pub params: Vec<Param>,
 	pub body: Block,
+	pub ty: Ty, // return type
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Param {
+	pub name: Name,
+	pub ty: Ty,
 }
 
 #[derive(Debug, PartialEq)]
@@ -138,7 +158,8 @@ pub struct UnExpr {
 pub enum Literal {
 	Nil,
 	Bool(bool),
-	Number(f64),
+	Num(f64),
+	Int(i32),
 	Str(String),
 }
 
@@ -146,12 +167,12 @@ pub enum Literal {
 pub enum Ty {
 	Any,
 	Bottom,
-	// NonNil,
 	Nil,
 	Bool,
 	Str,
-	Number,
-	Fn(Box<Ty>, Vec<Ty>), // ret, args
+	Num,
+	Int,
+	Fn(Vec<Ty>, Box<Ty>), // args, ret
 }
 
 #[derive(Debug, PartialEq)]

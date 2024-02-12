@@ -81,21 +81,18 @@ fn parse_statement_inner(input: &str, tokens: &mut Lexer) -> Stat {
 		TokenKind::For => Stat::ForBlock(parse_for_block(input, tokens)),
 		TokenKind::Fn => Stat::FnDef(parse_fn_def(input, tokens)),
 		_ => {
-			// Parse a suffix expression, then check if a `=` or `,` follows to parse (multiple) assignment.
+			// Parse a suffix expression, then check if a `=`, `,` or `:` follows to parse (multiple) assignment.
 			// If not, it should be a function call.
 			let suffix_expr = parse_suffix_expr(input, tokens);
 			match tokens.peek().kind {
-				TokenKind::Assign | TokenKind::Comma => Stat::Assignment(parse_assignment(suffix_expr, input, tokens)),
+				TokenKind::Assign | TokenKind::Comma | TokenKind::Colon => {
+					Stat::Assignment(parse_assignment(suffix_expr, input, tokens))
+				},
 				_ => {
-					if let Expr {
-						span: _,
-						kind: ExprKind::Call(e),
-					} = suffix_expr
-					{
+					if let ExprKind::Call(e) = suffix_expr.kind {
 						return Stat::Call(e);
 					}
 					// TODO: make this more informative
-					// TODO: check ambiguous syntax
 					let tk = tokens.next();
 					let msg = format!("Expected `=` but found: {tk}.");
 					format_err(&msg, tk.span, input);
@@ -107,29 +104,49 @@ fn parse_statement_inner(input: &str, tokens: &mut Lexer) -> Stat {
 }
 
 fn parse_assignment(first: Expr, input: &str, tokens: &mut Lexer) -> Assignment {
-	let mut vars = vec![first];
+	// dbg!(&first);
+	let start = first.span;
+	let first_var = match first.kind {
+		ExprKind::Name(name) if tokens.peek().kind == TokenKind::Colon => {
+			tokens.next();
+			let ty = parse_type(input, tokens);
+			Var::Typed(Typed { name, ty })
+		},
+		_ => Var::Expr(first),
+	};
 
-	while tokens.peek().kind == TokenKind::Comma {
-		tokens.next();
-		vars.push(parse_suffix_expr(input, tokens));
+	let vars = vec![first_var];
+
+	if tokens.peek().kind == TokenKind::Comma {
+		todo!();
 	}
 
+	// while tokens.peek().kind == TokenKind::Comma {
+	// 	tokens.next();
+	// 	vars.push(parse_suffix_expr(input, tokens));
+	// }
+
 	// lhs vars can not be a Call, since those arent lvalues.
-	for v in &vars {
-		if let ExprKind::Call(_) = v.kind {
-			let msg = "Can not assign to a function call.";
-			format_err(msg, v.span, input);
-			panic!("{}", msg);
+	for var in &vars {
+		if let Var::Expr(v) = var {
+			if let ExprKind::Call(_) = v.kind {
+				let msg = "Can not assign to a function call.";
+				format_err(msg, v.span, input);
+				panic!("{}", msg);
+			}
 		}
 	}
 	assert_next(input, tokens, TokenKind::Assign);
 
 	let exprs = parse_exprs(input, tokens);
 
+	let span = Span::join(start, exprs.last().unwrap().span);
+
 	Assignment {
 		vars,
 		exprs,
 		local: false,
+		span,
 	}
 }
 
@@ -159,13 +176,19 @@ fn parse_fn_name(input: &str, tokens: &mut Lexer) -> (Name, Vec<Property>) {
 }
 
 fn parse_fn_body(input: &str, tokens: &mut Lexer) -> FnBody {
-	assert_next(input, tokens, TokenKind::LParen);
 	let params = parse_parlist(input, tokens);
-	assert_next(input, tokens, TokenKind::RParen);
+
+	let ty = if tokens.peek().kind == TokenKind::Arrow {
+		tokens.next();
+		parse_type(input, tokens)
+	} else {
+		// Ty::Nil
+		panic!("use explicit returns");
+	};
 
 	let body = parse_block(input, tokens);
 
-	FnBody { params, body }
+	FnBody { params, body, ty }
 }
 
 fn parse_for_block(input: &str, tokens: &mut Lexer) -> ForBlock {
@@ -536,17 +559,34 @@ fn parse_names(input: &str, tokens: &mut Lexer) -> Vec<Name> {
 	names
 }
 
-fn parse_parlist(input: &str, tokens: &mut Lexer) -> Vec<Name> {
-	match tokens.peek().kind {
-		TokenKind::Name => {
-			let names = parse_names(input, tokens);
-			if tokens.peek().kind == TokenKind::Comma {
-				tokens.next();
-			};
-			names
-		},
-		_ => Vec::new(),
+fn parse_parlist(input: &str, tokens: &mut Lexer) -> Vec<Param> {
+	assert_next(input, tokens, TokenKind::LParen);
+
+	let mut params = Vec::new();
+
+	if tokens.peek().kind == TokenKind::RParen {
+		return params;
 	}
+
+	while tokens.peek().kind == TokenKind::Name {
+		let name = parse_name(input, tokens);
+		assert_next(input, tokens, TokenKind::Colon);
+		let ty = parse_type(input, tokens);
+		params.push(Param { name, ty });
+		if tokens.peek().kind == TokenKind::RParen {
+			break;
+		}
+		assert_next(input, tokens, TokenKind::Comma);
+	}
+
+	// allow trailing comma
+	if tokens.peek().kind == TokenKind::Comma {
+		tokens.next();
+	}
+
+	assert_next(input, tokens, TokenKind::RParen);
+
+	params
 }
 
 // Simple terminals
@@ -586,7 +626,12 @@ fn parse_number(input: &str, tokens: &mut Lexer) -> Expr {
 	if let Ok(num) = s.parse() {
 		Expr {
 			span,
-			kind: ExprKind::Literal(Literal::Number(num)),
+			kind: ExprKind::Literal(Literal::Int(num)),
+		}
+	} else if let Ok(num) = s.parse() {
+		Expr {
+			span,
+			kind: ExprKind::Literal(Literal::Num(num)),
 		}
 	} else {
 		let msg = format!("Malformed number: `{s}`.");
@@ -610,6 +655,23 @@ fn parse_property(input: &str, tokens: &mut Lexer) -> Property {
 	let name = span.as_string(input);
 	assert_next(input, tokens, TokenKind::Name);
 	Property { span, name }
+}
+
+fn parse_type(input: &str, tokens: &mut Lexer) -> Ty {
+	// TODO: fn types
+	let tk = tokens.next();
+	match tk.kind {
+		TokenKind::Nil => Ty::Nil,
+		TokenKind::TyNum => Ty::Num,
+		TokenKind::TyInt => Ty::Int,
+		TokenKind::TyStr => Ty::Str,
+		TokenKind::TyBool => Ty::Bool,
+		_ => {
+			let msg = format!("Expected type but found {}.", tk.kind);
+			format_err(&msg, tk.span, input);
+			panic!("{msg}");
+		},
+	}
 }
 
 fn assert_next(input: &str, tokens: &mut Lexer, expect: TokenKind) -> Token {

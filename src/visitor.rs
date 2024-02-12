@@ -34,10 +34,19 @@ pub trait Visitor: Sized {
 	fn visit_expr(&mut self, node: &mut Expr) {
 		node.walk(self);
 	}
+	fn visit_var(&mut self, node: &mut Var) {
+		node.walk(self);
+	}
+	fn visit_typed(&mut self, node: &mut Typed) {
+		node.walk(self);
+	}
 	fn visit_suffix(&mut self, node: &mut Suffix) {
 		node.walk(self);
 	}
 	fn visit_field(&mut self, node: &mut Field) {
+		node.walk(self);
+	}
+	fn visit_param(&mut self, node: &mut Param) {
 		node.walk(self);
 	}
 	// leaf nodes
@@ -147,12 +156,33 @@ impl<V: Visitor> VisitNode<V> for Assignment {
 		v.visit_assignment(self);
 	}
 	fn walk(&mut self, v: &mut V) {
-		for e in &mut self.vars {
-			v.visit_expr(e);
+		for var in &mut self.vars {
+			v.visit_var(var);
 		}
 		for e in &mut self.exprs {
 			v.visit_expr(e);
 		}
+	}
+}
+
+impl<V: Visitor> VisitNode<V> for Var {
+	fn visit(&mut self, v: &mut V) {
+		v.visit_var(self);
+	}
+	fn walk(&mut self, v: &mut V) {
+		match self {
+			Var::Expr(e) => v.visit_expr(e),
+			Var::Typed(e) => v.visit_typed(e),
+		}
+	}
+}
+
+impl<V: Visitor> VisitNode<V> for Typed {
+	fn visit(&mut self, v: &mut V) {
+		v.visit_typed(self);
+	}
+	fn walk(&mut self, v: &mut V) {
+		v.visit_name(&mut self.name);
 	}
 }
 
@@ -186,10 +216,19 @@ impl<V: Visitor> VisitNode<V> for FnBody {
 		v.visit_fn_body(self);
 	}
 	fn walk(&mut self, v: &mut V) {
-		for e in &mut self.params {
-			v.visit_name(e);
+		for p in &mut self.params {
+			v.visit_param(p);
 		}
 		v.visit_block(&mut self.body);
+	}
+}
+
+impl<V: Visitor> VisitNode<V> for Param {
+	fn visit(&mut self, v: &mut V) {
+		v.visit_param(self);
+	}
+	fn walk(&mut self, v: &mut V) {
+		v.visit_name(&mut self.name);
 	}
 }
 

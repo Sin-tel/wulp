@@ -7,6 +7,7 @@
 #![warn(clippy::match_same_arms)]
 #![deny(unreachable_patterns)]
 #![warn(clippy::single_match_else)]
+#![allow(clippy::match_like_matches_macro)]
 #![allow(clippy::enum_variant_names)]
 
 // #![warn(clippy::pedantic)]
@@ -43,22 +44,31 @@ fn main() -> Result<(), String> {
 	// let input = fs::read_to_string(filename).unwrap();
 
 	let input = r#"
-	x = 5 >= 6
-	y = false
-	print(x and y)
+	// fn fact(n: int) -> int {
+	// 	assert(n >= 0)
+	// 	if n != 0 return n * fact(n - 1)
+	// 	else return 1
+	// }
+	// print(fact(5))
+
+	x: num = 5
+	y: int = 4
+	z: num = x + y
+	assert(x > 4)
+	print(z)
 	"#;
 
 	let mut ast = parser::parse(&input);
 	// dbg!(&ast);
 
-	println!("----- input:");
-	println!("{input}");
+	// println!("----- input:");
+	// println!("{input}");
 
 	let mut symbol_table = ScopeCheck::check(&mut ast, &input)?;
 	TypeCheck::check(&mut ast, &input, &mut symbol_table)?;
 
-	println!("----- AST:");
-	AstPrinter::print_ast(&mut ast, &input);
+	// println!("----- AST:");
+	// AstPrinter::print_ast(&mut ast, &input);
 
 	println!("----- emitted code:");
 	let code = EmitLua::emit(&mut ast, symbol_table);
@@ -72,7 +82,7 @@ fn main() -> Result<(), String> {
 	let mut chunk = lua.load(code);
 	chunk = chunk.set_name(filename);
 	let res = chunk.exec();
-	display_return(res);
+	// display_return(res);
 
 	Ok(())
 }

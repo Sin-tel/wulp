@@ -175,7 +175,8 @@ impl Visitor for EmitLua {
 	fn visit_literal(&mut self, node: &mut Literal) {
 		match node {
 			Literal::Nil => self.code.push_str("nil"),
-			Literal::Number(s) => self.code.push_str(&s.to_string()),
+			Literal::Num(s) => self.code.push_str(&s.to_string()),
+			Literal::Int(s) => self.code.push_str(&s.to_string()),
 			Literal::Str(s) => {
 				// TODO: do proper escape sequences
 				self.code.push_str(&format!("{s:?}"));
