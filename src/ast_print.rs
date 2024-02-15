@@ -29,11 +29,11 @@ impl Visitor for AstPrinter<'_> {
 		node.walk(self);
 	}
 	fn visit_assignment(&mut self, node: &mut Assignment) {
-		add_branch!("{}", if node.local { "local assign" } else { "assign" });
+		add_branch!("{}", if node.new_def { "local assign" } else { "assign" });
 		node.walk(self);
 	}
 	fn visit_fn_def(&mut self, node: &mut FnDef) {
-		add_branch!("{}", if node.local { "local function" } else { "function" });
+		add_branch!("function");
 		node.walk(self);
 	}
 	fn visit_fn_call(&mut self, node: &mut Call) {

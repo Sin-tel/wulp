@@ -214,6 +214,7 @@ impl<'a> LexIter<'a> {
 			"int" => TokenKind::TyInt,
 			"str" => TokenKind::TyStr,
 			"bool" => TokenKind::TyBool,
+			"maybe" => TokenKind::TyMaybe,
 			_ => TokenKind::Name,
 		};
 

@@ -69,9 +69,7 @@ impl<V: Visitor> VisitNode<V> for File {
 		v.visit_file(self);
 	}
 	fn walk(&mut self, v: &mut V) {
-		for s in &mut self.stats {
-			v.visit_stat(s);
-		}
+		v.visit_block(&mut self.block);
 	}
 }
 
@@ -100,8 +98,8 @@ impl<V: Visitor> VisitNode<V> for Stat {
 			Stat::Block(s) => v.visit_block(s),
 			Stat::WhileBlock(s) => v.visit_while_block(s),
 			Stat::Break => (),
-			Stat::Return(exprs) => {
-				for e in exprs.iter_mut() {
+			Stat::Return(ret) => {
+				for e in &mut ret.exprs {
 					v.visit_expr(e);
 				}
 			},
@@ -134,9 +132,7 @@ impl<V: Visitor> VisitNode<V> for ForBlock {
 		for n in &mut self.names {
 			v.visit_name(n);
 		}
-		for e in &mut self.exprs {
-			v.visit_expr(e);
-		}
+		v.visit_expr(&mut self.expr);
 		v.visit_block(&mut self.block);
 	}
 }

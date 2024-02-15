@@ -59,6 +59,7 @@ pub enum TokenKind {
 	TyInt,
 	TyStr,
 	TyBool,
+	TyMaybe,
 	Eof,
 }
 
@@ -148,6 +149,7 @@ impl fmt::Display for TokenKind {
 				TyInt => "int",
 				TyStr => "str",
 				TyBool => "bool",
+				TyMaybe => "maybe",
 				Eof => "end of file",
 			}
 		)

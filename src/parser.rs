@@ -3,6 +3,7 @@ use crate::lexer::Lexer;
 use crate::span::Span;
 use crate::span::{format_err, format_warning};
 use crate::token::{Token, TokenKind};
+use crate::ty::Ty;
 
 pub fn parse(input: &str) -> File {
 	let mut tokens = Lexer::new(input);
@@ -23,7 +24,7 @@ pub fn parse(input: &str) -> File {
 
 fn parse_file(input: &str, tokens: &mut Lexer) -> File {
 	let stats = parse_stat_list(input, tokens);
-	File { stats }
+	File { block: Block { stats } }
 }
 
 /// `{` block `}` | statement
@@ -145,7 +146,8 @@ fn parse_assignment(first: Expr, input: &str, tokens: &mut Lexer) -> Assignment 
 	Assignment {
 		vars,
 		exprs,
-		local: false,
+		// we don't know yet, this gets fixed during scope checking
+		new_def: false,
 		span,
 	}
 }
@@ -156,12 +158,7 @@ fn parse_fn_def(input: &str, tokens: &mut Lexer) -> FnDef {
 	let (name, path) = parse_fn_name(input, tokens);
 	let body = parse_fn_body(input, tokens);
 
-	FnDef {
-		name,
-		path,
-		body,
-		local: false,
-	}
+	FnDef { name, path, body }
 }
 
 fn parse_fn_name(input: &str, tokens: &mut Lexer) -> (Name, Vec<Property>) {
@@ -180,10 +177,9 @@ fn parse_fn_body(input: &str, tokens: &mut Lexer) -> FnBody {
 
 	let ty = if tokens.peek().kind == TokenKind::Arrow {
 		tokens.next();
-		parse_type(input, tokens)
+		Some(parse_type(input, tokens))
 	} else {
-		// Ty::Nil
-		panic!("use explicit returns");
+		None
 	};
 
 	let body = parse_block(input, tokens);
@@ -198,10 +194,10 @@ fn parse_for_block(input: &str, tokens: &mut Lexer) -> ForBlock {
 
 	assert_next(input, tokens, TokenKind::In);
 
-	let exprs = parse_exprs(input, tokens);
+	let expr = parse_expr(input, tokens);
 	let block = parse_block(input, tokens);
 
-	ForBlock { names, exprs, block }
+	ForBlock { names, expr, block }
 }
 
 fn parse_if_block(input: &str, tokens: &mut Lexer) -> IfBlock {
@@ -253,13 +249,19 @@ fn parse_while_block(input: &str, tokens: &mut Lexer) -> WhileBlock {
 	WhileBlock { expr, block }
 }
 
-fn parse_return(input: &str, tokens: &mut Lexer) -> Vec<Expr> {
+fn parse_return(input: &str, tokens: &mut Lexer) -> Return {
+	let mut span = tokens.peek().span;
 	assert_next(input, tokens, TokenKind::Return);
 
+	let mut exprs = Vec::new();
 	match tokens.peek().kind {
-		TokenKind::RCurly | TokenKind::Eof | TokenKind::SemiColon => Vec::new(),
-		_ => parse_exprs(input, tokens),
-	}
+		TokenKind::RCurly | TokenKind::Eof | TokenKind::SemiColon => (),
+		_ => {
+			exprs = parse_exprs(input, tokens);
+			span.end = exprs.last().unwrap().span.end;
+		},
+	};
+	Return { span, exprs }
 }
 
 // Expression rules
@@ -322,6 +324,7 @@ fn parse_simple_expr(input: &str, tokens: &mut Lexer) -> Expr {
 			}
 		},
 		TokenKind::Fn => {
+			// TODO: we now use `fn` for the span of the lambda, which is kind of lame
 			let span = tokens.next().span;
 			Expr {
 				span,
@@ -565,13 +568,18 @@ fn parse_parlist(input: &str, tokens: &mut Lexer) -> Vec<Param> {
 	let mut params = Vec::new();
 
 	if tokens.peek().kind == TokenKind::RParen {
+		tokens.next();
 		return params;
 	}
 
 	while tokens.peek().kind == TokenKind::Name {
 		let name = parse_name(input, tokens);
-		assert_next(input, tokens, TokenKind::Colon);
-		let ty = parse_type(input, tokens);
+		let ty = if tokens.peek().kind == TokenKind::Colon {
+			tokens.next();
+			Some(parse_type(input, tokens))
+		} else {
+			None
+		};
 		params.push(Param { name, ty });
 		if tokens.peek().kind == TokenKind::RParen {
 			break;
@@ -666,6 +674,12 @@ fn parse_type(input: &str, tokens: &mut Lexer) -> Ty {
 		TokenKind::TyInt => Ty::Int,
 		TokenKind::TyStr => Ty::Str,
 		TokenKind::TyBool => Ty::Bool,
+		TokenKind::TyMaybe => {
+			assert_next(input, tokens, TokenKind::LParen);
+			let inner = parse_type(input, tokens);
+			assert_next(input, tokens, TokenKind::RParen);
+			Ty::Maybe(Box::new(inner))
+		},
 		_ => {
 			let msg = format!("Expected type but found {}.", tk.kind);
 			format_err(&msg, tk.span, input);

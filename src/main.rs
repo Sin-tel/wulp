@@ -9,7 +9,6 @@
 #![warn(clippy::single_match_else)]
 #![allow(clippy::match_like_matches_macro)]
 #![allow(clippy::enum_variant_names)]
-
 // #![warn(clippy::pedantic)]
 // #![allow(clippy::similar_names)]
 // #![allow(clippy::enum_glob_use)]
@@ -17,6 +16,8 @@
 // #![allow(clippy::too_many_lines)]
 // #![allow(clippy::doc_markdown)]
 
+//
+#![allow(unused_imports)]
 use crate::ast_print::AstPrinter;
 use crate::emit::EmitLua;
 use crate::scope::ScopeCheck;
@@ -25,14 +26,16 @@ use mlua::prelude::LuaResult;
 use std::fs;
 
 mod ast;
-mod ast_print;
+pub mod ast_print;
 mod emit;
 mod lexer;
 mod parser;
 mod scope;
 mod span;
+mod std_lib;
 mod symbol;
 mod token;
+mod ty;
 mod typecheck;
 mod visitor;
 
@@ -44,19 +47,22 @@ fn main() -> Result<(), String> {
 	// let input = fs::read_to_string(filename).unwrap();
 
 	let input = r#"
-	// fn fact(n: int) -> int {
-	// 	assert(n >= 0)
-	// 	if n != 0 return n * fact(n - 1)
-	// 	else return 1
-	// }
-	// print(fact(5))
+	// fn fact(n: int) -> num {
+	// 	if n != 1 return n * fact(n - 1)
+	// 	elseif n > 0 return 1
+	// 	// else return 0
 
-	x: num = 5
-	y: int = 4
-	z: num = x + y
-	assert(x > 4)
-	print(z)
-	"#;
+	// }
+	
+	// return fact(5)
+
+	x: int = 5
+	y = 6
+	x: int = y
+	{x = "str"}
+	print(x)
+	"#
+	.to_string();
 
 	let mut ast = parser::parse(&input);
 	// dbg!(&ast);
@@ -64,8 +70,8 @@ fn main() -> Result<(), String> {
 	// println!("----- input:");
 	// println!("{input}");
 
-	let mut symbol_table = ScopeCheck::check(&mut ast, &input)?;
-	TypeCheck::check(&mut ast, &input, &mut symbol_table)?;
+	let symbol_table = ScopeCheck::check(&mut ast, &input)?;
+	TypeCheck::check(&ast, &input)?;
 
 	// println!("----- AST:");
 	// AstPrinter::print_ast(&mut ast, &input);
@@ -82,7 +88,7 @@ fn main() -> Result<(), String> {
 	let mut chunk = lua.load(code);
 	chunk = chunk.set_name(filename);
 	let res = chunk.exec();
-	// display_return(res);
+	display_return(res);
 
 	Ok(())
 }

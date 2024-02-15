@@ -1,11 +1,13 @@
 use crate::ast::*;
 use crate::span::format_err;
-use crate::symbol::{Symbol, SymbolTable};
+use crate::std_lib::GLOBALS;
+use crate::symbol::{Symbol, SymbolId, SymbolTable};
+use crate::ty::Ty;
 use crate::visitor::{VisitNode, Visitor};
 use std::collections::HashMap;
 
 pub struct ScopeCheck<'a> {
-	scope_stack: Vec<HashMap<&'a str, usize>>,
+	scope_stack: Vec<HashMap<&'a str, SymbolId>>,
 	symbol_table: SymbolTable,
 	input: &'a str,
 	errors: Vec<String>,
@@ -22,11 +24,10 @@ impl<'a> ScopeCheck<'a> {
 
 		this.scope_stack.push(HashMap::new());
 
-		// TODO: parse std typedef
-		this.new_variable("print", true, Ty::Fn(vec![Ty::Any], Box::new(Ty::Nil)));
-		this.new_variable("assert", true, Ty::Fn(vec![Ty::Bool], Box::new(Ty::Nil)));
-		this.new_variable("Any", true, Ty::Any);
-		this.new_variable("Bottom", true, Ty::Bottom);
+		for item in GLOBALS.iter() {
+			this.new_variable(item.name, true);
+			assert_eq!(this.lookup(item.name), Some(item.id));
+		}
 
 		this.visit_file(ast);
 		this.scope_stack.pop();
@@ -38,15 +39,15 @@ impl<'a> ScopeCheck<'a> {
 		}
 	}
 
-	fn new_variable(&mut self, name: &'a str, is_const: bool, ty: Ty) {
-		let symbol = Symbol::new(name, is_const, ty);
+	fn new_variable(&mut self, name: &'a str, is_const: bool) {
+		let symbol = Symbol::new(name, is_const);
 		let id = self.symbol_table.push(symbol);
 		// unwrap: there is always at least one scope
 		let scope = self.scope_stack.last_mut().unwrap();
 		scope.insert(name, id);
 	}
 
-	fn lookup(&mut self, name: &str) -> Option<usize> {
+	fn lookup(&mut self, name: &str) -> Option<SymbolId> {
 		let mut id = None;
 		// look up identifier in scope, reverse order
 		for scope in self.scope_stack.iter().rev() {
@@ -59,7 +60,7 @@ impl<'a> ScopeCheck<'a> {
 	}
 
 	fn make_lvalue(&mut self, var: &mut Expr) -> bool {
-		let mut needs_local = false;
+		let mut new_def = false;
 		match &mut var.kind {
 			ExprKind::Name(n) => {
 				let name = n.span.as_str(self.input);
@@ -71,8 +72,8 @@ impl<'a> ScopeCheck<'a> {
 						self.errors.push(msg);
 					}
 				} else {
-					self.new_variable(name, false, Ty::Any);
-					needs_local = true;
+					self.new_variable(name, false);
+					new_def = true;
 				}
 
 				var.visit(self);
@@ -95,12 +96,10 @@ impl<'a> ScopeCheck<'a> {
 					e.visit(self);
 				}
 			},
-			_ => {
-				unreachable!();
-			},
+			_ => unreachable!(),
 		}
 
-		needs_local
+		new_def
 	}
 }
 
@@ -117,12 +116,10 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		for n in &mut node.names {
 			let name = n.span.as_str(self.input);
 			// marked as const since we should never assign to loop variable
-			self.new_variable(name, true, Ty::Num);
+			self.new_variable(name, true);
 			n.visit(self);
 		}
-		for e in &mut node.exprs {
-			e.visit(self);
-		}
+		node.expr.visit(self);
 		node.block.visit(self);
 
 		self.scope_stack.pop();
@@ -139,10 +136,9 @@ impl<'a> Visitor for ScopeCheck<'a> {
 				format_err(&msg, node.name.span, self.input);
 				self.errors.push(msg);
 			} else {
-				let param_types = node.body.params.iter().map(|p| p.ty.clone()).collect();
+				let param_types: Vec<Option<Ty>> = node.body.params.iter().map(|p| p.ty.clone()).collect();
 				// function defs are always const
-				self.new_variable(name, true, Ty::Fn(param_types, Box::new(node.body.ty.clone())));
-				node.local = true;
+				self.new_variable(name, true);
 			}
 		} else {
 			// fn property on some struct
@@ -161,7 +157,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		for n in &mut node.params {
 			let name = n.name.span.as_str(self.input);
 			// function args are mutable
-			self.new_variable(name, false, n.ty.clone());
+			self.new_variable(name, false);
 			n.visit(self);
 		}
 		node.body.visit(self);
@@ -179,8 +175,8 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		for var in &mut node.vars {
 			match var {
 				Var::Expr(e) => {
-					let make_local = self.make_lvalue(e);
-					node.local |= make_local;
+					let new_def = self.make_lvalue(e);
+					node.new_def |= new_def;
 				},
 				Var::Typed(n) => {
 					let name = n.name.span.as_str(self.input);
@@ -192,8 +188,8 @@ impl<'a> Visitor for ScopeCheck<'a> {
 							self.errors.push(msg);
 						}
 					} else {
-						self.new_variable(name, false, n.ty.clone());
-						node.local = true;
+						self.new_variable(name, false);
+						node.new_def = true;
 					}
 
 					n.name.visit(self);

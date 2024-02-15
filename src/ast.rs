@@ -1,8 +1,11 @@
 use crate::span::Span;
+use crate::symbol::SymbolId;
+use crate::ty::Ty;
+use std::fmt;
 
 #[derive(Debug, PartialEq)]
 pub struct File {
-	pub stats: Vec<Stat>,
+	pub block: Block,
 }
 
 #[derive(Debug, PartialEq)]
@@ -20,7 +23,13 @@ pub enum Stat {
 	ForBlock(ForBlock),
 	FnDef(FnDef),
 	Break,
-	Return(Vec<Expr>),
+	Return(Return),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Return {
+	pub span: Span,
+	pub exprs: Vec<Expr>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -46,7 +55,7 @@ pub struct WhileBlock {
 #[derive(Debug, PartialEq)]
 pub struct ForBlock {
 	pub names: Vec<Name>,
-	pub exprs: Vec<Expr>,
+	pub expr: Expr,
 	pub block: Block,
 }
 
@@ -54,8 +63,8 @@ pub struct ForBlock {
 pub struct Assignment {
 	pub vars: Vec<Var>,
 	pub exprs: Vec<Expr>,
-	pub local: bool,
 	pub span: Span,
+	pub new_def: bool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -106,20 +115,19 @@ pub struct FnDef {
 	pub name: Name,
 	pub path: Vec<Property>,
 	pub body: FnBody,
-	pub local: bool,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct FnBody {
 	pub params: Vec<Param>,
 	pub body: Block,
-	pub ty: Ty, // return type
+	pub ty: Option<Ty>, // return type
 }
 
 #[derive(Debug, PartialEq)]
 pub struct Param {
 	pub name: Name,
-	pub ty: Ty,
+	pub ty: Option<Ty>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -132,7 +140,7 @@ pub enum Field {
 #[derive(PartialEq, Debug)]
 pub struct Name {
 	pub span: Span,
-	pub id: usize,
+	pub id: SymbolId,
 }
 
 #[derive(PartialEq, Debug)]
@@ -161,18 +169,6 @@ pub enum Literal {
 	Num(f64),
 	Int(i32),
 	Str(String),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Ty {
-	Any,
-	Bottom,
-	Nil,
-	Bool,
-	Str,
-	Num,
-	Int,
-	Fn(Vec<Ty>, Box<Ty>), // args, ret
 }
 
 #[derive(Debug, PartialEq)]
@@ -217,5 +213,44 @@ impl BinOp {
 impl UnOp {
 	pub fn priority(&self) -> i32 {
 		7
+	}
+}
+
+impl fmt::Display for BinOp {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(
+			f,
+			"{}",
+			match self {
+				BinOp::Pow => "^",
+				BinOp::Mul => "*",
+				BinOp::Div => "/",
+				BinOp::Mod => "%",
+				BinOp::Plus => "+",
+				BinOp::Minus => "-",
+				BinOp::Concat => "..",
+				BinOp::Lt => "<",
+				BinOp::Gt => ">",
+				BinOp::Lte => "<=",
+				BinOp::Gte => ">=",
+				BinOp::Eq => "==",
+				BinOp::Neq => "!=",
+				BinOp::And => "and",
+				BinOp::Or => "or",
+			}
+		)
+	}
+}
+
+impl fmt::Display for UnOp {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(
+			f,
+			"{}",
+			match self {
+				UnOp::Minus => "-",
+				UnOp::Not => "not",
+			}
+		)
 	}
 }

@@ -50,10 +50,16 @@ impl Visitor for EmitLua {
 
 		self.visit_block(&mut node.block);
 
+		for elseif in &mut node.elseif {
+			self.indent();
+			self.code.push_str("elseif ");
+			self.visit_expr(&mut elseif.expr);
+			self.code.push_str(" then\n");
+			self.visit_block(&mut elseif.block);
+		}
 		if let Some(b) = &mut node.else_block {
 			self.indent();
 			self.code.push_str("else\n");
-
 			self.visit_block(b);
 		}
 		self.indent();
@@ -70,6 +76,7 @@ impl Visitor for EmitLua {
 		self.code.push_str("end");
 	}
 	fn visit_for_block(&mut self, node: &mut ForBlock) {
+		// TODO: emit the correct kind of iterator depending on the type of expr
 		self.code.push_str("for ");
 		// self.push_list(&mut node.names, ", ");
 
@@ -80,7 +87,7 @@ impl Visitor for EmitLua {
 
 		// self.code.push_str(" in ");
 		self.code.push_str(" in ipairs(");
-		self.push_list(&mut node.exprs, ", ");
+		self.visit_expr(&mut node.expr);
 		self.code.push(')');
 		self.code.push_str(" do\n");
 
@@ -90,7 +97,7 @@ impl Visitor for EmitLua {
 		self.code.push_str("end");
 	}
 	fn visit_assignment(&mut self, node: &mut Assignment) {
-		if node.local {
+		if node.new_def {
 			self.code.push_str("local ");
 		}
 		self.push_list(&mut node.vars, ", ");
@@ -100,9 +107,7 @@ impl Visitor for EmitLua {
 		}
 	}
 	fn visit_fn_def(&mut self, node: &mut FnDef) {
-		if node.local {
-			self.code.push_str("local ");
-		}
+		self.code.push_str("local ");
 		self.code.push_str("function ");
 
 		self.visit_name(&mut node.name);
@@ -121,9 +126,9 @@ impl Visitor for EmitLua {
 	fn visit_stat(&mut self, node: &mut Stat) {
 		self.indent();
 		match node {
-			Stat::Return(exprs) => {
+			Stat::Return(ret) => {
 				self.code.push_str("return ");
-				self.push_list(exprs, ", ");
+				self.push_list(&mut ret.exprs, ", ");
 			},
 			Stat::Break => {
 				self.code.push_str("break");
