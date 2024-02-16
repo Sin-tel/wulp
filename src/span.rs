@@ -56,6 +56,10 @@ pub fn format_warning(message: &str, span: Span, input: &str) {
 	print_message(message, span, input, "warning");
 }
 
+pub fn format_note(message: &str, span: Span, input: &str) {
+	print_message(message, span, input, "note");
+}
+
 pub fn print_message(message: &str, span: Span, input: &str, level: &'static str) {
 	// TODO: this only works properly if the span is one line
 

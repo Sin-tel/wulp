@@ -4,9 +4,9 @@ Cargo.lock
 .vscode
 better_lua.sublime-project
 better_lua.sublime-workspace
+tarpaulin-report.html
 todo.md
 notes.md
 types.md
 iter.md
-
-tarpaulin-report.html
+lua/**

@@ -1,9 +1,11 @@
 use crate::ast::*;
-use crate::span::format_err;
 use crate::span::Span;
+use crate::span::{format_err, format_note};
 use crate::std_lib::GLOBALS;
 use crate::symbol::SymbolId;
 use crate::ty::*;
+use anyhow::anyhow;
+use anyhow::Result;
 use std::collections::HashMap;
 use std::iter::zip;
 
@@ -16,7 +18,7 @@ pub struct TypeCheck<'a> {
 type RetPair = Option<(Ty, Span)>;
 
 impl<'a> TypeCheck<'a> {
-	pub fn check(file: &File, input: &'a str) -> Result<(), String> {
+	pub fn check(file: &File, input: &'a str) -> Result<()> {
 		let mut this = Self {
 			input,
 			errors: Vec::new(),
@@ -32,7 +34,7 @@ impl<'a> TypeCheck<'a> {
 		println!("Returned {ret_ty:?}");
 
 		match this.errors.last() {
-			Some(err) => Err(err.to_string()),
+			Some(err) => Err(anyhow!("{}", err)),
 			None => Ok(()),
 		}
 	}
@@ -56,7 +58,7 @@ impl<'a> TypeCheck<'a> {
 						let msg = format!("Incompatible return types `{new_ty}` and `{ty}`.");
 						format_err(&msg, new_span, self.input);
 						let msg2 = "Previous return value defined here:".to_string();
-						format_err(&msg2, prev_span, self.input);
+						format_note(&msg2, prev_span, self.input);
 						self.errors.push(msg);
 						Some((Ty::Bottom, new_span))
 					}

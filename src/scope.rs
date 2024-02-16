@@ -3,6 +3,7 @@ use crate::span::format_err;
 use crate::std_lib::GLOBALS;
 use crate::symbol::{Symbol, SymbolId, SymbolTable};
 use crate::visitor::{VisitNode, Visitor};
+use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 
 pub struct ScopeCheck<'a> {
@@ -13,7 +14,7 @@ pub struct ScopeCheck<'a> {
 }
 
 impl<'a> ScopeCheck<'a> {
-	pub fn check(ast: &mut File, input: &'a str) -> Result<SymbolTable, String> {
+	pub fn check(ast: &mut File, input: &'a str) -> Result<SymbolTable> {
 		let mut this = Self {
 			scope_stack: Vec::new(),
 			symbol_table: SymbolTable::new(),
@@ -33,7 +34,7 @@ impl<'a> ScopeCheck<'a> {
 		assert!(this.scope_stack.is_empty());
 
 		match this.errors.last() {
-			Some(err) => Err(err.to_string()),
+			Some(err) => Err(anyhow!("{}", err)),
 			None => Ok(this.symbol_table),
 		}
 	}

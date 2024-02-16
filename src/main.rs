@@ -25,7 +25,10 @@ use crate::emit::EmitLua;
 use crate::scope::ScopeCheck;
 use crate::typecheck::TypeCheck;
 
+use anyhow::Result;
 use mlua::prelude::LuaResult;
+use mlua::LuaOptions;
+use mlua::StdLib;
 use std::fs;
 
 pub mod ast;
@@ -45,7 +48,7 @@ pub mod visitor;
 #[cfg(test)]
 mod tests;
 
-fn main() -> Result<(), String> {
+fn main() -> Result<()> {
 	let filename = "blua/test.blua";
 	let input = fs::read_to_string(filename).unwrap();
 
@@ -64,7 +67,7 @@ fn main() -> Result<(), String> {
 	println!("{code}");
 
 	println!("----- execute:");
-	let lua = mlua::Lua::new();
+	let lua = mlua::Lua::new_with(StdLib::NONE, LuaOptions::default())?;
 	let mut chunk = lua.load(code);
 	chunk = chunk.set_name(filename);
 	let res = chunk.exec();
