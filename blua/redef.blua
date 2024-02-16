@@ -1,30 +1,31 @@
 // fails
-fn a() {}
-fn a() {}
+// fn a() {}
+// fn a() {}
 
 // fails
-fn b() {}
-b = fn() {}
+// fn b() {}
+// b = fn() {}
 
 // fails
-c = fn() {}
-fn c() {}
+// c = fn() {}
+// fn c() {}
 
 // allowed
-d = fn() {}
-d = fn() {}
+let d = fn() {}
+let d = fn() {}
 
 // fails
-print = fn() {}
+// print = fn() {}
 
 // fails
-for i in {1 2 3} {
-	i = 2
-}
+// for i in {1 2 3} {
+// 	i = 2
+// }
 
 // shoud fail but currently doesn't
-s = {
+let s = {
 	fn g() {}
 	fn g() {}
 }
-fn s.g() {}
+// we want to allow this kind of syntax
+// fn s.g() {}

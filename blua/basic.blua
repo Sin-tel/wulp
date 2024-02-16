@@ -1,19 +1,18 @@
-// factorial function
 fn fact(n: int) -> int {
 	assert(n >= 0)
 	if n != 0 return n * fact(n - 1)
 	else {{return 1}}
 }
 
-// add = fn(a: int, b: int) -> int {return a + b}
+let add = fn(a: int, b: int) {return a + b}
 
-iter = {2; 3 4, 5}
+let iter = {2; 3 4, 5}
 
-// for i in iter {
-// 	print(fact(i))
-// }
+for i in iter {
+	print(fact(i))
+}
 
-i = 4
+let i = 4
 while true {
 	print(i, fact(i))
 	i = i - 1

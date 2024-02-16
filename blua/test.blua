@@ -1,27 +1,19 @@
-x = 1
-y = 2
-c = fn() {}
-one = fn() {return fn() {return fn() {}}}
-b = 1
-z = {}
-a = fn() {return fn() {}}
+fn fact(n: int) -> num {
+	if n != 1 return n * fact(n - 1)
+	// elseif n > 0 return 1
+	else return 0
+}
 
-x = 1, nil, true, "test", (x * 5 * x + 3 - 1 + 5 + y - -3)
+let x = fn() {
+	if true {
+		return 1
+	} else {
+		return 1.5
+	}
+}
 
-y = { foo = "foo", bar = false, bizz = 1 }
+let x, y, z = 1, "str", true
 
-c("y無限   ' ' 	aa\"  a\n	tab \t	a")
+print(x, y)
 
-zz = [[
-『』　☆彡  「 \　\' ' \ta\\
-\"  a\\n\ttab \\t\ta"
-		 		　	　	  whitespace
-]]
-
-// 背flkfsヶfml背kmfls毛mflksm
-
-z.y = a(b, c())();
-
-(one)(two)(three)
-
-return "ok"
+return fact(5)

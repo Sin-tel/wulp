@@ -1,5 +1,5 @@
 // defining a struct prototype
-point = {
+let point = {
 	x = 1
 	y = 2
 	fn get_x(self) {

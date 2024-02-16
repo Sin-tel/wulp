@@ -1,6 +1,6 @@
-f = fn() {}
-x = fn() {}
-y = fn() {}
+let f = fn() {}
+let x = fn() {}
+let y = fn() {}
 
 
 // ok
@@ -10,5 +10,5 @@ f();
 f()(x or y)()
 
 // ambiguous
-f()
-(x or y)()
+// f()
+// (x or y)()
