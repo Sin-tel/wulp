@@ -15,7 +15,7 @@ impl EmitLua {
 			indent_level: 0,
 			symbol_table,
 		};
-		this.visit_file(ast);
+		ast.block.walk(&mut this);
 		this.code
 	}
 
@@ -97,10 +97,15 @@ impl Visitor for EmitLua {
 		self.code.push_str("end");
 	}
 	fn visit_assignment(&mut self, node: &mut Assignment) {
-		if node.new_def {
-			self.code.push_str("local ");
-		}
 		self.push_list(&mut node.vars, ", ");
+		if !node.exprs.is_empty() {
+			self.code.push_str(" = ");
+			self.push_list(&mut node.exprs, ", ");
+		}
+	}
+	fn visit_let(&mut self, node: &mut Let) {
+		self.code.push_str("local ");
+		self.push_list(&mut node.names, ", ");
 		if !node.exprs.is_empty() {
 			self.code.push_str(" = ");
 			self.push_list(&mut node.exprs, ", ");

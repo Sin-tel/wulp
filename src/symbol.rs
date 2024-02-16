@@ -1,18 +1,18 @@
-use crate::ty::Ty;
-
 pub type SymbolId = usize;
 
 #[derive(Debug)]
 pub struct Symbol {
 	pub name: String,
 	pub is_const: bool,
+	pub is_fn_def: bool,
 }
 
 impl Symbol {
-	pub fn new(name: &str, is_const: bool) -> Self {
+	pub fn new(name: &str, is_const: bool, is_fn_def: bool) -> Self {
 		Self {
 			name: name.to_string(),
 			is_const,
+			is_fn_def,
 		}
 	}
 }
@@ -30,7 +30,7 @@ impl SymbolTable {
 			globals: Vec::new(),
 		};
 		// id = 0 always points to this
-		new.symbols.push(Symbol::new("UNKNOWN_SYMBOL", true));
+		new.symbols.push(Symbol::new("UNKNOWN_SYMBOL", true, false));
 		new
 	}
 

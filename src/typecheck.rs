@@ -4,8 +4,6 @@ use crate::span::Span;
 use crate::std_lib::GLOBALS;
 use crate::symbol::SymbolId;
 use crate::ty::*;
-use crate::visitor::Visitor;
-use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::iter::zip;
 
@@ -60,8 +58,7 @@ impl<'a> TypeCheck<'a> {
 						let msg2 = "Previous return value defined here:".to_string();
 						format_err(&msg2, prev_span, self.input);
 						self.errors.push(msg);
-						// The join of incompatible types is the top element
-						Some((Ty::Any, new_span))
+						Some((Ty::Bottom, new_span))
 					}
 				},
 				None => new_pair,
@@ -121,9 +118,8 @@ impl<'a> TypeCheck<'a> {
 				Stat::Call(s) => {
 					self.eval_fn_call(s);
 				},
-				Stat::Assignment(s) => {
-					self.eval_assignment(s);
-				},
+				Stat::Assignment(s) => self.eval_assignment(s),
+				Stat::Let(s) => self.eval_let(s),
 				Stat::FnDef(s) => self.eval_fn_def(s),
 				s => unimplemented!("{s:?}"),
 			};
@@ -133,21 +129,43 @@ impl<'a> TypeCheck<'a> {
 
 	fn eval_fn_def(&mut self, node: &FnDef) {
 		assert!(node.path.is_empty());
-		self.eval_fn_body(&node.body, node.name.span);
+
+		let mut arg_ty = Vec::new();
+
+		for p in &node.body.params {
+			let ty = p.ty.clone().expect("Need parameter annotation");
+			self.new_def(p.name.id, ty.clone());
+			arg_ty.push(ty);
+		}
+		let ret_annotation = node.body.ty.as_ref().expect("Need return type annotation");
+		let fn_ty = Ty::Fn(arg_ty, Box::new(ret_annotation.clone()));
+		self.new_def(node.name.id, fn_ty);
+
+		let (mut ret_pair, ret_all) = self.eval_block(&node.body.body);
+		// There is an implied 'return nil' at the end of every body
+		if !ret_all {
+			ret_pair = self.join_or_fail(ret_pair, Some((Ty::Nil, node.name.span)));
+		};
+		let (ty, prev_span) = ret_pair.unwrap();
+
+		if !subtype(&ty, ret_annotation) {
+			let msg = format!("Expected return type `{ret_annotation}`, found `{ty}`.");
+			format_err(&msg, prev_span, self.input);
+			self.errors.push(msg);
+		};
 	}
 
 	// span should refer to the place where the function is defined
 	// TODO: get span info from AST and remove this argument
-	fn eval_fn_body(&mut self, node: &FnBody, span: Span) -> Ty {
+	fn eval_lambda(&mut self, node: &FnBody, span: Span) -> Ty {
 		// build function type from signature
 		let arg_ty = node
 			.params
 			.iter()
-			.map(|p| p.ty.clone().expect("Need annotation"))
+			.map(|p| p.ty.clone().expect("Need parameter annotation"))
 			.collect();
 
-		let ret_annotation = node.ty.as_ref().expect("Need annotation");
-		let fn_ty = Ty::Fn(arg_ty, Box::new(node.ty.clone().expect("Need annotation")));
+		let ret_annotation = node.ty.as_ref();
 
 		// check return type of the block
 		let (mut ret_pair, ret_all) = self.eval_block(&node.body);
@@ -156,27 +174,40 @@ impl<'a> TypeCheck<'a> {
 			ret_pair = self.join_or_fail(ret_pair, Some((Ty::Nil, span)));
 		};
 		let (ty, prev_span) = ret_pair.unwrap();
-		if !subtype(&ty, ret_annotation) {
-			let msg = format!("Expected return type `{ret_annotation}`, found `{ty}`.");
-			format_err(&msg, prev_span, self.input);
-			self.errors.push(msg);
-			return Ty::Bottom;
+
+		let ret_ty = if let Some(ret_ty) = ret_annotation {
+			if !subtype(&ty, ret_ty) {
+				let msg = format!("Expected return type `{ret_ty}`, found `{ty}`.");
+				format_err(&msg, prev_span, self.input);
+				self.errors.push(msg);
+			}
+			ret_ty
+		} else {
+			println!("Infer lambda return: {}", &ty);
+			&ty
 		};
 
-		fn_ty
+		Ty::Fn(arg_ty, Box::new(ret_ty.clone()))
 	}
 
 	fn eval_fn_call(&mut self, c: &Call) -> Ty {
 		match &c.expr.kind {
 			ExprKind::Name(n) => {
-				let fn_ty = self.lookup(n.id).expect("env lookup failed").clone();
+				let fn_ty = self.lookup(n.id).expect("lookup failed").clone();
 				if let Ty::Fn(params, ret_ty) = fn_ty {
-					for (p, a) in zip(params, c.args.iter()) {
-						let arg_ty = self.eval_expr(a);
-						if !subtype(&arg_ty, &p) {
-							let msg = format!("Expected argument type `{p}`, found `{arg_ty}`");
-							format_err(&msg, a.span, self.input);
-							self.errors.push(msg);
+					// TODO: get rid of hardcoded print here
+					if params.len() != c.args.len() && n.span.as_str(self.input) != "print" {
+						let msg = format!("Wrong number of arguments.");
+						format_err(&msg, n.span, self.input);
+						self.errors.push(msg);
+					} else {
+						for (p, a) in zip(params, c.args.iter()) {
+							let arg_ty = self.eval_expr(a);
+							if !subtype(&arg_ty, &p) {
+								let msg = format!("Expected argument type `{p}`, found `{arg_ty}`");
+								format_err(&msg, a.span, self.input);
+								self.errors.push(msg);
+							}
 						}
 					}
 					*ret_ty.clone()
@@ -193,7 +224,7 @@ impl<'a> TypeCheck<'a> {
 
 	fn eval_expr(&mut self, expr: &Expr) -> Ty {
 		let ty = self.eval_expr_inner(expr);
-		println!("infer: {}: {}", &expr.span.as_str(self.input), &ty);
+		// println!("infer: {}: {}", &expr.span.as_str(self.input), &ty);
 		ty
 	}
 
@@ -264,10 +295,10 @@ impl<'a> TypeCheck<'a> {
 				self.errors.push(msg);
 				Ty::Bottom
 			},
-			ExprKind::Name(n) => self.lookup(n.id).expect("env lookup failed").clone(),
+			ExprKind::Name(n) => self.lookup(n.id).unwrap().clone(),
 			ExprKind::Literal(l) => self.eval_literal(l),
 			ExprKind::Call(c) => self.eval_fn_call(c),
-			ExprKind::Lambda(l) => self.eval_fn_body(l, expr.span),
+			ExprKind::Lambda(l) => self.eval_lambda(l, expr.span),
 			ExprKind::Table(_) => Ty::Array(Box::new(Ty::Num)), // TODO
 			e => unimplemented!("{e:?}"),
 		}
@@ -283,56 +314,48 @@ impl<'a> TypeCheck<'a> {
 		}
 	}
 
-	fn eval_assignment(&mut self, node: &Assignment) {
-		assert!(node.exprs.len() == node.vars.len());
+	fn eval_let(&mut self, node: &Let) {
+		assert!(node.exprs.len() == node.names.len());
 
-		// TODO: if LHS has annotation, run in checking mode
 		let mut rhs = Vec::new();
 		for e in &node.exprs {
 			rhs.push(self.eval_expr(e).clone());
 		}
-
-		for (var, check_ty) in zip(&node.vars, rhs) {
-			let id = match var {
-				Var::Expr(e) => {
-					if let Expr {
-						kind: ExprKind::Name(n),
-						..
-					} = e
-					{
-						n.id
-					} else {
-						todo!();
-					}
-				},
-				Var::Typed(t) => {
-					// assert!(self.lookup(t.name.id) == None);
-					if let Some(ty) = self.lookup(t.name.id) {
-						if &t.ty != ty {
-							let msg = format!("Binding already has type `{ty}`, can't change it to `{}`.", t.ty);
-							format_err(&msg, node.span, self.input);
-							self.errors.push(msg);
-							// Do it anyway to prevent cascading errors
-							self.new_def(t.name.id, t.ty.clone());
-						}
-					} else if !subtype(&check_ty, &t.ty) {
-						let msg = format!("Type error, assigning `{}` to `{}`.", check_ty, t.ty);
-						format_err(&msg, node.span, self.input);
-						self.errors.push(msg);
-					}
-					t.name.id
-				},
-			};
-			if node.new_def {
-				self.new_def(id, check_ty);
-			} else {
-				let ty = self.lookup(id).unwrap();
-				if !subtype(&check_ty, ty) {
-					let msg = format!("Type error, assigning {} to {}.", check_ty, ty);
+		for (n, rhs_ty) in zip(&node.names, rhs) {
+			// check if annotation fits
+			if let Some(ty) = &n.ty {
+				if !subtype(&rhs_ty, ty) {
+					let msg = format!("Type error, assigning `{rhs_ty}` to `{ty}`.");
 					format_err(&msg, node.span, self.input);
 					self.errors.push(msg);
 				}
+				self.new_def(n.name.id, ty.clone());
+			} else {
+				self.new_def(n.name.id, rhs_ty);
 			}
+		}
+	}
+
+	fn eval_assignment(&mut self, node: &Assignment) {
+		assert!(node.exprs.len() == node.vars.len());
+
+		// TODO: lhs annotation
+		let mut rhs = Vec::new();
+		for e in &node.exprs {
+			rhs.push(self.eval_expr(e).clone());
+		}
+		for (var, rhs_ty) in zip(&node.vars, rhs) {
+			match &var.expr.kind {
+				ExprKind::Name(n) => {
+					let ty = self.lookup(n.id).expect("lookup failed");
+					if !subtype(&rhs_ty, ty) {
+						let msg = format!("Type error, assigning `{rhs_ty}` to `{ty}`.");
+						format_err(&msg, node.span, self.input);
+						self.errors.push(msg);
+					}
+				},
+				e => unimplemented!("{e:?}"),
+			};
 		}
 	}
 }

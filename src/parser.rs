@@ -76,6 +76,7 @@ fn parse_statement_inner(input: &str, tokens: &mut Lexer) -> Stat {
 			Stat::Break
 		},
 		TokenKind::Return => Stat::Return(parse_return(input, tokens)),
+		TokenKind::Let => Stat::Let(parse_let(input, tokens)),
 		TokenKind::LCurly => Stat::Block(parse_block(input, tokens)),
 		TokenKind::While => Stat::WhileBlock(parse_while_block(input, tokens)),
 		TokenKind::If => Stat::IfBlock(parse_if_block(input, tokens)),
@@ -105,36 +106,23 @@ fn parse_statement_inner(input: &str, tokens: &mut Lexer) -> Stat {
 }
 
 fn parse_assignment(first: Expr, input: &str, tokens: &mut Lexer) -> Assignment {
-	// dbg!(&first);
 	let start = first.span;
-	let first_var = match first.kind {
-		ExprKind::Name(name) if tokens.peek().kind == TokenKind::Colon => {
-			tokens.next();
-			let ty = parse_type(input, tokens);
-			Var::Typed(Typed { name, ty })
-		},
-		_ => Var::Expr(first),
-	};
+	let first_var = Var { expr: first };
+	let mut vars = vec![first_var];
 
-	let vars = vec![first_var];
-
-	if tokens.peek().kind == TokenKind::Comma {
-		todo!();
+	while tokens.peek().kind == TokenKind::Comma {
+		tokens.next();
+		vars.push(Var {
+			expr: parse_suffix_expr(input, tokens),
+		});
 	}
-
-	// while tokens.peek().kind == TokenKind::Comma {
-	// 	tokens.next();
-	// 	vars.push(parse_suffix_expr(input, tokens));
-	// }
 
 	// lhs vars can not be a Call, since those arent lvalues.
 	for var in &vars {
-		if let Var::Expr(v) = var {
-			if let ExprKind::Call(_) = v.kind {
-				let msg = "Can not assign to a function call.";
-				format_err(msg, v.span, input);
-				panic!("{}", msg);
-			}
+		if let ExprKind::Call(_) = var.expr.kind {
+			let msg = "Can not assign to a function call.";
+			format_err(msg, var.expr.span, input);
+			panic!("{}", msg);
 		}
 	}
 	assert_next(input, tokens, TokenKind::Assign);
@@ -143,13 +131,34 @@ fn parse_assignment(first: Expr, input: &str, tokens: &mut Lexer) -> Assignment 
 
 	let span = Span::join(start, exprs.last().unwrap().span);
 
-	Assignment {
-		vars,
-		exprs,
-		// we don't know yet, this gets fixed during scope checking
-		new_def: false,
-		span,
+	Assignment { vars, exprs, span }
+}
+
+fn parse_let(input: &str, tokens: &mut Lexer) -> Let {
+	let start = tokens.peek().span;
+	assert_next(input, tokens, TokenKind::Let);
+
+	let mut names = Vec::new();
+	loop {
+		let name = parse_name(input, tokens);
+		let ty = if tokens.peek().kind == TokenKind::Colon {
+			tokens.next();
+			Some(parse_type(input, tokens))
+		} else {
+			None
+		};
+		names.push(NameTy { name, ty });
+
+		if tokens.peek().kind == TokenKind::Assign {
+			break;
+		}
+		assert_next(input, tokens, TokenKind::Comma);
 	}
+	assert_next(input, tokens, TokenKind::Assign);
+
+	let exprs = parse_exprs(input, tokens);
+	let span = Span::join(start, exprs.last().unwrap().span);
+	Let { names, exprs, span }
 }
 
 fn parse_fn_def(input: &str, tokens: &mut Lexer) -> FnDef {

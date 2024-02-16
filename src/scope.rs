@@ -2,7 +2,6 @@ use crate::ast::*;
 use crate::span::format_err;
 use crate::std_lib::GLOBALS;
 use crate::symbol::{Symbol, SymbolId, SymbolTable};
-use crate::ty::Ty;
 use crate::visitor::{VisitNode, Visitor};
 use std::collections::HashMap;
 
@@ -25,7 +24,7 @@ impl<'a> ScopeCheck<'a> {
 		this.scope_stack.push(HashMap::new());
 
 		for item in GLOBALS.iter() {
-			this.new_variable(item.name, true);
+			this.new_variable(item.name, true, item.is_fn_def);
 			assert_eq!(this.lookup(item.name), Some(item.id));
 		}
 
@@ -39,8 +38,8 @@ impl<'a> ScopeCheck<'a> {
 		}
 	}
 
-	fn new_variable(&mut self, name: &'a str, is_const: bool) {
-		let symbol = Symbol::new(name, is_const);
+	fn new_variable(&mut self, name: &'a str, is_const: bool, is_fn_def: bool) {
+		let symbol = Symbol::new(name, is_const, is_fn_def);
 		let id = self.symbol_table.push(symbol);
 		// unwrap: there is always at least one scope
 		let scope = self.scope_stack.last_mut().unwrap();
@@ -59,47 +58,33 @@ impl<'a> ScopeCheck<'a> {
 		id.copied()
 	}
 
-	fn make_lvalue(&mut self, var: &mut Expr) -> bool {
-		let mut new_def = false;
+	fn check_lvalue(&mut self, var: &mut Expr) {
 		match &mut var.kind {
 			ExprKind::Name(n) => {
 				let name = n.span.as_str(self.input);
 
 				if let Some(id) = self.lookup(name) {
-					if self.symbol_table.get(id).is_const {
-						let msg = format!("Constant `{name}` already defined.");
+					if self.symbol_table.get(id).is_fn_def {
+						let msg = format!("Function `{name}` already defined.");
+						format_err(&msg, n.span, self.input);
+						self.errors.push(msg);
+					} else if self.symbol_table.get(id).is_const {
+						let msg = format!("Can't assign to constant `{name}`.");
 						format_err(&msg, n.span, self.input);
 						self.errors.push(msg);
 					}
-				} else {
-					self.new_variable(name, false);
-					new_def = true;
 				}
-
 				var.visit(self);
 			},
-			ExprKind::SuffixExpr(expr, _) => {
-				// indexing and property
-				if self.make_lvalue(expr) {
-					let msg = format!("Undefined variable: `{}`.", expr.span.as_str(self.input));
-					format_err(&msg, expr.span, self.input);
-					self.errors.push(msg);
-				}
-			},
+			ExprKind::SuffixExpr(expr, _) => self.check_lvalue(expr),
 			ExprKind::Call(call) => {
-				if self.make_lvalue(&mut call.expr) {
-					let msg = format!("Undefined variable: `{}`.", call.expr.span.as_str(self.input));
-					format_err(&msg, call.expr.span, self.input);
-					self.errors.push(msg);
-				}
+				self.check_lvalue(&mut call.expr);
 				for e in &mut call.args {
 					e.visit(self);
 				}
 			},
 			_ => unreachable!(),
 		}
-
-		new_def
 	}
 }
 
@@ -116,7 +101,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		for n in &mut node.names {
 			let name = n.span.as_str(self.input);
 			// marked as const since we should never assign to loop variable
-			self.new_variable(name, true);
+			self.new_variable(name, true, false);
 			n.visit(self);
 		}
 		node.expr.visit(self);
@@ -136,16 +121,18 @@ impl<'a> Visitor for ScopeCheck<'a> {
 				format_err(&msg, node.name.span, self.input);
 				self.errors.push(msg);
 			} else {
-				let param_types: Vec<Option<Ty>> = node.body.params.iter().map(|p| p.ty.clone()).collect();
 				// function defs are always const
-				self.new_variable(name, true);
+				self.new_variable(name, true, true);
 			}
 		} else {
-			// fn property on some struct
+			// fn property on some type
 			if lookup.is_none() {
-				let msg = format!("Undefined struct: `{name}`.");
+				let msg = format!("Undefined type: `{name}`.");
 				format_err(&msg, node.name.span, self.input);
 				self.errors.push(msg);
+				// to suppress further errors, we add a new variable anyway
+				// self.new_variable(name, false, false);
+				return;
 			}
 		}
 
@@ -157,7 +144,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		for n in &mut node.params {
 			let name = n.name.span.as_str(self.input);
 			// function args are mutable
-			self.new_variable(name, false);
+			self.new_variable(name, false, false);
 			n.visit(self);
 		}
 		node.body.visit(self);
@@ -171,30 +158,24 @@ impl<'a> Visitor for ScopeCheck<'a> {
 			e.visit(self);
 		}
 
-		// now check if we need to define a new variable for the rhs
+		// now check if rhs variables exist
 		for var in &mut node.vars {
-			match var {
-				Var::Expr(e) => {
-					let new_def = self.make_lvalue(e);
-					node.new_def |= new_def;
-				},
-				Var::Typed(n) => {
-					let name = n.name.span.as_str(self.input);
+			self.check_lvalue(&mut var.expr);
+		}
+	}
 
-					if let Some(id) = self.lookup(name) {
-						if self.symbol_table.get(id).is_const {
-							let msg = format!("Constant `{name}` already defined.");
-							format_err(&msg, n.name.span, self.input);
-							self.errors.push(msg);
-						}
-					} else {
-						self.new_variable(name, false);
-						node.new_def = true;
-					}
+	fn visit_let(&mut self, node: &mut Let) {
+		// visit rhs first
+		for e in &mut node.exprs {
+			e.visit(self);
+		}
 
-					n.name.visit(self);
-				},
-			}
+		// make new variables for lhs
+		for n in &mut node.names {
+			// TODO: make sure we don't do anything stupid like let x, x = 1, 2
+			let name_str = n.name.span.as_str(self.input);
+			self.new_variable(name_str, false, false);
+			n.name.visit(self);
 		}
 	}
 
@@ -225,6 +206,8 @@ impl<'a> Visitor for ScopeCheck<'a> {
 			let msg = format!("Undefined variable: `{name}`.");
 			format_err(&msg, node.span, self.input);
 			self.errors.push(msg);
+			// to suppress further errors, we add a new variable anyway
+			self.new_variable(name, false, false);
 		}
 	}
 }

@@ -202,6 +202,7 @@ impl<'a> LexIter<'a> {
 			"for" => TokenKind::For,
 			"in" => TokenKind::In,
 			"fn" => TokenKind::Fn,
+			"let" => TokenKind::Let,
 			"break" => TokenKind::Break,
 			"return" => TokenKind::Return,
 			"while" => TokenKind::While,

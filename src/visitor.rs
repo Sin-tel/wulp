@@ -13,6 +13,9 @@ pub trait Visitor: Sized {
 	fn visit_assignment(&mut self, node: &mut Assignment) {
 		node.walk(self);
 	}
+	fn visit_let(&mut self, node: &mut Let) {
+		node.walk(self);
+	}
 	fn visit_fn_def(&mut self, node: &mut FnDef) {
 		node.walk(self);
 	}
@@ -37,7 +40,7 @@ pub trait Visitor: Sized {
 	fn visit_var(&mut self, node: &mut Var) {
 		node.walk(self);
 	}
-	fn visit_typed(&mut self, node: &mut Typed) {
+	fn visit_name_ty(&mut self, node: &mut NameTy) {
 		node.walk(self);
 	}
 	fn visit_suffix(&mut self, node: &mut Suffix) {
@@ -91,6 +94,7 @@ impl<V: Visitor> VisitNode<V> for Stat {
 	fn walk(&mut self, v: &mut V) {
 		match self {
 			Stat::Assignment(s) => v.visit_assignment(s),
+			Stat::Let(s) => v.visit_let(s),
 			Stat::FnDef(s) => v.visit_fn_def(s),
 			Stat::Call(s) => v.visit_fn_call(s),
 			Stat::IfBlock(s) => v.visit_if_block(s),
@@ -161,24 +165,35 @@ impl<V: Visitor> VisitNode<V> for Assignment {
 	}
 }
 
+impl<V: Visitor> VisitNode<V> for Let {
+	fn visit(&mut self, v: &mut V) {
+		v.visit_let(self);
+	}
+	fn walk(&mut self, v: &mut V) {
+		for n in &mut self.names {
+			v.visit_name_ty(n);
+		}
+		for e in &mut self.exprs {
+			v.visit_expr(e);
+		}
+	}
+}
+
+impl<V: Visitor> VisitNode<V> for NameTy {
+	fn visit(&mut self, v: &mut V) {
+		v.visit_name_ty(self);
+	}
+	fn walk(&mut self, v: &mut V) {
+		v.visit_name(&mut self.name);
+	}
+}
+
 impl<V: Visitor> VisitNode<V> for Var {
 	fn visit(&mut self, v: &mut V) {
 		v.visit_var(self);
 	}
 	fn walk(&mut self, v: &mut V) {
-		match self {
-			Var::Expr(e) => v.visit_expr(e),
-			Var::Typed(e) => v.visit_typed(e),
-		}
-	}
-}
-
-impl<V: Visitor> VisitNode<V> for Typed {
-	fn visit(&mut self, v: &mut V) {
-		v.visit_typed(self);
-	}
-	fn walk(&mut self, v: &mut V) {
-		v.visit_name(&mut self.name);
+		v.visit_expr(&mut self.expr);
 	}
 }
 
