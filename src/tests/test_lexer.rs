@@ -55,7 +55,7 @@ fn single_line_string() {
 
 #[test]
 fn multi_line_string() {
-	let multi_line = "[[ This is a multi-line string ]]";
+	let multi_line = r##"#" multi-line	# "" 'raw string "#"##;
 	let mut lex = LexIter::new(multi_line);
 	assert_eq!(
 		lex.next(),

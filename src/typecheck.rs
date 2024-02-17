@@ -197,9 +197,9 @@ impl<'a> TypeCheck<'a> {
 			ExprKind::Name(n) => {
 				let fn_ty = self.lookup(n.id).expect("lookup failed").clone();
 				if let Ty::Fn(params, ret_ty) = fn_ty {
-					// TODO: get rid of hardcoded print here
+					// TODO: get rid of hardcoded "print" here
 					if params.len() != c.args.len() && n.span.as_str(self.input) != "print" {
-						let msg = format!("Wrong number of arguments.");
+						let msg = "Wrong number of arguments.".to_string();
 						format_err(&msg, n.span, self.input);
 						self.errors.push(msg);
 					} else {
@@ -226,7 +226,7 @@ impl<'a> TypeCheck<'a> {
 
 	fn eval_expr(&mut self, expr: &Expr) -> Ty {
 		let ty = self.eval_expr_inner(expr);
-		// println!("infer: {}: {}", &expr.span.as_str(self.input), &ty);
+		println!("infer: {}: {}", &expr.span.as_str(self.input), &ty);
 		ty
 	}
 
@@ -297,13 +297,58 @@ impl<'a> TypeCheck<'a> {
 				self.errors.push(msg);
 				Ty::Bottom
 			},
-			ExprKind::Name(n) => self.lookup(n.id).unwrap().clone(),
-			ExprKind::Literal(l) => self.eval_literal(l),
-			ExprKind::Call(c) => self.eval_fn_call(c),
-			ExprKind::Lambda(l) => self.eval_lambda(l, expr.span),
-			ExprKind::Table(_) => Ty::Array(Box::new(Ty::Num)), // TODO
+			ExprKind::Array(array) => {
+				// consider empty array `[]` to have type [Bottom]
+				let mut ty = Ty::Bottom;
+				for e in array {
+					let new_ty = self.eval_expr(e);
+					let try_join = join(&ty, &new_ty);
+					ty = if let Some(joined) = try_join {
+						joined
+					} else {
+						let msg = format!("Incompatible types in array: `{new_ty}` and `{ty}`.");
+						format_err(&msg, e.span, self.input);
+						self.errors.push(msg);
+						return Ty::Bottom;
+					}
+				}
+				Ty::Array(Box::new(ty))
+			},
+			ExprKind::Name(e) => self.lookup(e.id).unwrap().clone(),
+			ExprKind::SuffixExpr(e, s) => self.eval_suffix_expr(e, s),
+			ExprKind::Literal(e) => self.eval_literal(e),
+			ExprKind::Call(e) => self.eval_fn_call(e),
+			ExprKind::Lambda(e) => self.eval_lambda(e, expr.span),
 			e => unimplemented!("{e:?}"),
 		}
+	}
+
+	fn eval_suffix_expr(&mut self, expr: &Expr, s: &Vec<Suffix>) -> Ty {
+		let mut ty = self.eval_expr(expr);
+		for suffix in s {
+			match suffix {
+				Suffix::Property(_) => todo!(),
+				Suffix::Index(e) => {
+					ty = match ty {
+						Ty::Array(inner_ty) => *inner_ty,
+						Ty::Bottom => Ty::Bottom,
+						_ => {
+							let msg = format!("Can not index type `{ty}`.");
+							format_err(&msg, expr.span, self.input);
+							self.errors.push(msg);
+							Ty::Bottom
+						},
+					};
+					let index_ty = self.eval_expr(e);
+					if !subtype(&index_ty, &Ty::Int) {
+						let msg = format!("Index must be type `int` but found `{index_ty}`.");
+						format_err(&msg, e.span, self.input);
+						self.errors.push(msg);
+					}
+				},
+			}
+		}
+		ty
 	}
 
 	fn eval_literal(&self, l: &Literal) -> Ty {

@@ -17,6 +17,8 @@ impl<'a> Lexer<'a> {
 			peeked: None,
 		}
 	}
+	// I don't want to return Option<Token>
+	#[allow(clippy::should_implement_trait)]
 	pub fn next(&mut self) -> Token {
 		match self.peeked.take() {
 			Some(v) => v,
@@ -155,12 +157,12 @@ impl<'a> LexIter<'a> {
 		self.newtoken(TokenKind::Str, start, end)
 	}
 
-	// '[[' CONTENT ']]'
+	// '#"' CONTENT '"#'
 	fn multi_line_string(&mut self) -> Option<Token> {
 		let start = self.cursor;
 		self.eat_chars(2);
 		loop {
-			if self.match_chars("]]") {
+			if self.match_chars("\"#") {
 				self.eat_chars(2);
 				let end = self.cursor;
 				break Some(self.newtoken(TokenKind::Str, start, end));
@@ -275,7 +277,7 @@ impl Iterator for LexIter<'_> {
 
 			match c {
 				'\'' | '"' => Some(self.single_line_string()),
-				'[' if next == Some('[') => self.multi_line_string(),
+				'#' if next == Some('"') => self.multi_line_string(),
 				'=' if next == Some('=') => {
 					self.eat_chars(2);
 					let end = self.cursor;

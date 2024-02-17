@@ -79,8 +79,8 @@ pub fn subtype(a: &Ty, b: &Ty) -> bool {
 impl fmt::Display for Ty {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let s = match self {
-			Ty::Any => "any".to_string(),
-			Ty::Bottom => "never".to_string(),
+			Ty::Any => "Any".to_string(),
+			Ty::Bottom => "Bottom".to_string(),
 			Ty::Nil => "nil".to_string(),
 			Ty::Bool => "bool".to_string(),
 			Ty::Str => "str".to_string(),

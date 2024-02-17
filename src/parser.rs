@@ -343,6 +343,7 @@ fn parse_simple_expr(input: &str, tokens: &mut Lexer) -> Expr {
 		TokenKind::Str => parse_string(input, tokens),
 		TokenKind::Number => parse_number(input, tokens),
 		TokenKind::LCurly => parse_table_constructor(input, tokens),
+		TokenKind::LBracket => parse_array_constructor(input, tokens),
 		_ => parse_suffix_expr(input, tokens),
 	}
 }
@@ -473,6 +474,16 @@ fn parse_table_constructor(input: &str, tokens: &mut Lexer) -> Expr {
 	}
 }
 
+fn parse_array_constructor(input: &str, tokens: &mut Lexer) -> Expr {
+	let start = assert_next(input, tokens, TokenKind::LBracket).span;
+	let exprs = parse_array_fields(input, tokens);
+	let end = assert_next(input, tokens, TokenKind::RBracket).span;
+	Expr {
+		span: Span::join(start, end),
+		kind: ExprKind::Array(exprs),
+	}
+}
+
 fn parse_fields(input: &str, tokens: &mut Lexer) -> Vec<Field> {
 	if tokens.peek().kind == TokenKind::RCurly {
 		return Vec::new();
@@ -492,36 +503,43 @@ fn parse_fields(input: &str, tokens: &mut Lexer) -> Vec<Field> {
 				continue;
 			},
 			_ => (),
-			// _ => break,
 		}
 	}
+	fields
+}
 
+fn parse_array_fields(input: &str, tokens: &mut Lexer) -> Vec<Expr> {
+	if tokens.peek().kind == TokenKind::RBracket {
+		return Vec::new();
+	};
+
+	let mut fields = Vec::new();
+	loop {
+		if tokens.peek().kind == TokenKind::RBracket {
+			break;
+		}
+		let f = parse_expr(input, tokens);
+		fields.push(f);
+
+		match tokens.peek().kind {
+			TokenKind::Comma | TokenKind::SemiColon => {
+				tokens.next();
+				continue;
+			},
+			_ => (),
+		}
+	}
 	fields
 }
 
 fn parse_field(input: &str, tokens: &mut Lexer) -> Field {
 	match tokens.peek().kind {
 		TokenKind::Name => {
-			// TODO: this is a bit ugly
-			let span = tokens.next().span;
+			let property = parse_property(input, tokens);
+			assert_next(input, tokens, TokenKind::Assign);
+			let expr = parse_expr(input, tokens);
 
-			if tokens.peek().kind == TokenKind::Assign {
-				tokens.next();
-				let expr = parse_expr(input, tokens);
-				Field::Assign(
-					Property {
-						span,
-						name: span.as_string(input),
-					},
-					expr,
-				)
-			} else {
-				let name = new_name(span);
-				Field::Expr(Expr {
-					span,
-					kind: ExprKind::Name(name),
-				})
-			}
+			Field::Assign(property, expr)
 		},
 		TokenKind::Fn => {
 			tokens.next();
@@ -531,7 +549,12 @@ fn parse_field(input: &str, tokens: &mut Lexer) -> Field {
 
 			Field::Fn(name, body)
 		},
-		_ => Field::Expr(parse_expr(input, tokens)),
+		_ => {
+			let tk = tokens.next();
+			let msg = format!("Expected field but found: {tk}.");
+			format_err(&msg, tk.span, input);
+			panic!("{msg}");
+		},
 	}
 }
 
@@ -617,7 +640,7 @@ fn parse_string(input: &str, tokens: &mut Lexer) -> Expr {
 			chars.next_back();
 			Literal::Str(chars.as_str().to_string())
 		},
-		Some('[') => {
+		Some('#') => {
 			chars.next();
 			chars.next_back();
 			chars.next_back();

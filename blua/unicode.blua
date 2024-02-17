@@ -14,11 +14,11 @@ y = { foo = "foo", bar = false, bizz = 1 }
 
 c("y無限   ' ' 	aa\"  a\n	tab \t	a")
 
-let zz = [[
+let zz = #"
 『』　☆彡  「 \　\' ' \ta\\
 \"  a\\n\ttab \\t\ta"
 		 		　	　	  whitespace
-]]
+"#
 
 // 背flkfsヶfml背kmfls毛mflksm
 

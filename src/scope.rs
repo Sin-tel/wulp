@@ -180,23 +180,6 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		}
 	}
 
-	// TODO: just make this the default order
-	fn visit_field(&mut self, node: &mut Field) {
-		match node {
-			Field::Assign(p, e) => {
-				// rhs first
-				e.visit(self);
-				// this doesn't do anything for now
-				p.visit(self);
-			},
-			Field::Expr(e) => e.visit(self),
-			Field::Fn(p, f) => {
-				p.visit(self);
-				f.visit(self);
-			},
-		}
-	}
-
 	fn visit_name(&mut self, node: &mut Name) {
 		assert!(node.id == 0); // make sure we don't visit twice
 

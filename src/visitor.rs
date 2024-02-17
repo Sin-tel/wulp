@@ -272,6 +272,11 @@ impl<V: Visitor> VisitNode<V> for Expr {
 					v.visit_field(e);
 				}
 			},
+			ExprKind::Array(t) => {
+				for e in t {
+					v.visit_expr(e);
+				}
+			},
 		}
 	}
 }
@@ -295,10 +300,10 @@ impl<V: Visitor> VisitNode<V> for Field {
 	fn walk(&mut self, v: &mut V) {
 		match self {
 			Field::Assign(p, e) => {
-				v.visit_property(p);
+				// rhs first!
 				v.visit_expr(e);
+				v.visit_property(p);
 			},
-			Field::Expr(e) => v.visit_expr(e),
 			Field::Fn(p, f) => {
 				v.visit_property(p);
 				v.visit_fn_body(f);

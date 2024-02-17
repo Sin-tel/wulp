@@ -100,6 +100,7 @@ pub enum ExprKind {
 	UnExpr(UnExpr),
 	Call(Call),
 	Lambda(FnBody),
+	Array(Vec<Expr>),
 	Table(Vec<Field>),
 	SuffixExpr(Box<Expr>, Vec<Suffix>),
 	Expr(Box<Expr>), // bracketed expression
@@ -140,7 +141,6 @@ pub struct Param {
 #[derive(Debug, PartialEq)]
 pub enum Field {
 	Assign(Property, Expr),
-	Expr(Expr),
 	Fn(Property, FnBody),
 }
 

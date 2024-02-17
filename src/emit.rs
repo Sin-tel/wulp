@@ -144,7 +144,13 @@ impl Visitor for EmitLua {
 				self.indent();
 				self.code.push_str("end");
 			},
-			_ => {
+			Stat::WhileBlock(_)
+			| Stat::IfBlock(_)
+			| Stat::ForBlock(_)
+			| Stat::Assignment(_)
+			| Stat::Let(_)
+			| Stat::FnDef(_)
+			| Stat::Call(_) => {
 				node.walk(self);
 			},
 		};
@@ -179,7 +185,17 @@ impl Visitor for EmitLua {
 				self.push_list(t, ", ");
 				self.code.push('}');
 			},
-			_ => node.walk(self),
+			ExprKind::Array(t) => {
+				self.code.push('{');
+				if !t.is_empty() {
+					self.code.push_str("[0]=");
+				}
+				self.push_list(t, ", ");
+				self.code.push('}');
+			},
+			ExprKind::Literal(_) | ExprKind::Name(_) | ExprKind::Call(_) | ExprKind::SuffixExpr(_, _) => {
+				node.walk(self);
+			},
 		}
 	}
 	fn visit_literal(&mut self, node: &mut Literal) {
@@ -225,9 +241,6 @@ impl Visitor for EmitLua {
 			Field::Assign(p, e) => {
 				self.visit_property(p);
 				self.code.push_str(" = ");
-				self.visit_expr(e);
-			},
-			Field::Expr(e) => {
 				self.visit_expr(e);
 			},
 			Field::Fn(p, f) => {
