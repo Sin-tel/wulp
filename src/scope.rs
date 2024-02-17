@@ -4,10 +4,10 @@ use crate::std_lib::GLOBALS;
 use crate::symbol::{Symbol, SymbolId, SymbolTable};
 use crate::visitor::{VisitNode, Visitor};
 use anyhow::{anyhow, Result};
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 pub struct ScopeCheck<'a> {
-	scope_stack: Vec<HashMap<&'a str, SymbolId>>,
+	scope_stack: Vec<FxHashMap<&'a str, SymbolId>>,
 	symbol_table: SymbolTable,
 	input: &'a str,
 	errors: Vec<String>,
@@ -22,7 +22,7 @@ impl<'a> ScopeCheck<'a> {
 			errors: Vec::new(),
 		};
 
-		this.scope_stack.push(HashMap::new());
+		this.scope_stack.push(FxHashMap::default());
 
 		for item in GLOBALS.iter() {
 			this.new_variable(item.name, true, item.is_fn_def);
@@ -91,13 +91,13 @@ impl<'a> ScopeCheck<'a> {
 
 impl<'a> Visitor for ScopeCheck<'a> {
 	fn visit_block(&mut self, node: &mut Block) {
-		self.scope_stack.push(HashMap::new());
+		self.scope_stack.push(FxHashMap::default());
 		node.walk(self);
 		self.scope_stack.pop();
 	}
 
 	fn visit_for_block(&mut self, node: &mut ForBlock) {
-		self.scope_stack.push(HashMap::new());
+		self.scope_stack.push(FxHashMap::default());
 
 		for n in &mut node.names {
 			let name = n.span.as_str(self.input);
@@ -141,7 +141,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 	}
 
 	fn visit_fn_body(&mut self, node: &mut FnBody) {
-		self.scope_stack.push(HashMap::new());
+		self.scope_stack.push(FxHashMap::default());
 		for n in &mut node.params {
 			let name = n.name.span.as_str(self.input);
 			// function args are mutable

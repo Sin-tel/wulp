@@ -6,13 +6,13 @@ use crate::symbol::SymbolId;
 use crate::ty::*;
 use anyhow::anyhow;
 use anyhow::Result;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::iter::zip;
 
 pub struct TypeCheck<'a> {
 	input: &'a str,
 	errors: Vec<String>,
-	env: HashMap<SymbolId, Ty>,
+	env: FxHashMap<SymbolId, Ty>,
 }
 
 type RetPair = Option<(Ty, Span)>;
@@ -22,7 +22,7 @@ impl<'a> TypeCheck<'a> {
 		let mut this = Self {
 			input,
 			errors: Vec::new(),
-			env: HashMap::new(),
+			env: FxHashMap::default(),
 		};
 
 		for item in GLOBALS.iter() {
