@@ -90,7 +90,7 @@ impl fmt::Display for Ty {
 			Ty::Maybe(ty) => format!("maybe({ty})"),
 			Ty::Fn(args, ret) => {
 				let args = args.iter().map(|a| a.to_string()).collect::<Vec<String>>().join(", ");
-				format!("({args}) -> {ret}")
+				format!("fn({args}) -> {ret}")
 			},
 		};
 		write!(f, "{s}")

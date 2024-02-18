@@ -16,6 +16,7 @@ pub struct Block {
 #[derive(Debug, PartialEq)]
 pub enum Stat {
 	Assignment(Assignment),
+	AssignOp(AssignOp),
 	Let(Let),
 	Call(Call),
 	Block(Block),
@@ -62,15 +63,17 @@ pub struct ForBlock {
 
 #[derive(Debug, PartialEq)]
 pub struct Assignment {
-	pub vars: Vec<Var>,
+	pub vars: Vec<Expr>,
 	pub exprs: Vec<Expr>,
 	pub span: Span,
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Var {
+pub struct AssignOp {
+	pub var: Expr,
 	pub expr: Expr,
-	// pub ty: Option<Ty>,
+	pub op: BinOp,
+	pub span: Span,
 }
 
 #[derive(Debug, PartialEq)]

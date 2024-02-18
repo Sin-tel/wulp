@@ -90,13 +90,20 @@ fn parse_statement_inner(input: &str, tokens: &mut Lexer) -> Stat {
 				TokenKind::Assign | TokenKind::Comma | TokenKind::Colon => {
 					Stat::Assignment(parse_assignment(suffix_expr, input, tokens))
 				},
+				TokenKind::AssignPlus
+				| TokenKind::AssignMinus
+				| TokenKind::AssignMul
+				| TokenKind::AssignDiv
+				| TokenKind::AssignMod
+				| TokenKind::AssignPow
+				| TokenKind::AssignConcat => Stat::AssignOp(parse_assign_op(suffix_expr, input, tokens)),
 				_ => {
 					if let ExprKind::Call(e) = suffix_expr.kind {
 						return Stat::Call(e);
 					}
 					// TODO: make this more informative
 					let tk = tokens.next();
-					let msg = format!("Expected `=` but found: {tk}.");
+					let msg = format!("Expected `=` but found: `{tk}`.");
 					format_err(&msg, tk.span, input);
 					panic!("{msg}");
 				},
@@ -107,21 +114,18 @@ fn parse_statement_inner(input: &str, tokens: &mut Lexer) -> Stat {
 
 fn parse_assignment(first: Expr, input: &str, tokens: &mut Lexer) -> Assignment {
 	let start = first.span;
-	let first_var = Var { expr: first };
-	let mut vars = vec![first_var];
+	let mut vars = vec![first];
 
 	while tokens.peek().kind == TokenKind::Comma {
 		tokens.next();
-		vars.push(Var {
-			expr: parse_suffix_expr(input, tokens),
-		});
+		vars.push(parse_suffix_expr(input, tokens));
 	}
 
 	// lhs vars can not be a Call, since those arent lvalues.
 	for var in &vars {
-		if let ExprKind::Call(_) = var.expr.kind {
+		if let ExprKind::Call(_) = var.kind {
 			let msg = "Can not assign to a function call.";
-			format_err(msg, var.expr.span, input);
+			format_err(msg, var.span, input);
 			panic!("{}", msg);
 		}
 	}
@@ -132,6 +136,21 @@ fn parse_assignment(first: Expr, input: &str, tokens: &mut Lexer) -> Assignment 
 	let span = Span::join(start, exprs.last().unwrap().span);
 
 	Assignment { vars, exprs, span }
+}
+
+fn parse_assign_op(var: Expr, input: &str, tokens: &mut Lexer) -> AssignOp {
+	let op = if let Some(op) = tokens.peek().assign_to_bin() {
+		tokens.next();
+		op
+	} else {
+		unreachable!();
+	};
+
+	let expr = parse_expr(input, tokens);
+
+	let span = Span::join(var.span, expr.span);
+
+	AssignOp { var, expr, op, span }
 }
 
 fn parse_let(input: &str, tokens: &mut Lexer) -> Let {
@@ -455,7 +474,7 @@ fn parse_primary_expr(input: &str, tokens: &mut Lexer) -> Expr {
 		},
 		_ => {
 			let tk = tokens.next();
-			let msg = format!("Expected expression but found: {tk}.");
+			let msg = format!("Expected expression but found: `{tk}`.");
 			format_err(&msg, tk.span, input);
 			panic!("{msg}");
 		},
@@ -551,7 +570,7 @@ fn parse_field(input: &str, tokens: &mut Lexer) -> Field {
 		},
 		_ => {
 			let tk = tokens.next();
-			let msg = format!("Expected field but found: {tk}.");
+			let msg = format!("Expected field but found: `{tk}`.");
 			format_err(&msg, tk.span, input);
 			panic!("{msg}");
 		},
@@ -604,7 +623,10 @@ fn parse_parlist(input: &str, tokens: &mut Lexer) -> Vec<Param> {
 		return params;
 	}
 
-	while tokens.peek().kind == TokenKind::Name {
+	loop {
+		if tokens.peek().kind == TokenKind::RParen {
+			break;
+		}
 		let name = parse_name(input, tokens);
 		let ty = if tokens.peek().kind == TokenKind::Colon {
 			tokens.next();
@@ -706,6 +728,32 @@ fn parse_type(input: &str, tokens: &mut Lexer) -> Ty {
 		TokenKind::TyInt => Ty::Int,
 		TokenKind::TyStr => Ty::Str,
 		TokenKind::TyBool => Ty::Bool,
+		TokenKind::LBracket => {
+			// Array type
+			let ty = Ty::Array(Box::new(parse_type(input, tokens)));
+			assert_next(input, tokens, TokenKind::RBracket);
+			ty
+		},
+		TokenKind::Fn => {
+			// Function type
+			let mut arg_ty = Vec::new();
+			assert_next(input, tokens, TokenKind::LParen);
+			loop {
+				if tokens.peek().kind == TokenKind::RParen {
+					break;
+				}
+				arg_ty.push(parse_type(input, tokens));
+				if tokens.peek().kind == TokenKind::RParen {
+					break;
+				}
+				assert_next(input, tokens, TokenKind::Comma);
+			}
+			assert_next(input, tokens, TokenKind::RParen);
+			assert_next(input, tokens, TokenKind::Arrow);
+			let ret_ty = parse_type(input, tokens);
+
+			Ty::Fn(arg_ty, Box::new(ret_ty))
+		},
 		TokenKind::TyMaybe => {
 			assert_next(input, tokens, TokenKind::LParen);
 			let inner = parse_type(input, tokens);
@@ -713,7 +761,7 @@ fn parse_type(input: &str, tokens: &mut Lexer) -> Ty {
 			Ty::Maybe(Box::new(inner))
 		},
 		_ => {
-			let msg = format!("Expected type but found {}.", tk.kind);
+			let msg = format!("Expected type but found `{}`.", tk.kind);
 			format_err(&msg, tk.span, input);
 			panic!("{msg}");
 		},
@@ -723,7 +771,7 @@ fn parse_type(input: &str, tokens: &mut Lexer) -> Ty {
 fn assert_next(input: &str, tokens: &mut Lexer, expect: TokenKind) -> Token {
 	let tk = tokens.next();
 	if tk.kind != expect {
-		let msg = format!("Expected {} but found {}.", expect, tk.kind);
+		let msg = format!("Expected `{}` but found `{}`.", expect, tk.kind);
 		format_err(&msg, tk.span, input);
 		panic!("{msg}");
 	}

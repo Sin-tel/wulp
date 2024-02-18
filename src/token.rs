@@ -24,10 +24,10 @@ pub enum TokenKind {
 	Not,
 	Or,
 	Return,
+	While,
 	True,
 	False,
-	While,
-	Concat,
+
 	Period,
 	LParen,
 	RParen,
@@ -42,7 +42,15 @@ pub enum TokenKind {
 	Div,
 	Mod,
 	Pow,
+	Concat,
 	Assign,
+	AssignPlus,
+	AssignMinus,
+	AssignMul,
+	AssignDiv,
+	AssignMod,
+	AssignPow,
+	AssignConcat,
 	Eq,
 	Neq,
 	Gte,
@@ -86,6 +94,19 @@ impl Token {
 		}
 	}
 
+	pub fn assign_to_bin(&self) -> Option<BinOp> {
+		match self.kind {
+			TokenKind::AssignPlus => Some(BinOp::Plus),
+			TokenKind::AssignMinus => Some(BinOp::Minus),
+			TokenKind::AssignMul => Some(BinOp::Mul),
+			TokenKind::AssignDiv => Some(BinOp::Div),
+			TokenKind::AssignPow => Some(BinOp::Pow),
+			TokenKind::AssignMod => Some(BinOp::Mod),
+			TokenKind::AssignConcat => Some(BinOp::Concat),
+			_ => None,
+		}
+	}
+
 	pub fn as_un_op(&self) -> Option<UnOp> {
 		match self.kind {
 			TokenKind::Minus => Some(UnOp::Minus),
@@ -118,7 +139,6 @@ impl fmt::Display for TokenKind {
 				False => "false",
 				While => "while",
 				Let => "let",
-				Concat => "..",
 				Period => ".",
 				LParen => "(",
 				RParen => ")",
@@ -133,7 +153,15 @@ impl fmt::Display for TokenKind {
 				Div => "/",
 				Mod => "%",
 				Pow => "^",
+				Concat => "..",
 				Assign => "=",
+				AssignPlus => "+=",
+				AssignMinus => "-=",
+				AssignMul => "*=",
+				AssignDiv => "/=",
+				AssignMod => "%=",
+				AssignPow => "^=",
+				AssignConcat => "..=",
 				Eq => "==",
 				Neq => "!=",
 				Gte => ">=",
@@ -163,12 +191,3 @@ impl fmt::Display for Token {
 		write!(f, "{}", self.kind)
 	}
 }
-
-// impl fmt::Display for Tokens {
-// 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-// 		for token in &self.tokens {
-// 			write!(f, "{token}\t")?;
-// 		}
-// 		Ok(())
-// 	}
-// }

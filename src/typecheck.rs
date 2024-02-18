@@ -121,6 +121,7 @@ impl<'a> TypeCheck<'a> {
 					self.eval_fn_call(s);
 				},
 				Stat::Assignment(s) => self.eval_assignment(s),
+				Stat::AssignOp(s) => self.eval_assign_op(s),
 				Stat::Let(s) => self.eval_let(s),
 				Stat::FnDef(s) => self.eval_fn_def(s),
 				s => unimplemented!("{s:?}"),
@@ -130,15 +131,16 @@ impl<'a> TypeCheck<'a> {
 	}
 
 	fn eval_fn_def(&mut self, node: &FnDef) {
+		// TODO: de-dup with eval lambda
 		assert!(node.path.is_empty());
 
 		let mut arg_ty = Vec::new();
-
 		for p in &node.body.params {
 			let ty = p.ty.clone().expect("Need parameter annotation");
 			self.new_def(p.name.id, ty.clone());
 			arg_ty.push(ty);
 		}
+
 		let ret_annotation = node.body.ty.as_ref().expect("Need return type annotation");
 		let fn_ty = Ty::Fn(arg_ty, Box::new(ret_annotation.clone()));
 		self.new_def(node.name.id, fn_ty);
@@ -161,11 +163,12 @@ impl<'a> TypeCheck<'a> {
 	// TODO: get span info from AST and remove this argument
 	fn eval_lambda(&mut self, node: &FnBody, span: Span) -> Ty {
 		// build function type from signature
-		let arg_ty = node
-			.params
-			.iter()
-			.map(|p| p.ty.clone().expect("Need parameter annotation"))
-			.collect();
+		let mut arg_ty = Vec::new();
+		for p in &node.params {
+			let ty = p.ty.clone().expect("Need parameter annotation");
+			self.new_def(p.name.id, ty.clone());
+			arg_ty.push(ty);
+		}
 
 		let ret_annotation = node.ty.as_ref();
 
@@ -185,7 +188,7 @@ impl<'a> TypeCheck<'a> {
 			}
 			ret_ty
 		} else {
-			println!("Infer lambda return: {}", &ty);
+			println!("Inferred function return: {}", &ty);
 			&ty
 		};
 
@@ -193,40 +196,40 @@ impl<'a> TypeCheck<'a> {
 	}
 
 	fn eval_fn_call(&mut self, c: &Call) -> Ty {
-		match &c.expr.kind {
-			ExprKind::Name(n) => {
-				let fn_ty = self.lookup(n.id).expect("lookup failed").clone();
-				if let Ty::Fn(params, ret_ty) = fn_ty {
-					// TODO: get rid of hardcoded "print" here
-					if params.len() != c.args.len() && n.span.as_str(self.input) != "print" {
-						let msg = "Wrong number of arguments.".to_string();
-						format_err(&msg, n.span, self.input);
+		let fn_ty = self.eval_expr(&c.expr);
+		if let Ty::Fn(params, ret_ty) = fn_ty {
+			// TODO: get rid of hardcoded "print" here
+
+			if params.len() != c.args.len() && c.expr.span.as_str(self.input) != "print" {
+				let msg = format!(
+					"Function takes {} argument(s), {} supplied.",
+					params.len(),
+					c.args.len()
+				);
+				format_err(&msg, c.expr.span, self.input);
+				self.errors.push(msg);
+			} else {
+				for (p, a) in zip(params, c.args.iter()) {
+					let arg_ty = self.eval_expr(a);
+					if !subtype(&arg_ty, &p) {
+						let msg = format!("Expected argument type `{p}`, found `{arg_ty}`");
+						format_err(&msg, a.span, self.input);
 						self.errors.push(msg);
-					} else {
-						for (p, a) in zip(params, c.args.iter()) {
-							let arg_ty = self.eval_expr(a);
-							if !subtype(&arg_ty, &p) {
-								let msg = format!("Expected argument type `{p}`, found `{arg_ty}`");
-								format_err(&msg, a.span, self.input);
-								self.errors.push(msg);
-							}
-						}
 					}
-					*ret_ty.clone()
-				} else {
-					let msg = format!("Type `{fn_ty}` is not callable.");
-					format_err(&msg, c.expr.span, self.input);
-					self.errors.push(msg);
-					Ty::Bottom
 				}
-			},
-			e => unimplemented!("{e:?}"),
+			}
+			*ret_ty.clone()
+		} else {
+			let msg = format!("Type `{fn_ty}` is not callable.");
+			format_err(&msg, c.expr.span, self.input);
+			self.errors.push(msg);
+			Ty::Bottom
 		}
 	}
 
 	fn eval_expr(&mut self, expr: &Expr) -> Ty {
 		let ty = self.eval_expr_inner(expr);
-		println!("infer: {}: {}", &expr.span.as_str(self.input), &ty);
+		println!("infer {}: {}", &expr.span.as_str(self.input), &ty);
 		ty
 	}
 
@@ -250,6 +253,7 @@ impl<'a> TypeCheck<'a> {
 						}
 					},
 					BinOp::Gt | BinOp::Lt | BinOp::Gte | BinOp::Lte => {
+						// TODO: these also work on string type
 						if subtype(&lhs, &Ty::Num) && subtype(&rhs, &Ty::Num) {
 							return Ty::Bool;
 						}
@@ -314,10 +318,24 @@ impl<'a> TypeCheck<'a> {
 				}
 				Ty::Array(Box::new(ty))
 			},
-			ExprKind::Name(e) => self.lookup(e.id).unwrap().clone(),
+			ExprKind::Name(e) => {
+				let ty_opt = self.lookup(e.id);
+				if let Some(ty) = ty_opt {
+					ty.clone()
+				} else {
+					let msg = format!(
+						"error: Couldn't find type for `{}` {:?}",
+						expr.span.as_str(self.input),
+						e
+					);
+					format_err(&msg, e.span, self.input);
+					panic!("{}", &msg);
+				}
+			},
 			ExprKind::SuffixExpr(e, s) => self.eval_suffix_expr(e, s),
 			ExprKind::Literal(e) => self.eval_literal(e),
 			ExprKind::Call(e) => self.eval_fn_call(e),
+			ExprKind::Expr(e) => self.eval_expr(e),
 			ExprKind::Lambda(e) => self.eval_lambda(e, expr.span),
 			e => unimplemented!("{e:?}"),
 		}
@@ -383,26 +401,68 @@ impl<'a> TypeCheck<'a> {
 		}
 	}
 
+	fn eval_lvalue(&mut self, var: &Expr) -> Ty {
+		match &var.kind {
+			ExprKind::Name(n) => {
+				return self.lookup(n.id).expect("lookup failed").clone();
+			},
+			ExprKind::SuffixExpr(e, s) => {
+				return self.eval_suffix_expr(e, s);
+			},
+			ExprKind::Call(_) => todo!(),
+			_ => unreachable!(),
+		};
+	}
+
 	fn eval_assignment(&mut self, node: &Assignment) {
 		assert!(node.exprs.len() == node.vars.len());
 
-		// TODO: lhs annotation
 		let mut rhs = Vec::new();
 		for e in &node.exprs {
-			rhs.push(self.eval_expr(e).clone());
+			rhs.push(self.eval_expr(e));
 		}
 		for (var, rhs_ty) in zip(&node.vars, rhs) {
-			match &var.expr.kind {
-				ExprKind::Name(n) => {
-					let ty = self.lookup(n.id).expect("lookup failed");
-					if !subtype(&rhs_ty, ty) {
-						let msg = format!("Type error, assigning `{rhs_ty}` to `{ty}`.");
-						format_err(&msg, node.span, self.input);
-						self.errors.push(msg);
-					}
-				},
-				e => unimplemented!("{e:?}"),
+			let ty = self.eval_lvalue(var);
+			if !subtype(&rhs_ty, &ty) {
+				let msg = format!("Type error, assigning `{rhs_ty}` to `{ty}`.");
+				format_err(&msg, node.span, self.input);
+				self.errors.push(msg);
 			};
 		}
+	}
+
+	fn eval_assign_op(&mut self, node: &AssignOp) {
+		// TODO: refactor to use binop code
+		let rhs = self.eval_expr(&node.expr);
+		let lhs = self.eval_lvalue(&node.var);
+
+		if lhs == Ty::Bottom {
+			return;
+		}
+
+		match node.op {
+			BinOp::Plus | BinOp::Minus | BinOp::Mul | BinOp::Pow | BinOp::Mod => {
+				if lhs == Ty::Int && subtype(&rhs, &Ty::Int) {
+					return;
+				}
+				if lhs == Ty::Num && subtype(&rhs, &Ty::Num) {
+					return;
+				}
+			},
+			BinOp::Div => {
+				if lhs == Ty::Num && subtype(&rhs, &Ty::Num) {
+					return;
+				}
+			},
+			BinOp::Concat => {
+				if subtype(&lhs, &Ty::Str) && subtype(&rhs, &Ty::Str) {
+					return;
+				}
+			},
+			_ => unreachable!(),
+		}
+		let msg = format!("Operator `{}` cannot by applied to `{}` and `{}`.", node.op, lhs, rhs);
+		format_err(&msg, node.span, self.input);
+		self.errors.push(msg);
 	}
 }

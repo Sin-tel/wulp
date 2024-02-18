@@ -316,6 +316,11 @@ impl Iterator for LexIter<'_> {
 					let end = self.cursor;
 					Some(self.newtoken(Arrow, start, end))
 				},
+				'-' if next == Some('=') => {
+					self.eat_chars(2);
+					let end = self.cursor;
+					Some(self.newtoken(AssignMinus, start, end))
+				},
 				'-' => {
 					if self.peek_is_number() {
 						return Some(self.number());
@@ -351,8 +356,14 @@ impl Iterator for LexIter<'_> {
 				},
 				'.' if next == Some('.') => {
 					self.eat_chars(2);
-					let end = self.cursor;
-					Some(self.newtoken(Concat, start, end))
+					if self.cur_char() == Some('=') {
+						self.eat_char();
+						let end = self.cursor;
+						Some(self.newtoken(AssignConcat, start, end))
+					} else {
+						let end = self.cursor;
+						Some(self.newtoken(Concat, start, end))
+					}
 				},
 				'.' => {
 					self.eat_char();
@@ -384,25 +395,50 @@ impl Iterator for LexIter<'_> {
 					let end = self.cursor;
 					Some(self.newtoken(Gt, start, end))
 				},
+				'+' if next == Some('=') => {
+					self.eat_chars(2);
+					let end = self.cursor;
+					Some(self.newtoken(AssignPlus, start, end))
+				},
 				'+' => {
 					self.eat_char();
 					let end = self.cursor;
 					Some(self.newtoken(Plus, start, end))
+				},
+				'*' if next == Some('=') => {
+					self.eat_chars(2);
+					let end = self.cursor;
+					Some(self.newtoken(AssignMul, start, end))
 				},
 				'*' => {
 					self.eat_char();
 					let end = self.cursor;
 					Some(self.newtoken(Mul, start, end))
 				},
+				'/' if next == Some('=') => {
+					self.eat_chars(2);
+					let end = self.cursor;
+					Some(self.newtoken(AssignDiv, start, end))
+				},
 				'/' => {
 					self.eat_char();
 					let end = self.cursor;
 					Some(self.newtoken(Div, start, end))
 				},
+				'%' if next == Some('=') => {
+					self.eat_chars(2);
+					let end = self.cursor;
+					Some(self.newtoken(AssignMod, start, end))
+				},
 				'%' => {
 					self.eat_char();
 					let end = self.cursor;
 					Some(self.newtoken(Mod, start, end))
+				},
+				'^' if next == Some('=') => {
+					self.eat_chars(2);
+					let end = self.cursor;
+					Some(self.newtoken(AssignPow, start, end))
 				},
 				'^' => {
 					self.eat_char();

@@ -21,6 +21,7 @@ impl Symbol {
 pub struct SymbolTable {
 	symbols: Vec<Symbol>,
 	pub globals: Vec<SymbolId>,
+	temp_counter: usize,
 }
 
 impl SymbolTable {
@@ -28,6 +29,7 @@ impl SymbolTable {
 		let mut new = SymbolTable {
 			symbols: Vec::new(),
 			globals: Vec::new(),
+			temp_counter: 0,
 		};
 		// id = 0 always points to this
 		new.symbols.push(Symbol::new("UNKNOWN_SYMBOL", true, false));
@@ -38,6 +40,15 @@ impl SymbolTable {
 		let id = self.symbols.len();
 		self.symbols.push(symbol);
 		id
+	}
+
+	pub fn fresh_temp(&mut self) -> (SymbolId, String) {
+		let name = format!("_tmp{}", self.temp_counter);
+		self.temp_counter += 1;
+		let symbol = Symbol::new(&name, false, false);
+
+		let id = self.push(symbol);
+		(id, name)
 	}
 
 	pub fn get(&self, id: SymbolId) -> &Symbol {

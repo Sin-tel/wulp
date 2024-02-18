@@ -77,7 +77,15 @@ impl<'a> ScopeCheck<'a> {
 				}
 				var.visit(self);
 			},
-			ExprKind::SuffixExpr(expr, _) => self.check_lvalue(expr),
+			ExprKind::SuffixExpr(expr, s) => {
+				self.check_lvalue(expr);
+				for suffix in s {
+					match suffix {
+						Suffix::Property(_) => todo!(),
+						Suffix::Index(e) => e.visit(self),
+					};
+				}
+			},
 			ExprKind::Call(call) => {
 				self.check_lvalue(&mut call.expr);
 				for e in &mut call.args {
@@ -161,8 +169,14 @@ impl<'a> Visitor for ScopeCheck<'a> {
 
 		// now check if rhs variables exist
 		for var in &mut node.vars {
-			self.check_lvalue(&mut var.expr);
+			self.check_lvalue(var);
 		}
+	}
+
+	fn visit_assign_op(&mut self, node: &mut AssignOp) {
+		node.expr.visit(self);
+
+		self.check_lvalue(&mut node.var);
 	}
 
 	fn visit_let(&mut self, node: &mut Let) {

@@ -1,17 +1,25 @@
-// this should print 4, 5
-
-let f = (fn(a) {
-  let t = {a}
-  return fn () {return t}
-}) (4)
+let f = (
+	fn(a: int) -> fn() -> [int] {
+		let t = [a]
+		return fn () {
+			print("eval"); return t
+		}
+	}
+	) (4)
 
 let t = 1
 
-print(f()[1])
-f()[1] = 5
-print(f()[1])
 
-// This should fail Undefined variable: `s`.
+// should evaluate three times exactly
 
-// f = fn(s) {return {s}}
-// f(s)[1] = 5
+print(f()[0]) 
+f()[0] += 1
+print(f()[0])
+
+//--- prints:
+// eval
+// 4
+// eval
+// eval
+// 5
+

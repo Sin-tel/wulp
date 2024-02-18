@@ -1,19 +1,23 @@
-fn fact(n: int) -> num {
-	if n != 1 return n * fact(n - 1)
-	// elseif n > 0 return 1
-	else return 0
+let x = 0
+fn f() -> int {
+	print("only evaluated once")
+	x = x + 1
+	return x
 }
 
-let x = fn() {
-	if true {
-		return 1
-	} else {
-		return 1.5
-	}
-}
+let a = [1 2 3 4]
+let b = [4 3 2 1]
 
-let x, y, z = 1, "str", true
+a[b[a[f()]]] += 1
+// a[f()] = a[f()] + 1
 
-print(x, y)
+// let temp = f()
+// a[temp] = a[temp] + 1
 
-return fact(5)
+// a[f()] = a[f()] + 1
+
+print(a[0])
+print(a[1])
+print(a[2])
+print(a[3])
+
