@@ -4,18 +4,18 @@ fn fact(n: int) -> int {
 	else {{return 1}}
 }
 
-let add = fn(a: int, b: int) {return a + b}
+// let add = fn(a: int, b: int) {return a + b}
 
-let iter = {2; 3 4, 5}
+let list = [2 3 4 5]
 
-for i in iter {
-	print(fact(i))
-}
-
-let i = 4
-while true {
+for i in list {
 	print(i, fact(i))
-	i = i - 1
-	if i <= 0 break
 }
+
+// let i = 4
+// while true {
+// 	print(i, fact(i))
+// 	i = i - 1
+// 	if i <= 0 break
+// }
 

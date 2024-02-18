@@ -20,7 +20,9 @@ impl EmitLua {
 			symbol_table,
 			patch_temp_lvalue: false,
 		};
+		this.code.push_str(include_str!("../lua/std_preamble.lua"));
 		ast.block.walk(&mut this);
+
 		this.code
 	}
 
@@ -116,19 +118,14 @@ impl Visitor for EmitLua {
 	}
 	fn visit_for_block(&mut self, node: &mut ForBlock) {
 		// TODO: emit the correct kind of iterator depending on the type of expr
-		self.statement.push_str("for ");
-		// self.push_list(&mut node.names, ", ");
 
 		assert!(node.names.len() == 1);
-		// TODO: for now we only ever emit ipairs. fix up later to work with tables
-		self.statement.push_str("_, ");
+		self.statement.push_str("for ");
 		self.visit_name(&mut node.names[0]);
 
-		// self.statement.push_str(" in ");
-		self.statement.push_str(" in ipairs(");
+		self.statement.push_str(" in iter.wrap(iter.array(");
 		self.visit_expr(&mut node.expr);
-		self.statement.push(')');
-		self.statement.push_str(" do\n");
+		self.statement.push_str(")) do\n");
 
 		self.visit_block(&mut node.block);
 
@@ -162,7 +159,6 @@ impl Visitor for EmitLua {
 		self.visit_fn_body(&mut node.body);
 	}
 	fn visit_fn_call(&mut self, node: &mut Call) {
-		// node.walk(self);
 		self.visit_expr(&mut node.expr);
 		self.statement.push('(');
 		self.push_list(&mut node.args, ", ");
@@ -185,7 +181,7 @@ impl Visitor for EmitLua {
 				self.statement.push_str("end");
 			},
 			Stat::AssignOp(s) => {
-				// copy any index evaluations to a temp var
+				// Copy any evaluations to a temp var
 				self.patch_temp_lvalue = true;
 				self.visit_expr(&mut s.var);
 				self.patch_temp_lvalue = false;
@@ -251,6 +247,9 @@ impl Visitor for EmitLua {
 					self.statement.push_str("[0]=");
 				}
 				self.push_list(t, ", ");
+
+				self.statement.push_str(", n=");
+				self.statement.push_str(&t.len().to_string());
 				self.statement.push('}');
 			},
 			ExprKind::Literal(_) | ExprKind::Name(_) | ExprKind::Call(_) | ExprKind::SuffixExpr(_, _) => {
@@ -280,7 +279,7 @@ impl Visitor for EmitLua {
 			Suffix::Index(e) => {
 				self.statement.push('[');
 				if self.patch_temp_lvalue {
-					self.replace_with_temp(e)
+					self.replace_with_temp(e);
 				}
 				node.walk(self);
 				self.statement.push(']');
@@ -289,7 +288,7 @@ impl Visitor for EmitLua {
 	}
 
 	fn visit_fn_body(&mut self, node: &mut FnBody) {
-		// todo, no newline for short functions
+		// TODO: no newline for short functions
 		self.statement.push('(');
 		self.push_list(&mut node.params, ", ");
 		self.statement.push_str(")\n");

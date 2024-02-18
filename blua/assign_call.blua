@@ -1,11 +1,9 @@
-let f = (
-	fn(a: int) -> fn() -> [int] {
-		let t = [a]
-		return fn () {
-			print("eval"); return t
-		}
-	}
-	) (4)
+let f = (fn(a: int) -> fn() -> [int] {
+			let t = [a]
+			return fn () {
+				print("eval"); return t
+			}
+		}) (4)
 
 let t = 1
 

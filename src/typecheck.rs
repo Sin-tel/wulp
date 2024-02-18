@@ -77,6 +77,7 @@ impl<'a> TypeCheck<'a> {
 		let mut current_pair: RetPair = None;
 		for stat in &block.stats {
 			match stat {
+				Stat::Break => return (current_pair, false),
 				Stat::Block(block) => {
 					let (new_pair, ret) = self.eval_block(block);
 					current_pair = self.join_or_fail(current_pair, new_pair);
@@ -117,6 +118,25 @@ impl<'a> TypeCheck<'a> {
 						}
 					}
 				},
+				Stat::WhileBlock(s) => {
+					self.eval_expr(&s.expr);
+					let (pair, _) = self.eval_block(&s.block);
+					current_pair = self.join_or_fail(current_pair, pair);
+				},
+				Stat::ForBlock(s) => {
+					let ty = self.eval_expr(&s.expr);
+					// for now, only iterate on arrays
+					let ty = if let Ty::Array(inner) = ty {
+						inner
+					} else {
+						panic!("error: currently iteration is only supported on arrays.");
+					};
+					assert!(s.names.len() == 1);
+					self.new_def(s.names[0].id, *ty);
+
+					let (pair, _) = self.eval_block(&s.block);
+					current_pair = self.join_or_fail(current_pair, pair);
+				},
 				Stat::Call(s) => {
 					self.eval_fn_call(s);
 				},
@@ -124,7 +144,6 @@ impl<'a> TypeCheck<'a> {
 				Stat::AssignOp(s) => self.eval_assign_op(s),
 				Stat::Let(s) => self.eval_let(s),
 				Stat::FnDef(s) => self.eval_fn_def(s),
-				s => unimplemented!("{s:?}"),
 			};
 		}
 		(current_pair, false)
@@ -188,7 +207,7 @@ impl<'a> TypeCheck<'a> {
 			}
 			ret_ty
 		} else {
-			println!("Inferred function return: {}", &ty);
+			println!("infer fn return: {}", &ty);
 			&ty
 		};
 
@@ -253,8 +272,10 @@ impl<'a> TypeCheck<'a> {
 						}
 					},
 					BinOp::Gt | BinOp::Lt | BinOp::Gte | BinOp::Lte => {
-						// TODO: these also work on string type
 						if subtype(&lhs, &Ty::Num) && subtype(&rhs, &Ty::Num) {
+							return Ty::Bool;
+						}
+						if subtype(&lhs, &Ty::Str) && subtype(&rhs, &Ty::Str) {
 							return Ty::Bool;
 						}
 					},
@@ -323,11 +344,7 @@ impl<'a> TypeCheck<'a> {
 				if let Some(ty) = ty_opt {
 					ty.clone()
 				} else {
-					let msg = format!(
-						"error: Couldn't find type for `{}` {:?}",
-						expr.span.as_str(self.input),
-						e
-					);
+					let msg = format!("couldn't find type for `{}`", expr.span.as_str(self.input));
 					format_err(&msg, e.span, self.input);
 					panic!("{}", &msg);
 				}
@@ -403,15 +420,10 @@ impl<'a> TypeCheck<'a> {
 
 	fn eval_lvalue(&mut self, var: &Expr) -> Ty {
 		match &var.kind {
-			ExprKind::Name(n) => {
-				return self.lookup(n.id).expect("lookup failed").clone();
-			},
-			ExprKind::SuffixExpr(e, s) => {
-				return self.eval_suffix_expr(e, s);
-			},
-			ExprKind::Call(_) => todo!(),
+			ExprKind::Name(n) => self.lookup(n.id).expect("lookup failed").clone(),
+			ExprKind::SuffixExpr(e, s) => self.eval_suffix_expr(e, s),
 			_ => unreachable!(),
-		};
+		}
 	}
 
 	fn eval_assignment(&mut self, node: &Assignment) {
