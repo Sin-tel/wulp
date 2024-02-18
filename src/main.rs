@@ -49,21 +49,21 @@ pub mod visitor;
 mod tests;
 
 fn main() -> Result<()> {
-	let filename = "blua/basic.blua";
+	let filename = "blua/test_assign_ops.blua";
 	let input = fs::read_to_string(filename).unwrap();
 
 	let mut ast = parser::parse(&input);
 	// println!("----- input:");
 	// println!("{input}");
 
-	let symbol_table = ScopeCheck::check(&mut ast, &input)?;
+	let mut symbol_table = ScopeCheck::check(&mut ast, &input)?;
 	TypeCheck::check(&ast, &input)?;
 
 	// println!("----- AST:");
 	// AstPrinter::print_ast(&mut ast, &input);
 
 	println!("----- emitted code:");
-	// symbol_table.mangle();
+	symbol_table.mangle();
 	let code = EmitLua::emit(&mut ast, symbol_table);
 	println!("{code}");
 
@@ -76,9 +76,9 @@ fn main() -> Result<()> {
 	// let res = chunk.eval::<String>();
 	display_return(res, filename);
 
-	env::set_current_dir(Path::new(".."))?;
-	let mut file = fs::File::create(filename.replace("blua", "lua"))?;
-	file.write_all(code.as_bytes())?;
+	// env::set_current_dir(Path::new(".."))?;
+	// let mut file = fs::File::create(filename.replace("blua", "lua"))?;
+	// file.write_all(code.as_bytes())?;
 
 	Ok(())
 }

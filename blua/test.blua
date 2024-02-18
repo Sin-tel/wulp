@@ -8,7 +8,7 @@ fn f() -> int {
 let a = [1 2 3 4]
 let b = [4 3 2 1]
 
-a[b[a[f()]]] += 1
+a[f()] += 1
 // a[f()] = a[f()] + 1
 
 // let temp = f()

@@ -149,27 +149,34 @@ impl<'a> TypeCheck<'a> {
 		(current_pair, false)
 	}
 
-	fn eval_fn_def(&mut self, node: &FnDef) {
-		// TODO: de-dup with eval lambda
-		assert!(node.path.is_empty());
-
-		let mut arg_ty = Vec::new();
-		for p in &node.body.params {
+	fn eval_fn_params(&mut self, params: &[Param]) -> Vec<Ty> {
+		let mut param_ty = Vec::new();
+		for p in params {
 			let ty = p.ty.clone().expect("Need parameter annotation");
 			self.new_def(p.name.id, ty.clone());
-			arg_ty.push(ty);
+			param_ty.push(ty);
 		}
+		param_ty
+	}
 
-		let ret_annotation = node.body.ty.as_ref().expect("Need return type annotation");
-		let fn_ty = Ty::Fn(arg_ty, Box::new(ret_annotation.clone()));
-		self.new_def(node.name.id, fn_ty);
-
-		let (mut ret_pair, ret_all) = self.eval_block(&node.body.body);
+	fn eval_fn_body(&mut self, node: &FnBody, span: Span) -> (Ty, Span) {
+		let (mut ret_pair, ret_all) = self.eval_block(&node.body);
 		// There is an implied 'return nil' at the end of every body
 		if !ret_all {
-			ret_pair = self.join_or_fail(ret_pair, Some((Ty::Nil, node.name.span)));
+			ret_pair = self.join_or_fail(ret_pair, Some((Ty::Nil, span)));
 		};
-		let (ty, prev_span) = ret_pair.unwrap();
+		ret_pair.unwrap()
+	}
+
+	fn eval_fn_def(&mut self, node: &FnDef) {
+		assert!(node.path.is_empty());
+
+		let param_ty = self.eval_fn_params(&node.body.params);
+		let ret_annotation = node.body.ty.as_ref().expect("Need return type annotation");
+		let fn_ty = Ty::Fn(param_ty, Box::new(ret_annotation.clone()));
+		self.new_def(node.name.id, fn_ty);
+
+		let (ty, prev_span) = self.eval_fn_body(&node.body, node.name.span);
 
 		if !subtype(&ty, ret_annotation) {
 			let msg = format!("Expected return type `{ret_annotation}`, found `{ty}`.");
@@ -181,23 +188,10 @@ impl<'a> TypeCheck<'a> {
 	// span should refer to the place where the function is defined
 	// TODO: get span info from AST and remove this argument
 	fn eval_lambda(&mut self, node: &FnBody, span: Span) -> Ty {
-		// build function type from signature
-		let mut arg_ty = Vec::new();
-		for p in &node.params {
-			let ty = p.ty.clone().expect("Need parameter annotation");
-			self.new_def(p.name.id, ty.clone());
-			arg_ty.push(ty);
-		}
-
+		let param_ty = self.eval_fn_params(&node.params);
 		let ret_annotation = node.ty.as_ref();
 
-		// check return type of the block
-		let (mut ret_pair, ret_all) = self.eval_block(&node.body);
-		// There is an implied 'return nil' at the end of every body
-		if !ret_all {
-			ret_pair = self.join_or_fail(ret_pair, Some((Ty::Nil, span)));
-		};
-		let (ty, prev_span) = ret_pair.unwrap();
+		let (ty, prev_span) = self.eval_fn_body(&node, span);
 
 		let ret_ty = if let Some(ret_ty) = ret_annotation {
 			if !subtype(&ty, ret_ty) {
@@ -211,14 +205,13 @@ impl<'a> TypeCheck<'a> {
 			&ty
 		};
 
-		Ty::Fn(arg_ty, Box::new(ret_ty.clone()))
+		Ty::Fn(param_ty, Box::new(ret_ty.clone()))
 	}
 
 	fn eval_fn_call(&mut self, c: &Call) -> Ty {
 		let fn_ty = self.eval_expr(&c.expr);
 		if let Ty::Fn(params, ret_ty) = fn_ty {
 			// TODO: get rid of hardcoded "print" here
-
 			if params.len() != c.args.len() && c.expr.span.as_str(self.input) != "print" {
 				let msg = format!(
 					"Function takes {} argument(s), {} supplied.",
@@ -257,70 +250,11 @@ impl<'a> TypeCheck<'a> {
 			ExprKind::BinExpr(e) => {
 				let lhs = self.eval_expr(&e.lhs);
 				let rhs = self.eval_expr(&e.rhs);
-				match e.op {
-					BinOp::Plus | BinOp::Minus | BinOp::Mul | BinOp::Pow | BinOp::Mod => {
-						if subtype(&lhs, &Ty::Int) && subtype(&rhs, &Ty::Int) {
-							return Ty::Int;
-						}
-						if subtype(&lhs, &Ty::Num) && subtype(&rhs, &Ty::Num) {
-							return Ty::Num;
-						}
-					},
-					BinOp::Div => {
-						if subtype(&lhs, &Ty::Num) && subtype(&rhs, &Ty::Num) {
-							return Ty::Num;
-						}
-					},
-					BinOp::Gt | BinOp::Lt | BinOp::Gte | BinOp::Lte => {
-						if subtype(&lhs, &Ty::Num) && subtype(&rhs, &Ty::Num) {
-							return Ty::Bool;
-						}
-						if subtype(&lhs, &Ty::Str) && subtype(&rhs, &Ty::Str) {
-							return Ty::Bool;
-						}
-					},
-					BinOp::Concat => {
-						if subtype(&lhs, &Ty::Str) && subtype(&rhs, &Ty::Str) {
-							return Ty::Bool;
-						}
-					},
-					BinOp::And | BinOp::Or => {
-						if subtype(&lhs, &Ty::Bool) && subtype(&rhs, &Ty::Bool) {
-							return Ty::Bool;
-						}
-					},
-					BinOp::Eq | BinOp::Neq => {
-						if lhs == rhs {
-							return Ty::Bool;
-						}
-					},
-				}
-				let msg = format!("Operator `{}` cannot by applied to `{}` and `{}`.", e.op, lhs, rhs);
-				format_err(&msg, expr.span, self.input);
-				self.errors.push(msg);
-				Ty::Bottom
+				self.eval_bin_op(&e.op, &lhs, &rhs, expr.span)
 			},
 			ExprKind::UnExpr(e) => {
 				let ty = self.eval_expr(&e.expr);
-				match e.op {
-					UnOp::Minus => {
-						if subtype(&ty, &Ty::Int) {
-							return Ty::Int;
-						}
-						if subtype(&ty, &Ty::Num) {
-							return Ty::Num;
-						}
-					},
-					UnOp::Not => {
-						if subtype(&ty, &Ty::Bool) {
-							return Ty::Bool;
-						}
-					},
-				}
-				let msg = format!("Operator `{}` cannot by applied to `{}`.", e.op, ty);
-				format_err(&msg, expr.span, self.input);
-				self.errors.push(msg);
-				Ty::Bottom
+				self.eval_un_op(&e.op, &ty, expr.span)
 			},
 			ExprKind::Array(array) => {
 				// consider empty array `[]` to have type [Bottom]
@@ -386,16 +320,6 @@ impl<'a> TypeCheck<'a> {
 		ty
 	}
 
-	fn eval_literal(&self, l: &Literal) -> Ty {
-		match l {
-			Literal::Nil => Ty::Nil,
-			Literal::Bool(_) => Ty::Bool,
-			Literal::Num(_) => Ty::Num,
-			Literal::Int(_) => Ty::Int,
-			Literal::Str(_) => Ty::Str,
-		}
-	}
-
 	fn eval_let(&mut self, node: &Let) {
 		assert!(node.exprs.len() == node.names.len());
 
@@ -448,33 +372,89 @@ impl<'a> TypeCheck<'a> {
 		let rhs = self.eval_expr(&node.expr);
 		let lhs = self.eval_lvalue(&node.var);
 
-		if lhs == Ty::Bottom {
-			return;
-		}
+		let new_lhs = self.eval_bin_op(&node.op, &lhs, &rhs, node.span);
 
-		match node.op {
-			BinOp::Plus | BinOp::Minus | BinOp::Mul | BinOp::Pow | BinOp::Mod => {
-				if lhs == Ty::Int && subtype(&rhs, &Ty::Int) {
-					return;
+		if !subtype(&new_lhs, &lhs) {
+			let msg = format!("Cannot assign `{}` to `{}`.", new_lhs, lhs);
+			format_err(&msg, node.span, self.input);
+			self.errors.push(msg);
+		}
+	}
+
+	fn eval_un_op(&mut self, op: &UnOp, ty: &Ty, span: Span) -> Ty {
+		match op {
+			UnOp::Minus => {
+				if subtype(&ty, &Ty::Int) {
+					return Ty::Int;
 				}
-				if lhs == Ty::Num && subtype(&rhs, &Ty::Num) {
-					return;
+				if subtype(&ty, &Ty::Num) {
+					return Ty::Num;
+				}
+			},
+			UnOp::Not => {
+				if subtype(&ty, &Ty::Bool) {
+					return Ty::Bool;
+				}
+			},
+		}
+		let msg = format!("Operator `{}` cannot by applied to `{}`.", op, ty);
+		format_err(&msg, span, self.input);
+		self.errors.push(msg);
+		Ty::Bottom
+	}
+
+	fn eval_bin_op(&mut self, op: &BinOp, lhs: &Ty, rhs: &Ty, span: Span) -> Ty {
+		match op {
+			BinOp::Plus | BinOp::Minus | BinOp::Mul | BinOp::Pow | BinOp::Mod => {
+				if subtype(&lhs, &Ty::Int) && subtype(&rhs, &Ty::Int) {
+					return Ty::Int;
+				}
+				if subtype(&lhs, &Ty::Num) && subtype(&rhs, &Ty::Num) {
+					return Ty::Num;
 				}
 			},
 			BinOp::Div => {
-				if lhs == Ty::Num && subtype(&rhs, &Ty::Num) {
-					return;
+				if subtype(&lhs, &Ty::Num) && subtype(&rhs, &Ty::Num) {
+					return Ty::Num;
+				}
+			},
+			BinOp::Gt | BinOp::Lt | BinOp::Gte | BinOp::Lte => {
+				if subtype(&lhs, &Ty::Num) && subtype(&rhs, &Ty::Num) {
+					return Ty::Bool;
+				}
+				if subtype(&lhs, &Ty::Str) && subtype(&rhs, &Ty::Str) {
+					return Ty::Bool;
 				}
 			},
 			BinOp::Concat => {
 				if subtype(&lhs, &Ty::Str) && subtype(&rhs, &Ty::Str) {
-					return;
+					return Ty::Str;
 				}
 			},
-			_ => unreachable!(),
+			BinOp::And | BinOp::Or => {
+				if subtype(&lhs, &Ty::Bool) && subtype(&rhs, &Ty::Bool) {
+					return Ty::Bool;
+				}
+			},
+			BinOp::Eq | BinOp::Neq => {
+				if lhs == rhs {
+					return Ty::Bool;
+				}
+			},
 		}
-		let msg = format!("Operator `{}` cannot by applied to `{}` and `{}`.", node.op, lhs, rhs);
-		format_err(&msg, node.span, self.input);
+		let msg = format!("Operator `{}` cannot by applied to `{}` and `{}`.", op, lhs, rhs);
+		format_err(&msg, span, self.input);
 		self.errors.push(msg);
+		Ty::Bottom
+	}
+
+	fn eval_literal(&self, l: &Literal) -> Ty {
+		match l {
+			Literal::Nil => Ty::Nil,
+			Literal::Bool(_) => Ty::Bool,
+			Literal::Num(_) => Ty::Num,
+			Literal::Int(_) => Ty::Int,
+			Literal::Str(_) => Ty::Str,
+		}
 	}
 }

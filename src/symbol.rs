@@ -43,7 +43,7 @@ impl SymbolTable {
 	}
 
 	pub fn fresh_temp(&mut self) -> (SymbolId, String) {
-		let name = format!("_tmp{}", self.temp_counter);
+		let name = format!("_t{}", self.temp_counter);
 		self.temp_counter += 1;
 		let symbol = Symbol::new(&name, false, false);
 
@@ -54,5 +54,15 @@ impl SymbolTable {
 	pub fn get(&self, id: SymbolId) -> &Symbol {
 		assert!(id != 0);
 		&self.symbols[id]
+	}
+
+	pub fn mangle(&mut self) {
+		for s in &mut self.symbols {
+			if !s.is_const && !s.is_fn_def {
+				let mut name = "_Z".to_string();
+				name.push_str(&s.name);
+				s.name = name;
+			}
+		}
 	}
 }
