@@ -191,7 +191,7 @@ impl<'a> TypeCheck<'a> {
 		let param_ty = self.eval_fn_params(&node.params);
 		let ret_annotation = node.ty.as_ref();
 
-		let (ty, prev_span) = self.eval_fn_body(&node, span);
+		let (ty, prev_span) = self.eval_fn_body(node, span);
 
 		let ret_ty = if let Some(ret_ty) = ret_annotation {
 			if !subtype(&ty, ret_ty) {
@@ -375,7 +375,7 @@ impl<'a> TypeCheck<'a> {
 		let new_lhs = self.eval_bin_op(&node.op, &lhs, &rhs, node.span);
 
 		if !subtype(&new_lhs, &lhs) {
-			let msg = format!("Cannot assign `{}` to `{}`.", new_lhs, lhs);
+			let msg = format!("Cannot assign `{new_lhs}` to `{lhs}`.");
 			format_err(&msg, node.span, self.input);
 			self.errors.push(msg);
 		}
@@ -384,20 +384,20 @@ impl<'a> TypeCheck<'a> {
 	fn eval_un_op(&mut self, op: &UnOp, ty: &Ty, span: Span) -> Ty {
 		match op {
 			UnOp::Minus => {
-				if subtype(&ty, &Ty::Int) {
+				if subtype(ty, &Ty::Int) {
 					return Ty::Int;
 				}
-				if subtype(&ty, &Ty::Num) {
+				if subtype(ty, &Ty::Num) {
 					return Ty::Num;
 				}
 			},
 			UnOp::Not => {
-				if subtype(&ty, &Ty::Bool) {
+				if subtype(ty, &Ty::Bool) {
 					return Ty::Bool;
 				}
 			},
 		}
-		let msg = format!("Operator `{}` cannot by applied to `{}`.", op, ty);
+		let msg = format!("Operator `{op}` cannot by applied to `{ty}`.");
 		format_err(&msg, span, self.input);
 		self.errors.push(msg);
 		Ty::Bottom
@@ -406,33 +406,33 @@ impl<'a> TypeCheck<'a> {
 	fn eval_bin_op(&mut self, op: &BinOp, lhs: &Ty, rhs: &Ty, span: Span) -> Ty {
 		match op {
 			BinOp::Plus | BinOp::Minus | BinOp::Mul | BinOp::Pow | BinOp::Mod => {
-				if subtype(&lhs, &Ty::Int) && subtype(&rhs, &Ty::Int) {
+				if subtype(lhs, &Ty::Int) && subtype(rhs, &Ty::Int) {
 					return Ty::Int;
 				}
-				if subtype(&lhs, &Ty::Num) && subtype(&rhs, &Ty::Num) {
+				if subtype(lhs, &Ty::Num) && subtype(rhs, &Ty::Num) {
 					return Ty::Num;
 				}
 			},
 			BinOp::Div => {
-				if subtype(&lhs, &Ty::Num) && subtype(&rhs, &Ty::Num) {
+				if subtype(lhs, &Ty::Num) && subtype(rhs, &Ty::Num) {
 					return Ty::Num;
 				}
 			},
 			BinOp::Gt | BinOp::Lt | BinOp::Gte | BinOp::Lte => {
-				if subtype(&lhs, &Ty::Num) && subtype(&rhs, &Ty::Num) {
+				if subtype(lhs, &Ty::Num) && subtype(rhs, &Ty::Num) {
 					return Ty::Bool;
 				}
-				if subtype(&lhs, &Ty::Str) && subtype(&rhs, &Ty::Str) {
+				if subtype(lhs, &Ty::Str) && subtype(rhs, &Ty::Str) {
 					return Ty::Bool;
 				}
 			},
 			BinOp::Concat => {
-				if subtype(&lhs, &Ty::Str) && subtype(&rhs, &Ty::Str) {
+				if subtype(lhs, &Ty::Str) && subtype(rhs, &Ty::Str) {
 					return Ty::Str;
 				}
 			},
 			BinOp::And | BinOp::Or => {
-				if subtype(&lhs, &Ty::Bool) && subtype(&rhs, &Ty::Bool) {
+				if subtype(lhs, &Ty::Bool) && subtype(rhs, &Ty::Bool) {
 					return Ty::Bool;
 				}
 			},
@@ -442,7 +442,7 @@ impl<'a> TypeCheck<'a> {
 				}
 			},
 		}
-		let msg = format!("Operator `{}` cannot by applied to `{}` and `{}`.", op, lhs, rhs);
+		let msg = format!("Operator `{op}` cannot by applied to `{lhs}` and `{rhs}`.");
 		format_err(&msg, span, self.input);
 		self.errors.push(msg);
 		Ty::Bottom
