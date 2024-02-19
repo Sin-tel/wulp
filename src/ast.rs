@@ -3,17 +3,17 @@ use crate::symbol::SymbolId;
 use crate::ty::Ty;
 use std::fmt;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct File {
 	pub block: Block,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Block {
 	pub stats: Vec<Stat>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum Stat {
 	Assignment(Assignment),
 	AssignOp(AssignOp),
@@ -28,13 +28,13 @@ pub enum Stat {
 	Return(Return),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Return {
 	pub span: Span,
 	pub exprs: Vec<Expr>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct IfBlock {
 	pub expr: Expr,
 	pub block: Block,
@@ -42,33 +42,33 @@ pub struct IfBlock {
 	pub else_block: Option<Block>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct ElseIf {
 	pub expr: Expr,
 	pub block: Block,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct WhileBlock {
 	pub expr: Expr,
 	pub block: Block,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct ForBlock {
 	pub names: Vec<Name>,
 	pub expr: Expr,
 	pub block: Block,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Assignment {
 	pub vars: Vec<Expr>,
 	pub exprs: Vec<Expr>,
 	pub span: Span,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct AssignOp {
 	pub var: Expr,
 	pub expr: Expr,
@@ -76,26 +76,26 @@ pub struct AssignOp {
 	pub span: Span,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Let {
 	pub names: Vec<NameTy>,
 	pub exprs: Vec<Expr>,
 	pub span: Span,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct NameTy {
 	pub name: Name,
 	pub ty: Option<Ty>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Expr {
 	pub span: Span,
 	pub kind: ExprKind,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum ExprKind {
 	Name(Name),
 	Literal(Literal),
@@ -109,70 +109,70 @@ pub enum ExprKind {
 	Expr(Box<Expr>), // bracketed expression
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum Suffix {
 	Property(Property),
 	Index(Expr),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Call {
 	pub expr: Box<Expr>,
 	pub args: Vec<Expr>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct FnDef {
 	pub name: Name,
 	pub path: Vec<Property>,
 	pub body: FnBody,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct FnBody {
 	pub params: Vec<Param>,
 	pub body: Block,
 	pub ty: Option<Ty>, // return type
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Param {
 	pub name: Name,
 	pub ty: Option<Ty>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum Field {
 	Assign(Property, Expr),
 	Fn(Property, FnBody),
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Debug)]
 pub struct Name {
 	pub span: Span,
 	pub id: SymbolId,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Debug)]
 pub struct Property {
 	pub span: Span,
 	pub name: String,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct BinExpr {
 	pub op: BinOp,
 	pub lhs: Box<Expr>,
 	pub rhs: Box<Expr>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct UnExpr {
 	pub op: UnOp,
 	pub expr: Box<Expr>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum Literal {
 	Nil,
 	Bool(bool),
@@ -181,7 +181,7 @@ pub enum Literal {
 	Str(String),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum BinOp {
 	Plus,
 	Minus,
@@ -200,7 +200,7 @@ pub enum BinOp {
 	Or,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum UnOp {
 	Minus,
 	Not,

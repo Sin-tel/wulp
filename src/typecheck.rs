@@ -12,7 +12,7 @@ use std::iter::zip;
 pub struct TypeCheck<'a> {
 	input: &'a str,
 	errors: Vec<String>,
-	env: FxHashMap<SymbolId, Ty>,
+	env: FxHashMap<SymbolId, Ty>, // TODO: this can be Vec<Option<Ty>>
 }
 
 type RetPair = Option<(Ty, Span)>;
@@ -288,19 +288,30 @@ impl<'a> TypeCheck<'a> {
 			ExprKind::Call(e) => self.eval_fn_call(e),
 			ExprKind::Expr(e) => self.eval_expr(e),
 			ExprKind::Lambda(e) => self.eval_lambda(e, expr.span),
-			e => unimplemented!("{e:?}"),
+			ExprKind::Table(_) => Ty::Table(0), // TODO
 		}
 	}
 
 	fn eval_suffix_expr(&mut self, expr: &Expr, s: &Vec<Suffix>) -> Ty {
 		let mut ty = self.eval_expr(expr);
+		if ty == Ty::Bottom {
+			return Ty::Bottom;
+		}
 		for suffix in s {
 			match suffix {
-				Suffix::Property(_) => todo!(),
+				Suffix::Property(_) => {
+					ty = if let Ty::Table(_id) = ty {
+						Ty::Any
+					} else {
+						let msg = format!("Can not index type `{ty}`.");
+						format_err(&msg, expr.span, self.input);
+						self.errors.push(msg);
+						Ty::Bottom
+					}
+				},
 				Suffix::Index(e) => {
 					ty = match ty {
 						Ty::Array(inner_ty) => *inner_ty,
-						Ty::Bottom => Ty::Bottom,
 						_ => {
 							let msg = format!("Can not index type `{ty}`.");
 							format_err(&msg, expr.span, self.input);

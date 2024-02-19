@@ -28,6 +28,7 @@ use anyhow::Result;
 use mlua::{prelude::LuaResult, LuaOptions, StdLib};
 use std::env;
 use std::fs;
+#[allow(unused_imports)]
 use std::io::Write;
 use std::path::Path;
 
@@ -49,7 +50,7 @@ pub mod visitor;
 mod tests;
 
 fn main() -> Result<()> {
-	let filename = "blua/test_assign_ops.blua";
+	let filename = "blua/test.blua";
 	let input = fs::read_to_string(filename).unwrap();
 
 	let mut ast = parser::parse(&input);

@@ -1,6 +1,6 @@
-local exports = {}
+local iter = {}
 
-local function range_next()
+local function range_next(self)
 	if self.counter >= self.stop then
 		return nil
 	end
@@ -8,11 +8,9 @@ local function range_next()
 	return self.counter
 end
 
-local function range(stop)
+function iter.range(stop)
 	return { stop = stop, counter = 0, ["next"] = range_next }
 end
-
-exports.range = range
 
 local function array_next(self)
 	local item = self.a[self.counter]
@@ -23,16 +21,14 @@ local function array_next(self)
 	return item
 end
 
-local function array(a)
+function iter.array(a)
 	return { a = a, counter = 0, ["next"] = array_next }
 end
 
-exports.array = array
 
-local function wrap(iter)
+function iter.wrap(iter)
 	return iter.next, iter
 end
 
-exports.wrap = wrap
 
-return exports
+return iter

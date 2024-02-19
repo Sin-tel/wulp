@@ -10,6 +10,7 @@ pub enum Ty {
 	Str,
 	Num,
 	Int,
+	Table(usize),
 	Array(Box<Ty>),
 	Maybe(Box<Ty>),
 	Fn(Vec<Ty>, Box<Ty>), // args, ret
@@ -86,6 +87,7 @@ impl fmt::Display for Ty {
 			Ty::Str => "str".to_string(),
 			Ty::Num => "num".to_string(),
 			Ty::Int => "int".to_string(),
+			Ty::Table(_) => "table".to_string(),
 			Ty::Array(ty) => format!("[{ty}]"),
 			Ty::Maybe(ty) => format!("maybe({ty})"),
 			Ty::Fn(args, ret) => {
