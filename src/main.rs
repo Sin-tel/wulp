@@ -58,7 +58,7 @@ fn main() -> Result<()> {
 	// println!("{input}");
 
 	let mut symbol_table = ScopeCheck::check(&mut ast, &input)?;
-	TypeCheck::check(&ast, &input)?;
+	TypeCheck::check(&ast, &input, &symbol_table)?;
 
 	// println!("----- AST:");
 	// AstPrinter::print_ast(&mut ast, &input);

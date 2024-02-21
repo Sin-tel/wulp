@@ -730,35 +730,38 @@ fn parse_type(input: &str, tokens: &mut Lexer) -> Ty {
 		TokenKind::TyBool => Ty::Bool,
 		TokenKind::LBracket => {
 			// Array type
-			let ty = Ty::Array(Box::new(parse_type(input, tokens)));
-			assert_next(input, tokens, TokenKind::RBracket);
-			ty
+			todo!()
+			// let ty = Ty::Array(Box::new(parse_type(input, tokens)));
+			// assert_next(input, tokens, TokenKind::RBracket);
+			// ty
 		},
 		TokenKind::Fn => {
 			// Function type
-			let mut arg_ty = Vec::new();
-			assert_next(input, tokens, TokenKind::LParen);
-			loop {
-				if tokens.peek().kind == TokenKind::RParen {
-					break;
-				}
-				arg_ty.push(parse_type(input, tokens));
-				if tokens.peek().kind == TokenKind::RParen {
-					break;
-				}
-				assert_next(input, tokens, TokenKind::Comma);
-			}
-			assert_next(input, tokens, TokenKind::RParen);
-			assert_next(input, tokens, TokenKind::Arrow);
-			let ret_ty = parse_type(input, tokens);
+			todo!()
+			// let mut arg_ty = Vec::new();
+			// assert_next(input, tokens, TokenKind::LParen);
+			// loop {
+			// 	if tokens.peek().kind == TokenKind::RParen {
+			// 		break;
+			// 	}
+			// 	arg_ty.push(parse_type(input, tokens));
+			// 	if tokens.peek().kind == TokenKind::RParen {
+			// 		break;
+			// 	}
+			// 	assert_next(input, tokens, TokenKind::Comma);
+			// }
+			// assert_next(input, tokens, TokenKind::RParen);
+			// assert_next(input, tokens, TokenKind::Arrow);
+			// let ret_ty = parse_type(input, tokens);
 
-			Ty::Fn(arg_ty, Box::new(ret_ty))
+			// Ty::Fn(arg_ty, Box::new(ret_ty))
 		},
 		TokenKind::TyMaybe => {
-			assert_next(input, tokens, TokenKind::LParen);
-			let inner = parse_type(input, tokens);
-			assert_next(input, tokens, TokenKind::RParen);
-			Ty::Maybe(Box::new(inner))
+			todo!()
+			// assert_next(input, tokens, TokenKind::LParen);
+			// let inner = parse_type(input, tokens);
+			// assert_next(input, tokens, TokenKind::RParen);
+			// Ty::Maybe(Box::new(inner))
 		},
 		_ => {
 			let msg = format!("Expected type but found `{}`.", tk.kind);

@@ -19,7 +19,7 @@ impl Symbol {
 
 #[derive(Debug)]
 pub struct SymbolTable {
-	symbols: Vec<Symbol>,
+	pub symbols: Vec<Symbol>,
 	pub globals: Vec<SymbolId>,
 	temp_counter: usize,
 }

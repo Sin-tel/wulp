@@ -6,7 +6,8 @@ use lazy_static::lazy_static;
 pub struct Item {
 	pub name: &'static str,
 	pub is_fn_def: bool,
-	pub ty: Ty,
+	pub param_ty: Vec<Ty>,
+	pub ret_ty: Ty,
 	pub id: SymbolId,
 }
 
@@ -16,19 +17,22 @@ lazy_static! {
 		Item {
 			name: "print",
 			is_fn_def: true,
-			ty: Ty::Fn(vec![Ty::Any], Box::new(Ty::Nil)),
+			param_ty: vec![Ty::Any],
+			ret_ty: Ty::Nil,
 			id: 1
 		},
 		Item {
 			name: "assert",
 			is_fn_def: true,
-			ty: Ty::Fn(vec![Ty::Bool], Box::new(Ty::Nil)),
+			param_ty: vec![Ty::Bool],
+			ret_ty: Ty::Nil,
 			id: 2
 		},
 		Item {
 			name: "error",
 			is_fn_def: true,
-			ty: Ty::Fn(vec![Ty::Str], Box::new(Ty::Bottom)),
+			param_ty: vec![Ty::Str],
+			ret_ty: Ty::Bottom,
 			id: 3
 		},
 	];
