@@ -130,6 +130,16 @@ fn empty_table() {
 }
 
 #[test]
+fn numbers() {
+	let p = r#"1 1.2 1000. .5 -1"#;
+
+	let actual: Vec<_> = LexIter::new(p).map(|tk| tk.kind).collect();
+
+	use TokenKind::*;
+	assert_eq!(actual, vec![Number, Number, Number, Number, Minus, Number]);
+}
+
+#[test]
 #[should_panic(expected = "Failed to close string.")]
 fn string_fail() {
 	let p = r#"'hello"#;

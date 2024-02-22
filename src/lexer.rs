@@ -228,18 +228,11 @@ impl<'a> LexIter<'a> {
 		}
 	}
 
-	// ^-?[0-9](\.[0-9])?
+	// This still works for malformed numbers like '0.1.1' or '.1..1' etc.
+	// We check for this in the parser
 	fn number(&mut self) -> Token {
 		let start = self.cursor;
 		let mut s = String::new();
-
-		// we only want a minus sign at the front
-		// ^-
-		if self.cur_char() == Some('-') {
-			if let Some(c) = self.eat_char() {
-				s.push(c);
-			}
-		}
 
 		while let Some(n) = self.cur_char() {
 			match n {
@@ -322,9 +315,6 @@ impl Iterator for LexIter<'_> {
 					Some(self.newtoken(AssignMinus, start, end))
 				},
 				'-' => {
-					if self.peek_is_number() {
-						return Some(self.number());
-					}
 					self.eat_char();
 					let end = self.cursor;
 					Some(self.newtoken(Minus, start, end))
