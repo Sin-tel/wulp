@@ -245,10 +245,10 @@ impl Visitor for EmitLua {
 				self.statement.push('{');
 				if !t.is_empty() {
 					self.statement.push_str("[0]=");
+					self.push_list(t, ", ");
+					self.statement.push_str(", ");
 				}
-				self.push_list(t, ", ");
-
-				self.statement.push_str(", n=");
+				self.statement.push_str("n=");
 				self.statement.push_str(&t.len().to_string());
 				self.statement.push('}');
 			},

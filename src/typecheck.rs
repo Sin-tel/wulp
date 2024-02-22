@@ -18,6 +18,8 @@ pub struct TypeCheck<'a> {
 	types: Vec<TyNode>,
 }
 
+const ERR_TY: TyId = 0;
+
 type RetPair = Option<(TyId, Span)>;
 
 impl<'a> TypeCheck<'a> {
@@ -28,6 +30,9 @@ impl<'a> TypeCheck<'a> {
 			types: Vec::new(),
 			env: FxHashMap::default(),
 		};
+
+		this.types.push(TyNode::Ty(Ty::Bottom));
+		assert!(this.get_type(ERR_TY) == Ty::Bottom);
 
 		for item in GLOBALS.iter() {
 			let mut param_ty = Vec::new();
@@ -44,15 +49,15 @@ impl<'a> TypeCheck<'a> {
 			println!("Main return: {}, ({})", this.get_type(ret_ty), ret_ty);
 		}
 
-		println!("----- types ");
-		for (i, v) in this.types.iter().enumerate() {
-			println!("{}: {}", i, v);
-		}
+		// println!("----- types ");
+		// for (i, v) in this.types.iter().enumerate() {
+		// 	println!("{}: {}", i, v);
+		// }
 
 		println!("----- env ");
 		for (i, s) in symbol_table.symbols.iter().enumerate().skip(1) {
 			if let Some(id) = this.lookup(i) {
-				println!("{}: {}", s.name, this.get_type(id));
+				println!("`{}`: {}", s.name, this.get_type(id));
 			}
 		}
 
@@ -62,58 +67,125 @@ impl<'a> TypeCheck<'a> {
 		}
 	}
 
+	// add symbol to env with specified type
 	fn new_def(&mut self, id: SymbolId, ty: Ty) -> TyId {
 		let ty_id = self.new_ty(ty);
 		self.env.insert(id, ty_id);
 		ty_id
 	}
 
+	// new type variable
 	fn new_ty(&mut self, ty: Ty) -> TyId {
 		let ty_id = self.types.len();
 		self.types.push(TyNode::Ty(ty));
 		ty_id
 	}
 
-	fn unify(&mut self, a_id: TyId, b_id: TyId) -> bool {
-		println!(
-			"unify {}: {} and {}: {}",
-			a_id,
-			self.get_type(a_id),
-			b_id,
-			self.get_type(b_id)
-		);
-		if a_id == b_id {
-			true
-		} else {
-			match (self.get_type(a_id), self.get_type(b_id)) {
-				(_, Ty::TyVar) => {
-					self.types[b_id] = TyNode::Node(a_id);
-					true
-				},
-				(Ty::TyVar, _) => {
-					self.types[a_id] = TyNode::Node(b_id);
-					true
-				},
-
-				(Ty::Array(a), Ty::Array(b)) => self.unify(*a, *b),
-				(Ty::Maybe(a), Ty::Maybe(b)) => self.unify(*a, *b),
-				(a, b) if a == b => true,
-				_ => false,
-			}
-		}
-	}
-
+	// lookup type id in env
 	fn lookup(&self, id: SymbolId) -> Option<TyId> {
 		// TODO: pass in span and fail here
 		self.env.get(&id).copied()
 	}
 
-	fn get_type(&self, mut id: TyId) -> &Ty {
-		// TODO: recursively look up parents of typevars
+	fn get_parent(&self, mut id: TyId) -> TyId {
+		// TODO: path compression
 		loop {
 			match &self.types[id] {
 				TyNode::Node(parent) => id = *parent,
-				TyNode::Ty(ty) => return &ty,
+				TyNode::Ty(_) => return id,
+			}
+		}
+	}
+
+	// get concrete type
+	fn get_type(&self, id: TyId) -> Ty {
+		// TODO: path compression
+		let parent_id = self.get_parent(id);
+		match &self.types[parent_id] {
+			TyNode::Ty(ty) => return ty.clone(),
+			_ => unreachable!(),
+		}
+	}
+
+	// promote unbound type variables to free variables
+	fn promote_free(&mut self, id: TyId) {
+		// todo!()
+		match self.get_type(id) {
+			Ty::Any | Ty::Bottom | Ty::Nil | Ty::Bool | Ty::Str | Ty::Num | Ty::Int => (),
+			Ty::TyVar => {
+				let parent_id = self.get_parent(id);
+				self.types[parent_id] = TyNode::Ty(Ty::Free);
+			},
+			Ty::Free => (),
+			Ty::Table(_) => todo!(),
+			Ty::Array(t) | Ty::Maybe(t) => self.promote_free(t),
+			Ty::Fn(args, ret) => {
+				for a in args {
+					self.promote_free(a);
+				}
+				self.promote_free(ret)
+			},
+		}
+	}
+
+	// instantiate a type with free variables
+	fn instantiate(&mut self, id: TyId, subs: &mut Vec<(TyId, TyId)>) -> TyId {
+		let ty = self.get_type(id);
+		let parent_id = self.get_parent(id);
+		match ty {
+			Ty::Any | Ty::Bottom | Ty::Nil | Ty::Bool | Ty::Str | Ty::Num | Ty::Int | Ty::TyVar => parent_id,
+			Ty::Free => {
+				// keep track of which variables were already instantiated
+				for &(old, new) in subs.iter() {
+					if parent_id == old {
+						return new;
+					}
+				}
+				let t = self.new_ty(Ty::TyVar);
+				subs.push((parent_id, t));
+				t
+			},
+			Ty::Table(_) => todo!(),
+			Ty::Array(t) | Ty::Maybe(t) => self.instantiate(t, subs),
+			Ty::Fn(args, ret) => {
+				let mut new_args = Vec::new();
+				for a in args {
+					new_args.push(self.instantiate(a, subs));
+				}
+				let new_ret = self.instantiate(ret, subs);
+				self.new_ty(Ty::Fn(new_args, new_ret))
+			},
+		}
+	}
+
+	fn unify(&mut self, a_id: TyId, b_id: TyId) -> Result<(), ()> {
+		println!(
+			"unify {}, {} ({}, {})",
+			a_id,
+			b_id,
+			self.get_type(a_id),
+			self.get_type(b_id)
+		);
+		if a_id == b_id {
+			Ok(())
+		} else {
+			match (self.get_type(a_id), self.get_type(b_id)) {
+				(_, Ty::Free) | (Ty::Free, _) => panic!("Can not unify free type variables"),
+				(_, Ty::Bottom) | (Ty::Bottom, _) | (_, Ty::Any) | (Ty::Any, _) => Ok(()), // bail
+				(_, Ty::TyVar) => {
+					self.types[b_id] = TyNode::Node(a_id);
+					Ok(())
+				},
+				(Ty::TyVar, _) => {
+					self.types[a_id] = TyNode::Node(b_id);
+					Ok(())
+				},
+				(a, b) if a == b => Ok(()),
+				(Ty::Array(a), Ty::Array(b)) | (Ty::Maybe(a), Ty::Maybe(b)) => self.unify(a, b),
+
+				(_, Ty::Fn(_, _)) | (Ty::Fn(_, _), _) => todo!(),
+
+				_ => Err(()),
 			}
 		}
 	}
@@ -122,7 +194,7 @@ impl<'a> TypeCheck<'a> {
 		if let Some((ref new_ty, new_span)) = new_pair {
 			match current_pair {
 				Some((ty, prev_span)) => {
-					if self.unify(ty, *new_ty) {
+					if self.unify(ty, *new_ty).is_ok() {
 						Some((ty, new_span))
 					} else {
 						let msg = format!("Incompatible return types `{new_ty}` and `{ty}`.");
@@ -130,7 +202,7 @@ impl<'a> TypeCheck<'a> {
 						let msg2 = "Previous return value defined here:".to_string();
 						format_note(&msg2, prev_span, self.input);
 						self.errors.push(msg);
-						Some((self.new_ty(Ty::Bottom), new_span))
+						Some((ERR_TY, new_span))
 					}
 				},
 				None => new_pair,
@@ -167,6 +239,7 @@ impl<'a> TypeCheck<'a> {
 					return (current_pair, true);
 				},
 				Stat::IfBlock(if_block) => {
+					// TODO: check bool
 					self.eval_expr(&if_block.expr);
 					let (if_pair, ret) = self.eval_block(&if_block.block);
 					let mut all_return = ret;
@@ -189,27 +262,24 @@ impl<'a> TypeCheck<'a> {
 					}
 				},
 				Stat::WhileBlock(s) => {
+					// TODO: check bool
 					self.eval_expr(&s.expr);
 					let (pair, _) = self.eval_block(&s.block);
 					current_pair = self.unify_return(current_pair, pair);
 				},
 				Stat::ForBlock(s) => {
 					let ty = self.eval_expr(&s.expr);
-					// for now, only iterate on arrays
-					// let ty = if let Ty::Array(inner) = self.get_type(ty) {
-					// 	inner
-					// } else {
-					// 	panic!("error: currently iteration is only supported on arrays.");
-					// };
-					// assert!(s.names.len() == 1);
-					// self.new_def(s.names[0].id, Ty::TyVar(*ty));
+					assert!(s.names.len() == 1);
 
 					// make new i: U
 					let loop_var = self.new_def(s.names[0].id, Ty::TyVar);
 
 					// unify iter: [T], [U]
+					// for now, only iterate on arrays
 					let loop_ty = self.new_ty(Ty::Array(loop_var));
-					self.unify(ty, loop_ty);
+					if self.unify(ty, loop_ty).is_err() {
+						panic!("error: currently iteration is only supported on arrays.");
+					}
 
 					let (pair, _) = self.eval_block(&s.block);
 					current_pair = self.unify_return(current_pair, pair);
@@ -230,11 +300,12 @@ impl<'a> TypeCheck<'a> {
 		let mut param_ty = Vec::new();
 		for p in params {
 			// let ty = p.ty.clone().expect("Need parameter annotation");
-			if p.ty.is_some() {
-				println!("warning: type annotation {} ignored", p.ty.as_ref().unwrap());
-			}
+			let ty = match &p.ty {
+				Some(ty) => ty.clone(),
+				None => Ty::TyVar,
+			};
 
-			let id = self.new_def(p.name.id, Ty::TyVar);
+			let id = self.new_def(p.name.id, ty);
 			param_ty.push(id);
 		}
 		param_ty
@@ -256,7 +327,7 @@ impl<'a> TypeCheck<'a> {
 		let param_ty = self.eval_fn_params(&node.body.params);
 		// let ret_annotation = self.new_ty(node.body.ty.as_ref().expect("Need return type annotation").clone());
 		if node.body.ty.is_some() {
-			println!("warning: type annotation {} ignored", node.body.ty.as_ref().unwrap());
+			panic!("type annotation {} ignored", node.body.ty.as_ref().unwrap());
 		}
 		let ret_id = self.new_ty(Ty::TyVar);
 		let fn_ty = Ty::Fn(param_ty, ret_id);
@@ -264,9 +335,7 @@ impl<'a> TypeCheck<'a> {
 
 		let (ty, prev_span) = self.eval_fn_body(&node.body, node.name.span);
 
-		dbg!(ty, ret_id);
-
-		if !self.unify(ty, ret_id) {
+		if self.unify(ty, ret_id).is_err() {
 			let msg = format!(
 				"Expected return type `{}`, found `{}`.",
 				self.get_type(ty),
@@ -276,36 +345,46 @@ impl<'a> TypeCheck<'a> {
 			self.errors.push(msg);
 		};
 
+		self.promote_free(fn_id);
+
 		println!("infer fn def: {} {}", fn_id, self.get_type(fn_id));
 	}
 
 	// span should refer to the place where the function is defined
 	// TODO: get span info from AST and remove this argument
 	fn eval_lambda(&mut self, node: &FnBody, span: Span) -> TyId {
-		todo!()
-		// let param_ty = self.eval_fn_params(&node.params);
-		// let ret_annotation = node.ty.as_ref();
+		let param_ty = self.eval_fn_params(&node.params);
+		// let ret_annotation = self.new_ty(node.body.ty.as_ref().expect("Need return type annotation").clone());
+		if node.ty.is_some() {
+			panic!("type annotation {} ignored", node.ty.as_ref().unwrap());
+		}
+		let ret_id = self.new_ty(Ty::TyVar);
+		let fn_ty = Ty::Fn(param_ty, ret_id);
+		let fn_id = self.new_ty(fn_ty);
 
-		// let (ty, prev_span) = self.eval_fn_body(node, span);
+		let (ty, prev_span) = self.eval_fn_body(node, span);
 
-		// let ret_ty = if let Some(ret_ty) = ret_annotation {
-		// 	if !self.unify(&ty, ret_ty) {
-		// 		let msg = format!("Expected return type `{ret_ty}`, found `{ty}`.");
-		// 		format_err(&msg, prev_span, self.input);
-		// 		self.errors.push(msg);
-		// 	}
-		// 	ret_ty
-		// } else {
-		// 	println!("infer fn return: {}", &ty);
-		// 	&ty
-		// };
+		if self.unify(ty, ret_id).is_err() {
+			let msg = format!(
+				"Expected return type `{}`, found `{}`.",
+				self.get_type(ty),
+				self.get_type(ret_id)
+			);
+			format_err(&msg, prev_span, self.input);
+			self.errors.push(msg);
+		}
 
-		// Ty::Fn(param_ty, Box::new(ret_ty.clone()))
+		self.promote_free(fn_id);
+
+		println!("infer lambda: {} {}", fn_id, self.get_type(fn_id));
+
+		fn_id
 	}
 
 	fn eval_fn_call(&mut self, c: &Call) -> TyId {
-		let fn_ty = self.eval_expr(&c.expr);
-		if let Ty::Fn(params, ret_ty) = self.get_type(fn_ty).clone() {
+		let fn_ty_id = self.eval_expr(&c.expr);
+		let fn_ty = self.instantiate(fn_ty_id, &mut Vec::new());
+		if let Ty::Fn(params, ret_ty) = self.get_type(fn_ty) {
 			// TODO: get rid of hardcoded "print" here
 			if params.len() != c.args.len() && c.expr.span.as_str(self.input) != "print" {
 				let msg = format!(
@@ -318,8 +397,7 @@ impl<'a> TypeCheck<'a> {
 			} else {
 				for (p, a) in zip(params, c.args.iter()) {
 					let arg_ty = self.eval_expr(a);
-					// TODO: shouldn't unify here for TypeVars
-					if !self.unify(arg_ty, p) {
+					if self.unify(arg_ty, p).is_err() {
 						let msg = format!("Expected argument type `{p}`, found `{arg_ty}`");
 						format_err(&msg, a.span, self.input);
 						self.errors.push(msg);
@@ -331,18 +409,18 @@ impl<'a> TypeCheck<'a> {
 			let msg = format!("Type `{fn_ty}` is not callable.");
 			format_err(&msg, c.expr.span, self.input);
 			self.errors.push(msg);
-			self.new_ty(Ty::Bottom)
+			ERR_TY
 		}
 	}
 
 	fn eval_expr(&mut self, expr: &Expr) -> TyId {
 		let ty = self.eval_expr_inner(expr);
-		println!(
-			"infer {}: {} ({})",
-			&expr.span.as_str(self.input),
-			self.get_type(ty),
-			ty
-		);
+		// println!(
+		// 	"infer `{}`: {} ({})",
+		// 	&expr.span.as_str(self.input),
+		// 	self.get_type(ty),
+		// 	ty
+		// );
 		ty
 	}
 
@@ -358,17 +436,16 @@ impl<'a> TypeCheck<'a> {
 				self.eval_un_op(&e.op, ty, expr.span)
 			},
 			ExprKind::Array(array) => {
-				// consider empty array `[]` to have type [Bottom]
-				let mut ty = self.new_ty(Ty::Bottom);
+				let mut ty = self.new_ty(Ty::TyVar);
 				for e in array {
 					let new_ty = self.eval_expr(e);
-					ty = if self.unify(ty, new_ty) {
+					ty = if self.unify(ty, new_ty).is_ok() {
 						new_ty
 					} else {
 						let msg = format!("Incompatible types in array: `{new_ty}` and `{ty}`.");
 						format_err(&msg, e.span, self.input);
 						self.errors.push(msg);
-						return self.new_ty(Ty::Bottom);
+						return ERR_TY;
 					}
 				}
 				self.new_ty(Ty::Array(ty))
@@ -376,7 +453,7 @@ impl<'a> TypeCheck<'a> {
 			ExprKind::Name(e) => {
 				let ty_opt = self.lookup(e.id);
 				if let Some(ty) = ty_opt {
-					ty.clone()
+					ty
 				} else {
 					let msg = format!(
 						"(compiler error) couldn't find type for `{}`",
@@ -408,22 +485,22 @@ impl<'a> TypeCheck<'a> {
 					// 	let msg = format!("Can not index type `{ty}`.");
 					// 	format_err(&msg, expr.span, self.input);
 					// 	self.errors.push(msg);
-					// 	Ty::Bottom
+					// 	ERR_TY
 					// }
 				},
 				Suffix::Index(e) => {
 					ty = match self.get_type(ty) {
-						Ty::Array(inner_ty) => *inner_ty,
+						Ty::Array(inner_ty) => inner_ty,
 						_ => {
 							let msg = format!("Can not index type `{ty}`.");
 							format_err(&msg, expr.span, self.input);
 							self.errors.push(msg);
-							self.new_ty(Ty::Bottom)
+							ERR_TY
 						},
 					};
 					let index_ty = self.eval_expr(e);
 					let ty_int = self.new_ty(Ty::Int);
-					if !self.unify(index_ty, ty_int) {
+					if self.unify(index_ty, ty_int).is_err() {
 						let msg = format!("Index must be type `int` but found `{index_ty}`.");
 						format_err(&msg, e.span, self.input);
 						self.errors.push(msg);
@@ -445,7 +522,7 @@ impl<'a> TypeCheck<'a> {
 			// check if annotation fits
 			if let Some(ty) = &n.ty {
 				let ty_id = self.new_ty(ty.clone());
-				if !self.unify(rhs_ty, ty_id) {
+				if self.unify(rhs_ty, ty_id).is_err() {
 					let msg = format!("Type error, assigning `{rhs_ty}` to `{ty}`.");
 					format_err(&msg, node.span, self.input);
 					self.errors.push(msg);
@@ -459,7 +536,7 @@ impl<'a> TypeCheck<'a> {
 
 	fn eval_lvalue(&mut self, var: &Expr) -> TyId {
 		match &var.kind {
-			ExprKind::Name(n) => self.lookup(n.id).expect("lookup failed").clone(),
+			ExprKind::Name(n) => self.lookup(n.id).expect("lookup failed"),
 			ExprKind::SuffixExpr(e, s) => self.eval_suffix_expr(e, s),
 			_ => unreachable!(),
 		}
@@ -474,7 +551,7 @@ impl<'a> TypeCheck<'a> {
 		}
 		for (var, rhs_ty) in zip(&node.vars, rhs) {
 			let ty = self.eval_lvalue(var);
-			if !self.unify(rhs_ty, ty) {
+			if self.unify(rhs_ty, ty).is_err() {
 				let msg = format!("Type error, assigning `{rhs_ty}` to `{ty}`.");
 				format_err(&msg, node.span, self.input);
 				self.errors.push(msg);
@@ -489,7 +566,7 @@ impl<'a> TypeCheck<'a> {
 
 		let new_lhs = self.eval_bin_op(&node.op, lhs, rhs, node.span);
 
-		if !self.unify(new_lhs, lhs) {
+		if self.unify(new_lhs, lhs).is_err() {
 			let msg = format!("Cannot assign `{new_lhs}` to `{lhs}`.");
 			format_err(&msg, node.span, self.input);
 			self.errors.push(msg);
@@ -500,15 +577,15 @@ impl<'a> TypeCheck<'a> {
 		let ty = self.get_type(id);
 		match op {
 			UnOp::Minus => {
-				if ty == &Ty::Int {
+				if ty == Ty::Int {
 					return id;
 				}
-				if ty == &Ty::Num {
+				if ty == Ty::Num {
 					return id;
 				}
 			},
 			UnOp::Not => {
-				if ty == &Ty::Bool {
+				if ty == Ty::Bool {
 					return id;
 				}
 			},
@@ -516,41 +593,35 @@ impl<'a> TypeCheck<'a> {
 		let msg = format!("Operator `{op}` cannot by applied to `{ty}`.");
 		format_err(&msg, span, self.input);
 		self.errors.push(msg);
-		self.new_ty(Ty::Bottom)
+		ERR_TY
 	}
 
 	fn eval_bin_op(&mut self, op: &BinOp, lhs: TyId, rhs: TyId, span: Span) -> TyId {
-		if !self.unify(lhs, rhs) {
+		if self.unify(lhs, rhs).is_err() {
 			let msg = format!("Operator `{op}` cannot by applied to `{lhs}` and `{rhs}`.");
 			format_err(&msg, span, self.input);
 			self.errors.push(msg);
-			return self.new_ty(Ty::Bottom);
+			return ERR_TY;
 		}
 		let ty = self.get_type(lhs);
 		match op {
-			BinOp::Plus | BinOp::Minus | BinOp::Mul | BinOp::Pow | BinOp::Mod => {
-				if ty == &Ty::Int || ty == &Ty::Num {
+			BinOp::Plus | BinOp::Minus | BinOp::Mul | BinOp::Pow | BinOp::Mod | BinOp::Div => {
+				if ty == Ty::Int || ty == Ty::Num {
 					return lhs;
 				}
 			},
-			BinOp::Div => {
-				todo!();
-				// if ty == &Ty::Int || ty == &Ty::Num {
-				// 	return self.new_ty(Ty::Num);
-				// }
-			},
 			BinOp::Gt | BinOp::Lt | BinOp::Gte | BinOp::Lte => {
-				if ty == &Ty::Int || ty == &Ty::Num || ty == &Ty::Str {
+				if ty == Ty::Int || ty == Ty::Num || ty == Ty::Str {
 					return self.new_ty(Ty::Bool);
 				}
 			},
 			BinOp::Concat => {
-				if ty == &Ty::Str {
+				if ty == Ty::Str {
 					return lhs;
 				}
 			},
 			BinOp::And | BinOp::Or => {
-				if ty == &Ty::Bool {
+				if ty == Ty::Bool {
 					return lhs;
 				}
 			},
@@ -559,10 +630,10 @@ impl<'a> TypeCheck<'a> {
 			},
 		}
 
-		let msg = format!("Operator `{op}` cannot by applied to `{lhs}` and `{rhs}`.");
+		let msg = format!("Failed to infer if we can apply `{op}` here.");
 		format_err(&msg, span, self.input);
 		self.errors.push(msg);
-		return self.new_ty(Ty::Bottom);
+		ERR_TY
 	}
 
 	fn eval_literal(&mut self, l: &Literal) -> TyId {
