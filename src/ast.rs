@@ -1,6 +1,6 @@
 use crate::span::Span;
 use crate::symbol::SymbolId;
-use crate::ty::Ty;
+use crate::ty::TyAst;
 use std::fmt;
 
 #[derive(Debug)]
@@ -86,7 +86,7 @@ pub struct Let {
 #[derive(Debug)]
 pub struct NameTy {
 	pub name: Name,
-	pub ty: Option<Ty>,
+	pub ty: Option<TyAst>,
 }
 
 #[derive(Debug)]
@@ -132,13 +132,13 @@ pub struct FnDef {
 pub struct FnBody {
 	pub params: Vec<Param>,
 	pub body: Block,
-	pub ty: Option<Ty>, // return type
+	pub ty: Option<TyAst>, // return type
 }
 
 #[derive(Debug)]
 pub struct Param {
 	pub name: Name,
-	pub ty: Option<Ty>,
+	pub ty: Option<TyAst>,
 }
 
 #[derive(Debug)]

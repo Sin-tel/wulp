@@ -1,0 +1,11 @@
+// occurs check
+let x = []
+x = [[x]]
+x = [x] // infinite loop!
+
+
+// let x = []
+// if x == [x] {
+// 	print(x)
+// }
+

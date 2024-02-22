@@ -3,7 +3,7 @@ use crate::lexer::Lexer;
 use crate::span::Span;
 use crate::span::{format_err, format_warning};
 use crate::token::{Token, TokenKind};
-use crate::ty::Ty;
+use crate::ty::TyAst;
 
 pub fn parse(input: &str) -> File {
 	let mut tokens = Lexer::new(input);
@@ -719,19 +719,19 @@ fn parse_property(input: &str, tokens: &mut Lexer) -> Property {
 	Property { span, name }
 }
 
-fn parse_type(input: &str, tokens: &mut Lexer) -> Ty {
+fn parse_type(input: &str, tokens: &mut Lexer) -> TyAst {
 	// TODO: fn types
 	let tk = tokens.next();
 	match tk.kind {
-		TokenKind::Nil => Ty::Nil,
-		TokenKind::TyNum => Ty::Num,
-		TokenKind::TyInt => Ty::Int,
-		TokenKind::TyStr => Ty::Str,
-		TokenKind::TyBool => Ty::Bool,
+		TokenKind::Nil => TyAst::Nil,
+		TokenKind::TyNum => TyAst::Num,
+		TokenKind::TyInt => TyAst::Int,
+		TokenKind::TyStr => TyAst::Str,
+		TokenKind::TyBool => TyAst::Bool,
 		TokenKind::LBracket => {
 			// Array type
 			todo!()
-			// let ty = Ty::Array(Box::new(parse_type(input, tokens)));
+			// let ty = TyAst::Array(Box::new(parse_type(input, tokens)));
 			// assert_next(input, tokens, TokenKind::RBracket);
 			// ty
 		},
@@ -754,14 +754,14 @@ fn parse_type(input: &str, tokens: &mut Lexer) -> Ty {
 			// assert_next(input, tokens, TokenKind::Arrow);
 			// let ret_ty = parse_type(input, tokens);
 
-			// Ty::Fn(arg_ty, Box::new(ret_ty))
+			// TyAst::Fn(arg_ty, Box::new(ret_ty))
 		},
 		TokenKind::TyMaybe => {
 			todo!()
 			// assert_next(input, tokens, TokenKind::LParen);
 			// let inner = parse_type(input, tokens);
 			// assert_next(input, tokens, TokenKind::RParen);
-			// Ty::Maybe(Box::new(inner))
+			// TyAst::Maybe(Box::new(inner))
 		},
 		_ => {
 			let msg = format!("Expected type but found `{}`.", tk.kind);

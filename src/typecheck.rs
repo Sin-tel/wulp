@@ -46,24 +46,57 @@ impl<'a> TypeCheck<'a> {
 		let (ret, _) = this.eval_block(&file.block);
 
 		if let Some((ret_ty, _)) = ret {
-			println!("Main return: {}, ({})", this.get_type(ret_ty), ret_ty);
+			println!("Main return: {}", this.ty_to_string(ret_ty));
 		}
-
-		println!("----- types ");
-		for (i, v) in this.types.iter().enumerate() {
-			println!("{i}: {v}");
-		}
-
+		// println!("----- types ");
+		// for (i, _) in this.types.iter().enumerate() {
+		// 	println!("{i}: {}", this.ty_to_string(i));
+		// }
 		println!("----- env ");
 		for (i, s) in symbol_table.symbols.iter().enumerate().skip(1) {
 			if let Some(id) = this.lookup(i) {
-				println!("`{}`: {}", s.name, this.get_type(id));
+				println!("`{}`: {}", s.name, this.ty_to_string(id));
 			}
 		}
 
 		match this.errors.last() {
 			Some(err) => Err(anyhow!("{}", err)),
 			None => Ok(()),
+		}
+	}
+	fn ty_to_string(&self, id: TyId) -> String {
+		match self.get_type(id) {
+			Ty::Any => "Any".to_string(),
+			Ty::Bottom => "Bottom".to_string(),
+			Ty::Nil => "nil".to_string(),
+			Ty::Bool => "bool".to_string(),
+			Ty::Str => "str".to_string(),
+			Ty::Num => "num".to_string(),
+			Ty::Int => "int".to_string(),
+			Ty::TyVar => format!("T{id}?"),
+			Ty::Free => format!("T{id}"),
+			Ty::Table(_) => "table".to_string(),
+			Ty::Array(ty) => format!("[{}]", self.ty_to_string(ty)),
+			Ty::Maybe(ty) => format!("maybe({})", self.ty_to_string(ty)),
+			Ty::Fn(args, ret) => {
+				let args = args
+					.iter()
+					.map(|a| self.ty_to_string(*a))
+					.collect::<Vec<String>>()
+					.join(", ");
+				format!("fn({args}) -> {}", self.ty_to_string(ret))
+			},
+		}
+	}
+	fn to_ty(&self, ty_ast: &TyAst) -> Ty {
+		match ty_ast {
+			TyAst::Any => Ty::Any,
+			TyAst::Nil => Ty::Nil,
+			TyAst::Bool => Ty::Bool,
+			TyAst::Str => Ty::Str,
+			TyAst::Num => Ty::Num,
+			TyAst::Int => Ty::Int,
+			_ => todo!(),
 		}
 	}
 
@@ -189,8 +222,8 @@ impl<'a> TypeCheck<'a> {
 			"unify {}, {} ({}, {})",
 			a_id,
 			b_id,
-			self.get_type(a_id),
-			self.get_type(b_id)
+			self.ty_to_string(a_id),
+			self.ty_to_string(b_id)
 		);
 		if a_id == b_id {
 			Ok(())
@@ -219,13 +252,17 @@ impl<'a> TypeCheck<'a> {
 	}
 
 	fn unify_return(&mut self, current_pair: RetPair, new_pair: RetPair) -> RetPair {
-		if let Some((ref new_ty, new_span)) = new_pair {
+		if let Some((new_ty, new_span)) = new_pair {
 			match current_pair {
 				Some((ty, prev_span)) => {
-					if self.unify(ty, *new_ty).is_ok() {
+					if self.unify(ty, new_ty).is_ok() {
 						Some((ty, new_span))
 					} else {
-						let msg = format!("Incompatible return types `{new_ty}` and `{ty}`.");
+						let msg = format!(
+							"Incompatible return types `{}` and `{}`.",
+							self.ty_to_string(new_ty),
+							self.ty_to_string(ty)
+						);
 						format_err(&msg, new_span, self.input);
 						let msg2 = "Previous return value defined here:".to_string();
 						format_note(&msg2, prev_span, self.input);
@@ -245,9 +282,8 @@ impl<'a> TypeCheck<'a> {
 	// Bool indicates if the block always returns
 	fn eval_block(&mut self, block: &Block) -> (RetPair, bool) {
 		for stat in &block.stats {
-			match stat {
-				Stat::FnDef(s) => self.hoist_fn_def(s),
-				_ => (),
+			if let Stat::FnDef(s) = stat {
+				self.hoist_fn_def(s);
 			}
 		}
 		let mut current_pair: RetPair = None;
@@ -333,12 +369,10 @@ impl<'a> TypeCheck<'a> {
 	fn eval_fn_params(&mut self, params: &[Param]) -> Vec<TyId> {
 		let mut param_ty = Vec::new();
 		for p in params {
-			// let ty = p.ty.clone().expect("Need parameter annotation");
 			let ty = match &p.ty {
-				Some(ty) => ty.clone(),
+				Some(ty) => self.to_ty(ty),
 				None => Ty::TyVar,
 			};
-
 			let id = self.new_def(p.name.id, ty);
 			param_ty.push(id);
 		}
@@ -360,12 +394,12 @@ impl<'a> TypeCheck<'a> {
 
 		let param_ty = self.eval_fn_params(&node.body.params);
 		let ty = match &node.body.ty {
-			Some(ty) => ty.clone(),
+			Some(ty) => self.to_ty(ty),
 			None => Ty::TyVar,
 		};
 		let ret_id = self.new_ty(ty);
 		let fn_ty = Ty::Fn(param_ty, ret_id);
-		let fn_id = self.new_def(node.name.id, fn_ty); // !
+		self.new_def(node.name.id, fn_ty);
 	}
 
 	fn eval_fn_def(&mut self, node: &FnDef) {
@@ -382,8 +416,8 @@ impl<'a> TypeCheck<'a> {
 		if self.unify(ty, ret_id).is_err() {
 			let msg = format!(
 				"Expected return type `{}`, found `{}`.",
-				self.get_type(ty),
-				self.get_type(ret_id)
+				self.ty_to_string(ty),
+				self.ty_to_string(ret_id)
 			);
 			format_err(&msg, prev_span, self.input);
 			self.errors.push(msg);
@@ -391,7 +425,7 @@ impl<'a> TypeCheck<'a> {
 
 		self.promote_free(fn_id);
 
-		println!("infer fn def: {} {}", fn_id, self.get_type(fn_id));
+		println!("infer fn def: {} {}", fn_id, self.ty_to_string(fn_id));
 	}
 
 	// span should refer to the place where the function is defined
@@ -399,7 +433,7 @@ impl<'a> TypeCheck<'a> {
 	fn eval_lambda(&mut self, node: &FnBody, span: Span) -> TyId {
 		let param_ty = self.eval_fn_params(&node.params);
 		let ty = match &node.ty {
-			Some(ty) => ty.clone(),
+			Some(ty) => self.to_ty(ty),
 			None => Ty::TyVar,
 		};
 		let ret_id = self.new_ty(ty);
@@ -411,17 +445,14 @@ impl<'a> TypeCheck<'a> {
 		if self.unify(ty, ret_id).is_err() {
 			let msg = format!(
 				"Expected return type `{}`, found `{}`.",
-				self.get_type(ty),
-				self.get_type(ret_id)
+				self.ty_to_string(ty),
+				self.ty_to_string(ret_id)
 			);
 			format_err(&msg, prev_span, self.input);
 			self.errors.push(msg);
 		}
-
 		self.promote_free(fn_id);
-
-		println!("infer lambda: {} {}", fn_id, self.get_type(fn_id));
-
+		println!("infer lambda: {} {}", fn_id, self.ty_to_string(fn_id));
 		fn_id
 	}
 
@@ -442,7 +473,11 @@ impl<'a> TypeCheck<'a> {
 				for (p, a) in zip(params, c.args.iter()) {
 					let arg_ty = self.eval_expr(a);
 					if self.unify(arg_ty, p).is_err() {
-						let msg = format!("Expected argument type `{p}`, found `{arg_ty}`");
+						let msg = format!(
+							"Expected argument type `{}`, found `{}`",
+							self.ty_to_string(p),
+							self.ty_to_string(arg_ty)
+						);
 						format_err(&msg, a.span, self.input);
 						self.errors.push(msg);
 					}
@@ -450,7 +485,7 @@ impl<'a> TypeCheck<'a> {
 			}
 			ret_ty
 		} else {
-			let msg = format!("Type `{fn_ty}` is not callable.");
+			let msg = format!("Type `{}` is not callable.", self.ty_to_string(fn_ty));
 			format_err(&msg, c.expr.span, self.input);
 			self.errors.push(msg);
 			ERR_TY
@@ -458,17 +493,6 @@ impl<'a> TypeCheck<'a> {
 	}
 
 	fn eval_expr(&mut self, expr: &Expr) -> TyId {
-		let ty = self.eval_expr_inner(expr);
-		// println!(
-		// 	"infer `{}`: {} ({})",
-		// 	&expr.span.as_str(self.input),
-		// 	self.get_type(ty),
-		// 	ty
-		// );
-		ty
-	}
-
-	fn eval_expr_inner(&mut self, expr: &Expr) -> TyId {
 		match &expr.kind {
 			ExprKind::BinExpr(e) => {
 				let lhs = self.eval_expr(&e.lhs);
@@ -486,7 +510,11 @@ impl<'a> TypeCheck<'a> {
 					ty = if self.unify(ty, new_ty).is_ok() {
 						new_ty
 					} else {
-						let msg = format!("Incompatible types in array: `{new_ty}` and `{ty}`.");
+						let msg = format!(
+							"Incompatible types in array: `{}` and `{}`.",
+							self.ty_to_string(new_ty),
+							self.ty_to_string(ty)
+						);
 						format_err(&msg, e.span, self.input);
 						self.errors.push(msg);
 						return ERR_TY;
@@ -536,7 +564,7 @@ impl<'a> TypeCheck<'a> {
 					ty = match self.get_type(ty) {
 						Ty::Array(inner_ty) => inner_ty,
 						_ => {
-							let msg = format!("Can not index type `{ty}`.");
+							let msg = format!("Can not index type `{}`.", self.ty_to_string(ty));
 							format_err(&msg, expr.span, self.input);
 							self.errors.push(msg);
 							ERR_TY
@@ -545,7 +573,7 @@ impl<'a> TypeCheck<'a> {
 					let index_ty = self.eval_expr(e);
 					let ty_int = self.new_ty(Ty::Int);
 					if self.unify(index_ty, ty_int).is_err() {
-						let msg = format!("Index must be type `int` but found `{index_ty}`.");
+						let msg = format!("Index must be type `int` but found `{}`.", self.ty_to_string(index_ty));
 						format_err(&msg, e.span, self.input);
 						self.errors.push(msg);
 					}
@@ -565,13 +593,17 @@ impl<'a> TypeCheck<'a> {
 		for (n, rhs_ty) in zip(&node.names, rhs) {
 			// check if annotation fits
 			if let Some(ty) = &n.ty {
-				let ty_id = self.new_ty(ty.clone());
+				let ty_id = self.new_ty(self.to_ty(ty));
 				if self.unify(rhs_ty, ty_id).is_err() {
-					let msg = format!("Type error, assigning `{rhs_ty}` to `{ty}`.");
+					let msg = format!(
+						"Type error, assigning `{}` to `{}`.",
+						self.ty_to_string(rhs_ty),
+						self.ty_to_string(ty_id)
+					);
 					format_err(&msg, node.span, self.input);
 					self.errors.push(msg);
 				}
-				self.new_def(n.name.id, ty.clone());
+				self.new_def(n.name.id, self.to_ty(ty));
 			} else {
 				self.new_def(n.name.id, self.get_type(rhs_ty).clone());
 			}
@@ -596,7 +628,11 @@ impl<'a> TypeCheck<'a> {
 		for (var, rhs_ty) in zip(&node.vars, rhs) {
 			let ty = self.eval_lvalue(var);
 			if self.unify(rhs_ty, ty).is_err() {
-				let msg = format!("Type error, assigning `{rhs_ty}` to `{ty}`.");
+				let msg = format!(
+					"Type error, assigning `{}` to `{}`.",
+					self.ty_to_string(rhs_ty),
+					self.ty_to_string(ty)
+				);
 				format_err(&msg, node.span, self.input);
 				self.errors.push(msg);
 			};
@@ -611,7 +647,11 @@ impl<'a> TypeCheck<'a> {
 		let new_lhs = self.eval_bin_op(&node.op, lhs, rhs, node.span);
 
 		if self.unify(new_lhs, lhs).is_err() {
-			let msg = format!("Cannot assign `{new_lhs}` to `{lhs}`.");
+			let msg = format!(
+				"Cannot assign `{}` to `{}`.",
+				self.ty_to_string(new_lhs),
+				self.ty_to_string(lhs)
+			);
 			format_err(&msg, node.span, self.input);
 			self.errors.push(msg);
 		}
@@ -634,7 +674,7 @@ impl<'a> TypeCheck<'a> {
 				}
 			},
 		}
-		let msg = format!("Operator `{op}` cannot by applied to `{ty}`.");
+		let msg = format!("Operator `{op}` cannot by applied to `{}`.", self.ty_to_string(id));
 		format_err(&msg, span, self.input);
 		self.errors.push(msg);
 		ERR_TY
@@ -642,7 +682,11 @@ impl<'a> TypeCheck<'a> {
 
 	fn eval_bin_op(&mut self, op: &BinOp, lhs: TyId, rhs: TyId, span: Span) -> TyId {
 		if self.unify(lhs, rhs).is_err() {
-			let msg = format!("Operator `{op}` cannot by applied to `{lhs}` and `{rhs}`.");
+			let msg = format!(
+				"Operator `{op}` cannot by applied to `{}` and `{}`.",
+				self.ty_to_string(lhs),
+				self.ty_to_string(rhs)
+			);
 			format_err(&msg, span, self.input);
 			self.errors.push(msg);
 			return ERR_TY;

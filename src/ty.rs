@@ -27,35 +27,33 @@ pub enum Ty {
 	Fn(Vec<TyId>, TyId), // args, ret
 }
 
-impl fmt::Display for TyNode {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(
-			f,
-			"{}",
-			match self {
-				TyNode::Node(id) => format!(">> {id}"),
-				TyNode::Ty(ty) => ty.to_string(),
-			}
-		)
-	}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TyAst {
+	Any,
+	Nil,
+	Bool,
+	Str,
+	Num,
+	Int,
+	Table(TableId),
+	Array(Box<TyAst>),
+	Maybe(Box<TyAst>),
+	Fn(Vec<TyAst>, Box<TyAst>),
 }
 
-impl fmt::Display for Ty {
+impl fmt::Display for TyAst {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let s = match self {
-			Ty::Any => "Any".to_string(),
-			Ty::Bottom => "Bottom".to_string(),
-			Ty::Nil => "nil".to_string(),
-			Ty::Bool => "bool".to_string(),
-			Ty::Str => "str".to_string(),
-			Ty::Num => "num".to_string(),
-			Ty::Int => "int".to_string(),
-			Ty::TyVar => "T?".to_string(),
-			Ty::Free => "Tn".to_string(),
-			Ty::Table(_) => "table".to_string(),
-			Ty::Array(ty) => format!("[{ty}]"),
-			Ty::Maybe(ty) => format!("maybe({ty})"),
-			Ty::Fn(args, ret) => {
+			TyAst::Any => "Any".to_string(),
+			TyAst::Nil => "nil".to_string(),
+			TyAst::Bool => "bool".to_string(),
+			TyAst::Str => "str".to_string(),
+			TyAst::Num => "num".to_string(),
+			TyAst::Int => "int".to_string(),
+			TyAst::Table(_) => "table".to_string(),
+			TyAst::Array(ty) => format!("[{ty}]"),
+			TyAst::Maybe(ty) => format!("maybe({ty})"),
+			TyAst::Fn(args, ret) => {
 				let args = args.iter().map(|a| a.to_string()).collect::<Vec<String>>().join(", ");
 				format!("fn({args}) -> {ret}")
 			},

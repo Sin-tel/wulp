@@ -104,9 +104,8 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		self.scope_stack.push(FxHashMap::default());
 		self.hoist_fn_def = true;
 		for b in &mut node.stats {
-			match b {
-				Stat::FnDef(f) => f.visit(self),
-				_ => (),
+			if let Stat::FnDef(f) = b {
+				f.visit(self);
 			}
 		}
 		self.hoist_fn_def = false;
@@ -152,7 +151,6 @@ impl<'a> Visitor for ScopeCheck<'a> {
 					self.errors.push(msg);
 					// to suppress further errors, we add a new variable anyway
 					// self.new_variable(name, false, false);
-					return;
 				}
 			}
 		} else {

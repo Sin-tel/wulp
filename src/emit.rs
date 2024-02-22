@@ -33,7 +33,7 @@ impl EmitLua {
 	}
 
 	fn put_statement(&mut self) {
-		if self.statement.len() > 0 {
+		if !self.statement.is_empty() {
 			self.code.push_str(&mem::take(&mut self.statement));
 			self.code.push(';');
 			self.code.push('\n');
@@ -105,23 +105,17 @@ impl Visitor for EmitLua {
 		self.indent_level += 1;
 		self.hoist_fn_def = true;
 		for b in &mut node.stats {
-			match b {
-				Stat::FnDef(f) => {
-					self.indent();
-					self.emit_fn_local(f);
-					self.put_statement();
-				},
-				_ => (),
+			if let Stat::FnDef(f) = b {
+				self.indent();
+				self.emit_fn_local(f);
+				self.put_statement();
 			}
 		}
 		for b in &mut node.stats {
-			match b {
-				Stat::FnDef(f) => {
-					self.indent();
-					self.emit_fn_def(f);
-					self.put_statement();
-				},
-				_ => (),
+			if let Stat::FnDef(f) = b {
+				self.indent();
+				self.emit_fn_def(f);
+				self.put_statement();
 			}
 		}
 		self.hoist_fn_def = false;
@@ -191,7 +185,7 @@ impl Visitor for EmitLua {
 			self.push_list(&mut node.exprs, ", ");
 		}
 	}
-	fn visit_fn_def(&mut self, node: &mut FnDef) {
+	fn visit_fn_def(&mut self, _node: &mut FnDef) {
 		// nop
 	}
 	fn visit_fn_call(&mut self, node: &mut Call) {
