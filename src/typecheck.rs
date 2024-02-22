@@ -49,10 +49,10 @@ impl<'a> TypeCheck<'a> {
 			println!("Main return: {}, ({})", this.get_type(ret_ty), ret_ty);
 		}
 
-		// println!("----- types ");
-		// for (i, v) in this.types.iter().enumerate() {
-		// 	println!("{}: {}", i, v);
-		// }
+		println!("----- types ");
+		for (i, v) in this.types.iter().enumerate() {
+			println!("{i}: {v}");
+		}
 
 		println!("----- env ");
 		for (i, s) in symbol_table.symbols.iter().enumerate().skip(1) {
@@ -102,28 +102,26 @@ impl<'a> TypeCheck<'a> {
 		// TODO: path compression
 		let parent_id = self.get_parent(id);
 		match &self.types[parent_id] {
-			TyNode::Ty(ty) => return ty.clone(),
+			TyNode::Ty(ty) => ty.clone(),
 			_ => unreachable!(),
 		}
 	}
 
 	// promote unbound type variables to free variables
 	fn promote_free(&mut self, id: TyId) {
-		// todo!()
 		match self.get_type(id) {
-			Ty::Any | Ty::Bottom | Ty::Nil | Ty::Bool | Ty::Str | Ty::Num | Ty::Int => (),
+			Ty::Any | Ty::Bottom | Ty::Nil | Ty::Bool | Ty::Str | Ty::Num | Ty::Int | Ty::Free => (),
 			Ty::TyVar => {
 				let parent_id = self.get_parent(id);
 				self.types[parent_id] = TyNode::Ty(Ty::Free);
 			},
-			Ty::Free => (),
 			Ty::Table(_) => todo!(),
 			Ty::Array(t) | Ty::Maybe(t) => self.promote_free(t),
 			Ty::Fn(args, ret) => {
 				for a in args {
 					self.promote_free(a);
 				}
-				self.promote_free(ret)
+				self.promote_free(ret);
 			},
 		}
 	}
@@ -158,6 +156,31 @@ impl<'a> TypeCheck<'a> {
 		}
 	}
 
+	fn occurs(&mut self, ty: Ty, id: TyId) -> Result<(), ()> {
+		match ty {
+			Ty::Any | Ty::Bottom | Ty::Nil | Ty::Bool | Ty::Str | Ty::Num | Ty::Int | Ty::TyVar | Ty::Free => Ok(()),
+			Ty::Table(_) => todo!(),
+			Ty::Array(t_id) | Ty::Maybe(t_id) => {
+				if t_id == id {
+					return Err(());
+				}
+				self.occurs(self.get_type(t_id), id)
+			},
+			Ty::Fn(args, ret) => {
+				for a in args {
+					if a == id {
+						return Err(());
+					}
+					self.occurs(self.get_type(a), id)?;
+				}
+				if ret == id {
+					return Err(());
+				}
+				self.occurs(self.get_type(ret), id)
+			},
+		}
+	}
+
 	fn unify(&mut self, a_id: TyId, b_id: TyId) -> Result<(), ()> {
 		println!(
 			"unify {}, {} ({}, {})",
@@ -172,11 +195,13 @@ impl<'a> TypeCheck<'a> {
 			match (self.get_type(a_id), self.get_type(b_id)) {
 				(_, Ty::Free) | (Ty::Free, _) => panic!("Can not unify free type variables"),
 				(_, Ty::Bottom) | (Ty::Bottom, _) | (_, Ty::Any) | (Ty::Any, _) => Ok(()), // bail
-				(_, Ty::TyVar) => {
+				(ty, Ty::TyVar) => {
+					self.occurs(ty, b_id)?;
 					self.types[b_id] = TyNode::Node(a_id);
 					Ok(())
 				},
-				(Ty::TyVar, _) => {
+				(Ty::TyVar, ty) => {
+					self.occurs(ty, a_id)?;
 					self.types[a_id] = TyNode::Node(b_id);
 					Ok(())
 				},
@@ -325,11 +350,11 @@ impl<'a> TypeCheck<'a> {
 		assert!(node.path.is_empty());
 
 		let param_ty = self.eval_fn_params(&node.body.params);
-		// let ret_annotation = self.new_ty(node.body.ty.as_ref().expect("Need return type annotation").clone());
-		if node.body.ty.is_some() {
-			panic!("type annotation {} ignored", node.body.ty.as_ref().unwrap());
-		}
-		let ret_id = self.new_ty(Ty::TyVar);
+		let ty = match &node.body.ty {
+			Some(ty) => ty.clone(),
+			None => Ty::TyVar,
+		};
+		let ret_id = self.new_ty(ty);
 		let fn_ty = Ty::Fn(param_ty, ret_id);
 		let fn_id = self.new_def(node.name.id, fn_ty);
 
@@ -354,11 +379,11 @@ impl<'a> TypeCheck<'a> {
 	// TODO: get span info from AST and remove this argument
 	fn eval_lambda(&mut self, node: &FnBody, span: Span) -> TyId {
 		let param_ty = self.eval_fn_params(&node.params);
-		// let ret_annotation = self.new_ty(node.body.ty.as_ref().expect("Need return type annotation").clone());
-		if node.ty.is_some() {
-			panic!("type annotation {} ignored", node.ty.as_ref().unwrap());
-		}
-		let ret_id = self.new_ty(Ty::TyVar);
+		let ty = match &node.ty {
+			Some(ty) => ty.clone(),
+			None => Ty::TyVar,
+		};
+		let ret_id = self.new_ty(ty);
 		let fn_ty = Ty::Fn(param_ty, ret_id);
 		let fn_id = self.new_ty(fn_ty);
 
