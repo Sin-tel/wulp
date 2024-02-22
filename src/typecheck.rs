@@ -125,9 +125,12 @@ impl<'a> TypeCheck<'a> {
 			},
 		}
 	}
+	fn instantiate(&mut self, id: TyId) -> TyId {
+		self.instantiate_inner(id, &mut Vec::new())
+	}
 
 	// instantiate a type with free variables
-	fn instantiate(&mut self, id: TyId, subs: &mut Vec<(TyId, TyId)>) -> TyId {
+	fn instantiate_inner(&mut self, id: TyId, subs: &mut Vec<(TyId, TyId)>) -> TyId {
 		let ty = self.get_type(id);
 		let parent_id = self.get_parent(id);
 		match ty {
@@ -144,13 +147,13 @@ impl<'a> TypeCheck<'a> {
 				t
 			},
 			Ty::Table(_) => todo!(),
-			Ty::Array(t) | Ty::Maybe(t) => self.instantiate(t, subs),
+			Ty::Array(t) | Ty::Maybe(t) => self.instantiate_inner(t, subs),
 			Ty::Fn(args, ret) => {
 				let mut new_args = Vec::new();
 				for a in args {
-					new_args.push(self.instantiate(a, subs));
+					new_args.push(self.instantiate_inner(a, subs));
 				}
-				let new_ret = self.instantiate(ret, subs);
+				let new_ret = self.instantiate_inner(ret, subs);
 				self.new_ty(Ty::Fn(new_args, new_ret))
 			},
 		}
@@ -241,6 +244,12 @@ impl<'a> TypeCheck<'a> {
 	// Otherwise return None
 	// Bool indicates if the block always returns
 	fn eval_block(&mut self, block: &Block) -> (RetPair, bool) {
+		for stat in &block.stats {
+			match stat {
+				Stat::FnDef(s) => self.hoist_fn_def(s),
+				_ => (),
+			}
+		}
 		let mut current_pair: RetPair = None;
 		for stat in &block.stats {
 			match stat {
@@ -346,7 +355,7 @@ impl<'a> TypeCheck<'a> {
 		ret_pair.unwrap()
 	}
 
-	fn eval_fn_def(&mut self, node: &FnDef) {
+	fn hoist_fn_def(&mut self, node: &FnDef) {
 		assert!(node.path.is_empty());
 
 		let param_ty = self.eval_fn_params(&node.body.params);
@@ -356,7 +365,17 @@ impl<'a> TypeCheck<'a> {
 		};
 		let ret_id = self.new_ty(ty);
 		let fn_ty = Ty::Fn(param_ty, ret_id);
-		let fn_id = self.new_def(node.name.id, fn_ty);
+		let fn_id = self.new_def(node.name.id, fn_ty); // !
+	}
+
+	fn eval_fn_def(&mut self, node: &FnDef) {
+		let fn_id = self.lookup(node.name.id).unwrap();
+		let fn_ty = self.get_type(fn_id);
+		let ret_id = if let Ty::Fn(_, ret_id) = fn_ty {
+			ret_id
+		} else {
+			panic!("lookup failed");
+		};
 
 		let (ty, prev_span) = self.eval_fn_body(&node.body, node.name.span);
 
@@ -387,7 +406,7 @@ impl<'a> TypeCheck<'a> {
 		let fn_ty = Ty::Fn(param_ty, ret_id);
 		let fn_id = self.new_ty(fn_ty);
 
-		let (ty, prev_span) = self.eval_fn_body(node, span);
+		let (ty, prev_span) = self.eval_fn_body(node, span); // !
 
 		if self.unify(ty, ret_id).is_err() {
 			let msg = format!(
@@ -408,7 +427,7 @@ impl<'a> TypeCheck<'a> {
 
 	fn eval_fn_call(&mut self, c: &Call) -> TyId {
 		let fn_ty_id = self.eval_expr(&c.expr);
-		let fn_ty = self.instantiate(fn_ty_id, &mut Vec::new());
+		let fn_ty = self.instantiate(fn_ty_id);
 		if let Ty::Fn(params, ret_ty) = self.get_type(fn_ty) {
 			// TODO: get rid of hardcoded "print" here
 			if params.len() != c.args.len() && c.expr.span.as_str(self.input) != "print" {

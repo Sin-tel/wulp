@@ -11,6 +11,7 @@ pub struct ScopeCheck<'a> {
 	symbol_table: SymbolTable,
 	input: &'a str,
 	errors: Vec<String>,
+	hoist_fn_def: bool,
 }
 
 impl<'a> ScopeCheck<'a> {
@@ -20,6 +21,7 @@ impl<'a> ScopeCheck<'a> {
 			symbol_table: SymbolTable::new(),
 			input,
 			errors: Vec::new(),
+			hoist_fn_def: false,
 		};
 
 		this.scope_stack.push(FxHashMap::default());
@@ -100,6 +102,14 @@ impl<'a> ScopeCheck<'a> {
 impl<'a> Visitor for ScopeCheck<'a> {
 	fn visit_block(&mut self, node: &mut Block) {
 		self.scope_stack.push(FxHashMap::default());
+		self.hoist_fn_def = true;
+		for b in &mut node.stats {
+			match b {
+				Stat::FnDef(f) => f.visit(self),
+				_ => (),
+			}
+		}
+		self.hoist_fn_def = false;
 		node.walk(self);
 		self.scope_stack.pop();
 	}
@@ -120,32 +130,34 @@ impl<'a> Visitor for ScopeCheck<'a> {
 	}
 
 	fn visit_fn_def(&mut self, node: &mut FnDef) {
-		let name = node.name.span.as_str(self.input);
+		if self.hoist_fn_def {
+			let name = node.name.span.as_str(self.input);
 
-		let lookup = self.lookup(name);
-		if node.path.is_empty() {
-			// plain fn def
-			if lookup.is_some() {
-				let msg = format!("Function `{name}` already defined.");
-				format_err(&msg, node.name.span, self.input);
-				self.errors.push(msg);
+			let lookup = self.lookup(name);
+			if node.path.is_empty() {
+				// plain fn def
+				if lookup.is_some() {
+					let msg = format!("Function `{name}` already defined.");
+					format_err(&msg, node.name.span, self.input);
+					self.errors.push(msg);
+				} else {
+					// function defs are always const
+					self.new_variable(name, true, true);
+				}
 			} else {
-				// function defs are always const
-				self.new_variable(name, true, true);
+				// fn property on some type
+				if lookup.is_none() {
+					let msg = format!("Undefined type: `{name}`.");
+					format_err(&msg, node.name.span, self.input);
+					self.errors.push(msg);
+					// to suppress further errors, we add a new variable anyway
+					// self.new_variable(name, false, false);
+					return;
+				}
 			}
 		} else {
-			// fn property on some type
-			if lookup.is_none() {
-				let msg = format!("Undefined type: `{name}`.");
-				format_err(&msg, node.name.span, self.input);
-				self.errors.push(msg);
-				// to suppress further errors, we add a new variable anyway
-				// self.new_variable(name, false, false);
-				return;
-			}
+			node.walk(self);
 		}
-
-		node.walk(self);
 	}
 
 	fn visit_fn_body(&mut self, node: &mut FnBody) {

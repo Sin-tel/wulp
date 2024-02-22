@@ -9,6 +9,7 @@ pub struct EmitLua {
 	indent_level: usize,
 	symbol_table: SymbolTable,
 	patch_temp_lvalue: bool,
+	hoist_fn_def: bool,
 }
 
 impl EmitLua {
@@ -19,17 +20,24 @@ impl EmitLua {
 			indent_level: 0,
 			symbol_table,
 			patch_temp_lvalue: false,
+			hoist_fn_def: false,
 		};
 		this.code.push_str(include_str!("../lua/std_preamble.lua"));
-		ast.block.walk(&mut this);
+		ast.block.visit(&mut this);
+
+		// this.code = this.code.replace("\n", " ");
+		// this.code = this.code.replace(";", "");
+		// this.code = this.code.replace("\t", "");
 
 		this.code
 	}
 
 	fn put_statement(&mut self) {
-		self.code.push_str(&mem::take(&mut self.statement));
-		self.code.push(';');
-		self.code.push('\n');
+		if self.statement.len() > 0 {
+			self.code.push_str(&mem::take(&mut self.statement));
+			self.code.push(';');
+			self.code.push('\n');
+		}
 	}
 
 	fn push_list<V>(&mut self, list: &mut [V], punctuation: &str)
@@ -46,7 +54,7 @@ impl EmitLua {
 		}
 	}
 	fn indent(&mut self) {
-		self.statement.push_str(&"\t".repeat(self.indent_level));
+		self.statement.push_str(&"\t".repeat(self.indent_level - 1));
 	}
 	fn replace_with_temp(&mut self, expr: &mut Expr) {
 		// bail out if it's not necessary
@@ -76,11 +84,47 @@ impl EmitLua {
 			kind: ExprKind::Name(Name { id, span }),
 		}
 	}
+	fn emit_fn_local(&mut self, node: &mut FnDef) {
+		self.statement.push_str("local ");
+		self.visit_name(&mut node.name);
+	}
+	fn emit_fn_def(&mut self, node: &mut FnDef) {
+		self.statement.push_str("function ");
+		self.visit_name(&mut node.name);
+
+		for p in &mut node.path {
+			self.statement.push('.');
+			self.visit_property(p);
+		}
+		self.visit_fn_body(&mut node.body);
+	}
 }
 
 impl Visitor for EmitLua {
 	fn visit_block(&mut self, node: &mut Block) {
 		self.indent_level += 1;
+		self.hoist_fn_def = true;
+		for b in &mut node.stats {
+			match b {
+				Stat::FnDef(f) => {
+					self.indent();
+					self.emit_fn_local(f);
+					self.put_statement();
+				},
+				_ => (),
+			}
+		}
+		for b in &mut node.stats {
+			match b {
+				Stat::FnDef(f) => {
+					self.indent();
+					self.emit_fn_def(f);
+					self.put_statement();
+				},
+				_ => (),
+			}
+		}
+		self.hoist_fn_def = false;
 		node.walk(self);
 		self.indent_level -= 1;
 	}
@@ -148,15 +192,7 @@ impl Visitor for EmitLua {
 		}
 	}
 	fn visit_fn_def(&mut self, node: &mut FnDef) {
-		self.statement.push_str("local ");
-		self.statement.push_str("function ");
-
-		self.visit_name(&mut node.name);
-		for p in &mut node.path {
-			self.statement.push('.');
-			self.visit_property(p);
-		}
-		self.visit_fn_body(&mut node.body);
+		// nop
 	}
 	fn visit_fn_call(&mut self, node: &mut Call) {
 		self.visit_expr(&mut node.expr);
@@ -199,10 +235,11 @@ impl Visitor for EmitLua {
 			| Stat::ForBlock(_)
 			| Stat::Assignment(_)
 			| Stat::Let(_)
-			| Stat::FnDef(_)
+			// | Stat::FnDef(_)
 			| Stat::Call(_) => {
 				node.walk(self);
 			},
+			Stat::FnDef(_) => (),
 		};
 
 		self.put_statement();
