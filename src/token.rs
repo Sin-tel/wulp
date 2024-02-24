@@ -27,6 +27,9 @@ pub enum TokenKind {
 	While,
 	True,
 	False,
+	Import,
+	As,
+	From,
 
 	Period,
 	LParen,
@@ -139,6 +142,10 @@ impl fmt::Display for TokenKind {
 				False => "false",
 				While => "while",
 				Let => "let",
+				Import => "import",
+				As => "as",
+				From => "from",
+
 				Period => ".",
 				LParen => "(",
 				RParen => ")",

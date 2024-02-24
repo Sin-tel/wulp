@@ -199,11 +199,15 @@ impl Visitor for EmitLua {
 			Stat::Break => {
 				self.statement.push_str("break");
 			},
-			Stat::Block(_) => {
+			Stat::Block(b) => {
 				self.statement.push_str("do\n");
-				node.walk(self);
+				b.visit(self);
 				self.indent();
 				self.statement.push_str("end");
+			},
+			Stat::Import(_) => {
+				// self.statement.push_str("break");
+				todo!();
 			},
 			Stat::AssignOp(s) => {
 				// Copy any evaluations to a temp var
@@ -264,7 +268,7 @@ impl Visitor for EmitLua {
 			},
 			ExprKind::Table(t) => {
 				self.statement.push('{');
-				self.push_list(t, ", ");
+				self.push_list(&mut t.fields, ", ");
 				self.statement.push('}');
 			},
 			ExprKind::Array(t) => {

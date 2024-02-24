@@ -7,6 +7,9 @@ pub trait Visitor: Sized {
 	fn visit_block(&mut self, node: &mut Block) {
 		node.walk(self);
 	}
+	fn visit_import(&mut self, node: &mut Import) {
+		node.walk(self);
+	}
 	fn visit_stat(&mut self, node: &mut Stat) {
 		node.walk(self);
 	}
@@ -76,6 +79,15 @@ impl<V: Visitor> VisitNode<V> for File {
 	}
 }
 
+impl<V: Visitor> VisitNode<V> for Import {
+	fn visit(&mut self, v: &mut V) {
+		v.visit_import(self);
+	}
+	fn walk(&mut self, _v: &mut V) {
+		todo!()
+	}
+}
+
 impl<V: Visitor> VisitNode<V> for Block {
 	fn visit(&mut self, v: &mut V) {
 		v.visit_block(self);
@@ -103,6 +115,7 @@ impl<V: Visitor> VisitNode<V> for Stat {
 			Stat::Block(s) => v.visit_block(s),
 			Stat::WhileBlock(s) => v.visit_while_block(s),
 			Stat::Break => (),
+			Stat::Import(s) => v.visit_import(s),
 			Stat::Return(ret) => {
 				for e in &mut ret.exprs {
 					v.visit_expr(e);
@@ -269,7 +282,7 @@ impl<V: Visitor> VisitNode<V> for Expr {
 				}
 			},
 			ExprKind::Table(t) => {
-				for e in t {
+				for e in &mut t.fields {
 					v.visit_field(e);
 				}
 			},

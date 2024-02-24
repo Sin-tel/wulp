@@ -1,3 +1,4 @@
+use crate::ast;
 use crate::ast::*;
 use crate::span::Span;
 use crate::span::{format_err, format_note};
@@ -18,6 +19,10 @@ struct Table {
 	// name: String,
 }
 
+const ERR_TY: TyId = 0;
+
+type RetPair = Option<(TyId, Span)>;
+
 #[derive(Debug)]
 pub struct TypeCheck<'a> {
 	input: &'a str,
@@ -26,10 +31,6 @@ pub struct TypeCheck<'a> {
 	types: Vec<TyNode>,
 	tables: Vec<Table>,
 }
-
-const ERR_TY: TyId = 0;
-
-type RetPair = Option<(TyId, Span)>;
 
 impl<'a> TypeCheck<'a> {
 	pub fn check(file: &File, input: &'a str, symbol_table: &SymbolTable) -> Result<()> {
@@ -377,6 +378,7 @@ impl<'a> TypeCheck<'a> {
 				Stat::AssignOp(s) => self.eval_assign_op(s),
 				Stat::Let(s) => self.eval_let(s),
 				Stat::FnDef(s) => self.eval_fn_def(s),
+				Stat::Import(_) => todo!(),
 			};
 		}
 		(current_pair, false)
@@ -558,12 +560,12 @@ impl<'a> TypeCheck<'a> {
 		}
 	}
 
-	fn eval_table(&mut self, field_list: &Vec<Field>) -> TyId {
+	fn eval_table(&mut self, ast_table: &ast::Table) -> TyId {
 		let mut fields = FxHashMap::default();
-		for f in field_list {
+		for f in &ast_table.fields {
 			match f {
-				Field::Assign(p, a) => fields.insert(p.name.clone(), self.eval_expr(a)),
-				Field::Fn(p, f) => fields.insert(p.name.clone(), self.eval_lambda(f, p.span)),
+				Field::Assign(p, a) => fields.insert(p.name.clone(), self.eval_expr(&a)),
+				Field::Fn(p, f) => fields.insert(p.name.clone(), self.eval_lambda(&f, p.span)),
 			};
 		}
 		let table = Table { fields };

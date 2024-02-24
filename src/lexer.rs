@@ -197,6 +197,9 @@ impl<'a> LexIter<'a> {
 		let span = Span { start, end };
 
 		let kind = match s.as_str() {
+			"import" => TokenKind::Import,
+			"as" => TokenKind::As,
+			"from" => TokenKind::From,
 			"false" => TokenKind::False,
 			"true" => TokenKind::True,
 			"nil" => TokenKind::Nil,

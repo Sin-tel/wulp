@@ -26,6 +26,13 @@ pub enum Stat {
 	FnDef(FnDef),
 	Break,
 	Return(Return),
+	Import(Import),
+}
+
+#[derive(Debug)]
+pub struct Import {
+	pub name: String,
+	pub alias: String,
 }
 
 #[derive(Debug)]
@@ -104,9 +111,14 @@ pub enum ExprKind {
 	Call(Call),
 	Lambda(FnBody),
 	Array(Vec<Expr>),
-	Table(Vec<Field>),
+	Table(Table),
 	SuffixExpr(Box<Expr>, Vec<Suffix>),
 	Expr(Box<Expr>), // bracketed expression
+}
+
+#[derive(Debug)]
+pub struct Table {
+	pub fields: Vec<Field>,
 }
 
 #[derive(Debug)]
