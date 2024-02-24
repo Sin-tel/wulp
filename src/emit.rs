@@ -91,11 +91,6 @@ impl EmitLua {
 	fn emit_fn_def(&mut self, node: &mut FnDef) {
 		self.statement.push_str("function ");
 		self.visit_name(&mut node.name);
-
-		for p in &mut node.path {
-			self.statement.push('.');
-			self.visit_property(p);
-		}
 		self.visit_fn_body(&mut node.body);
 	}
 }

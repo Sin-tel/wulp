@@ -10,12 +10,21 @@ use anyhow::Result;
 use rustc_hash::FxHashMap;
 use std::iter::zip;
 
+type TableId = usize;
+
+#[derive(Debug)]
+struct Table {
+	fields: FxHashMap<String, TyId>,
+	// name: String,
+}
+
 #[derive(Debug)]
 pub struct TypeCheck<'a> {
 	input: &'a str,
 	errors: Vec<String>,
 	env: FxHashMap<SymbolId, TyId>, // TODO: this can be Vec<Option>
 	types: Vec<TyNode>,
+	tables: Vec<Table>,
 }
 
 const ERR_TY: TyId = 0;
@@ -29,6 +38,7 @@ impl<'a> TypeCheck<'a> {
 			errors: Vec::new(),
 			types: Vec::new(),
 			env: FxHashMap::default(),
+			tables: Vec::new(),
 		};
 
 		this.types.push(TyNode::Ty(Ty::Bottom));
@@ -75,7 +85,13 @@ impl<'a> TypeCheck<'a> {
 			Ty::Int => "int".to_string(),
 			Ty::TyVar => format!("T{id}?"),
 			Ty::Free => format!("T{id}"),
-			Ty::Table(_) => "table".to_string(),
+			Ty::Table(table_id) => {
+				let mut s = String::new();
+				for (p, ty) in self.tables[table_id].fields.iter() {
+					s.push_str(&format!("{} = {}, ", p, self.ty_to_string(*ty)))
+				}
+				format!("{{ {s} }}")
+			},
 			Ty::Array(ty) => format!("[{}]", self.ty_to_string(ty)),
 			Ty::Maybe(ty) => format!("maybe({})", self.ty_to_string(ty)),
 			Ty::Fn(args, ret) => {
@@ -390,8 +406,6 @@ impl<'a> TypeCheck<'a> {
 	}
 
 	fn hoist_fn_def(&mut self, node: &FnDef) {
-		assert!(node.path.is_empty());
-
 		let param_ty = self.eval_fn_params(&node.body.params);
 		let ty = match &node.body.ty {
 			Some(ty) => self.to_ty(ty),
@@ -540,25 +554,48 @@ impl<'a> TypeCheck<'a> {
 			ExprKind::Call(e) => self.eval_fn_call(e),
 			ExprKind::Expr(e) => self.eval_expr(e),
 			ExprKind::Lambda(e) => self.eval_lambda(e, expr.span),
-			// ExprKind::Table(_) => Ty::Table(0), // TODO
-			_ => todo!(),
+			ExprKind::Table(e) => self.eval_table(e),
 		}
+	}
+
+	fn eval_table(&mut self, field_list: &Vec<Field>) -> TyId {
+		let mut fields = FxHashMap::default();
+		for f in field_list {
+			match f {
+				Field::Assign(p, a) => fields.insert(p.name.clone(), self.eval_expr(a)),
+				Field::Fn(p, f) => fields.insert(p.name.clone(), self.eval_lambda(f, p.span)),
+			};
+		}
+		let table = Table { fields };
+		let table_id = self.tables.len();
+		self.tables.push(table);
+		self.new_ty(Ty::Table(table_id))
+	}
+
+	fn get_property(&mut self, table: TableId, p: &Property) -> Option<TyId> {
+		self.tables[table].fields.get(&p.name).copied()
 	}
 
 	fn eval_suffix_expr(&mut self, expr: &Expr, s: &Vec<Suffix>) -> TyId {
 		let mut ty = self.eval_expr(expr);
 		for suffix in s {
 			match suffix {
-				Suffix::Property(_) => {
-					todo!()
-					// ty = if let Ty::Table(_id) = ty {
-					// 	// Ty::Any
-					// } else {
-					// 	let msg = format!("Can not index type `{ty}`.");
-					// 	format_err(&msg, expr.span, self.input);
-					// 	self.errors.push(msg);
-					// 	ERR_TY
-					// }
+				Suffix::Property(p) => {
+					ty = if let Ty::Table(table) = self.get_type(ty) {
+						if let Some(p_id) = self.get_property(table, p) {
+							p_id
+						} else {
+							let msg = format!("Table doesn't have property `{}`.", p.name);
+							format_err(&msg, p.span, self.input);
+							self.errors.push(msg);
+							ERR_TY
+						}
+					} else {
+						let msg = format!("Can get property on type `{}`.", self.ty_to_string(ty));
+						format_err(&msg, expr.span, self.input);
+						self.errors.push(msg);
+						ERR_TY
+					};
 				},
 				Suffix::Index(e) => {
 					ty = match self.get_type(ty) {

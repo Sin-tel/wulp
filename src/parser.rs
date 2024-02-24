@@ -183,21 +183,10 @@ fn parse_let(input: &str, tokens: &mut Lexer) -> Let {
 fn parse_fn_def(input: &str, tokens: &mut Lexer) -> FnDef {
 	assert_next(input, tokens, TokenKind::Fn);
 
-	let (name, path) = parse_fn_name(input, tokens);
+	let name = parse_name(input, tokens);
 	let body = parse_fn_body(input, tokens);
 
-	FnDef { name, path, body }
-}
-
-fn parse_fn_name(input: &str, tokens: &mut Lexer) -> (Name, Vec<Property>) {
-	let name = parse_name(input, tokens);
-	let mut path = Vec::new();
-
-	while tokens.peek().kind == (TokenKind::Period) {
-		tokens.next();
-		path.push(parse_property(input, tokens));
-	}
-	(name, path)
+	FnDef { name, body }
 }
 
 fn parse_fn_body(input: &str, tokens: &mut Lexer) -> FnBody {

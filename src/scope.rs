@@ -131,27 +131,15 @@ impl<'a> Visitor for ScopeCheck<'a> {
 	fn visit_fn_def(&mut self, node: &mut FnDef) {
 		if self.hoist_fn_def {
 			let name = node.name.span.as_str(self.input);
-
 			let lookup = self.lookup(name);
-			if node.path.is_empty() {
-				// plain fn def
-				if lookup.is_some() {
-					let msg = format!("Function `{name}` already defined.");
-					format_err(&msg, node.name.span, self.input);
-					self.errors.push(msg);
-				} else {
-					// function defs are always const
-					self.new_variable(name, true, true);
-				}
+			// plain fn def
+			if lookup.is_some() {
+				let msg = format!("Function `{name}` already defined.");
+				format_err(&msg, node.name.span, self.input);
+				self.errors.push(msg);
 			} else {
-				// fn property on some type
-				if lookup.is_none() {
-					let msg = format!("Undefined type: `{name}`.");
-					format_err(&msg, node.name.span, self.input);
-					self.errors.push(msg);
-					// to suppress further errors, we add a new variable anyway
-					// self.new_variable(name, false, false);
-				}
+				// function defs are always const
+				self.new_variable(name, true, true);
 			}
 		} else {
 			node.walk(self);

@@ -1,16 +1,37 @@
-// let a = [1 2]
+// let t = {
+// 	x = 1,
+// 	y = 2,
+// 	fn chain(self) {
+// 		return self
+// 	}
+// 	fn add(self, n) {
+// 		self.x += n
+// 		return self
+// 	}
+// }
 
-// // array.push(a, 3)
-// a.push(3)
+// t.chain().add().chain()
+// print(t.x)
 
-// for v in a print(v)
-
-let p = {
-	x = 1
-	y = 2
+let t = {
+	x = 1,
+	y = 2,
 }
 
-print(p.x)
+let u = {
+	a = 1,
+	b = 5,
+	fn add_one(a) {
+		return a + 1
+	}
 
-// for v in iter.range(5) print(v)
+	add_two = fn(a) {
+		return a + 2
+	}
+}
 
+let y = u.add_one(3)
+let z = u.add_two(3)
+
+print(y)
+print(z)

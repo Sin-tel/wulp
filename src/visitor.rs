@@ -207,9 +207,6 @@ impl<V: Visitor> VisitNode<V> for FnDef {
 	}
 	fn walk(&mut self, v: &mut V) {
 		v.visit_name(&mut self.name);
-		for p in &mut self.path {
-			v.visit_property(p);
-		}
 		v.visit_fn_body(&mut self.body);
 	}
 }

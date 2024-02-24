@@ -124,7 +124,6 @@ pub struct Call {
 #[derive(Debug)]
 pub struct FnDef {
 	pub name: Name,
-	pub path: Vec<Property>,
 	pub body: FnBody,
 }
 
