@@ -22,6 +22,7 @@
 #[allow(unused_imports)]
 use crate::ast_print::AstPrinter;
 use crate::emit::EmitLua;
+use crate::parser::Parser;
 use crate::scope::ScopeCheck;
 use crate::typecheck::TypeCheck;
 use anyhow::Result;
@@ -53,18 +54,18 @@ fn main() -> Result<()> {
 	let filename = "blua/test.blua";
 	let input = fs::read_to_string(filename).unwrap();
 
-	let mut ast = parser::parse(&input);
+	let mut ast = Parser::parse(&input);
 	// println!("----- input:");
 	// println!("{input}");
 
-	let mut symbol_table = ScopeCheck::check(&mut ast, &input)?;
+	let symbol_table = ScopeCheck::check(&mut ast, &input)?;
 	TypeCheck::check(&ast, &input, &symbol_table)?;
 
 	// println!("----- AST:");
 	// AstPrinter::print_ast(&mut ast, &input);
 
 	println!("----- emitted code:");
-	symbol_table.mangle();
+	// symbol_table.mangle();
 	let code = EmitLua::emit(&mut ast, symbol_table);
 	println!("{code}");
 
