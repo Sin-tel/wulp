@@ -205,9 +205,14 @@ impl Visitor for EmitLua {
 				self.indent();
 				self.statement.push_str("end");
 			},
-			Stat::Import(_) => {
-				// self.statement.push_str("break");
-				todo!();
+			Stat::Import(s) => {
+				self.statement.push_str("local ");
+				s.alias.visit(self);
+				self.statement.push_str(" = ");
+				self.statement.push('{');
+				self.push_list(&mut s.module.fields, ", ");
+				self.statement.push('}');
+					// self.new_def(s.alias.id, self.get_type(table).clone());
 			},
 			Stat::AssignOp(s) => {
 				// Copy any evaluations to a temp var

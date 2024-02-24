@@ -1,4 +1,5 @@
 use crate::ast::*;
+use crate::fs;
 use crate::lexer::Lexer;
 use crate::span::Span;
 use crate::span::{format_err, format_warning};
@@ -27,6 +28,23 @@ impl<'a> Parser<'a> {
 		ast
 	}
 
+	fn parse_module(filename: &str) -> Table {
+		let filename = format!("blua/{filename}.blua");
+		let input = &fs::read_to_string(filename).unwrap();
+		let mut this = Parser {
+			input,
+			tokens: Lexer::new(input),
+		};
+		let fields = this.parse_fields();
+
+		// make sure we are done
+		let tk = this.tokens.next();
+		if tk.kind != TokenKind::Eof {
+			this.error(format!("Expected end of file but found: {tk}."), tk.span);
+		}
+		return Table { fields };
+	}
+
 	fn error(&mut self, msg: String, span: Span) -> ! {
 		format_err(&msg, span, self.input);
 		panic!("{msg}");
@@ -35,19 +53,23 @@ impl<'a> Parser<'a> {
 	fn parse_import(&mut self) -> Import {
 		match self.tokens.next().kind {
 			TokenKind::Import => {
-				let name = self.tokens.peek().span.as_string(self.input);
-				self.assert_next(TokenKind::Name);
+				let span = self.assert_next(TokenKind::Name).span;
+				let filename = span.as_string(self.input);
 
 				let alias = if self.tokens.peek().kind == TokenKind::As {
 					self.tokens.next();
-					let alias = self.tokens.peek().span.as_string(self.input);
-					self.assert_next(TokenKind::Name);
-					alias
+					self.parse_name()
 				} else {
-					name.clone()
+					Name { id: 0, span }
 				};
 
-				return Import { name, alias };
+				let module = Self::parse_module(&filename);
+
+				return Import {
+					filename,
+					alias,
+					module,
+				};
 			},
 			TokenKind::From => todo!(),
 			_ => unreachable!(),
@@ -522,13 +544,13 @@ impl<'a> Parser<'a> {
 	}
 
 	fn parse_fields(&mut self) -> Vec<Field> {
-		if self.tokens.peek().kind == TokenKind::RCurly {
+		if (self.tokens.peek().kind == TokenKind::RCurly) | (self.tokens.peek().kind == TokenKind::Eof) {
 			return Vec::new();
 		};
 
 		let mut fields = Vec::new();
 		loop {
-			if self.tokens.peek().kind == TokenKind::RCurly {
+			if (self.tokens.peek().kind == TokenKind::RCurly) | (self.tokens.peek().kind == TokenKind::Eof) {
 				break;
 			}
 			let f = self.parse_field();

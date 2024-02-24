@@ -378,7 +378,10 @@ impl<'a> TypeCheck<'a> {
 				Stat::AssignOp(s) => self.eval_assign_op(s),
 				Stat::Let(s) => self.eval_let(s),
 				Stat::FnDef(s) => self.eval_fn_def(s),
-				Stat::Import(_) => todo!(),
+				Stat::Import(s) => {
+					let table = self.eval_table(&s.module);
+					self.new_def(s.alias.id, self.get_type(table).clone());
+				},
 			};
 		}
 		(current_pair, false)

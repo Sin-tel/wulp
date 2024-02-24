@@ -83,8 +83,11 @@ impl<V: Visitor> VisitNode<V> for Import {
 	fn visit(&mut self, v: &mut V) {
 		v.visit_import(self);
 	}
-	fn walk(&mut self, _v: &mut V) {
-		todo!()
+	fn walk(&mut self, v: &mut V) {
+		v.visit_name(&mut self.alias);
+		for e in &mut self.module.fields {
+			v.visit_field(e);
+		}
 	}
 }
 

@@ -100,6 +100,18 @@ impl<'a> ScopeCheck<'a> {
 }
 
 impl<'a> Visitor for ScopeCheck<'a> {
+	fn visit_import(&mut self, node: &mut Import) {
+		// TODO: each file should have its own scope!
+		self.scope_stack.push(FxHashMap::default());
+		for field in &mut node.module.fields {
+			field.visit(self)
+		}
+		self.scope_stack.pop();
+		let name_str = node.alias.span.as_str(self.input);
+		self.new_variable(name_str, true, false);
+		node.alias.visit(self);
+	}
+
 	fn visit_block(&mut self, node: &mut Block) {
 		self.scope_stack.push(FxHashMap::default());
 		self.hoist_fn_def = true;

@@ -31,8 +31,9 @@ pub enum Stat {
 
 #[derive(Debug)]
 pub struct Import {
-	pub name: String,
-	pub alias: String,
+	pub filename: String,
+	pub alias: Name,
+	pub module: Table,
 }
 
 #[derive(Debug)]
