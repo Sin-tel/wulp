@@ -1,37 +1,6 @@
-// let t = {
-// 	x = 1,
-// 	y = 2,
-// 	fn chain(self) {
-// 		return self
-// 	}
-// 	fn add(self, n) {
-// 		self.x += n
-// 		return self
-// 	}
-// }
+import module
 
-// t.chain().add().chain()
-// print(t.x)
 
-let t = {
-	x = 1,
-	y = 2,
-}
+print(module)
 
-let u = {
-	a = 1,
-	b = 5,
-	fn add_one(a) {
-		return a + 1
-	}
-
-	add_two = fn(a) {
-		return a + 2
-	}
-}
-
-let y = u.add_one(3)
-let z = u.add_two(3)
-
-print(y)
-print(z)
+print(module.is_even(2))

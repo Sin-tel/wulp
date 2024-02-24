@@ -1,0 +1,8 @@
+// ok
+let _ = true
+let _ = 5
+
+// not ok
+_ = 3
+let x = 3*_
+print(x)
