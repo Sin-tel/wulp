@@ -10,7 +10,6 @@
 #![allow(clippy::match_like_matches_macro)]
 #![allow(clippy::enum_variant_names)]
 #![allow(clippy::new_without_default)]
-
 // #![warn(clippy::pedantic)]
 // #![allow(clippy::similar_names)]
 // #![allow(clippy::enum_glob_use)]
@@ -18,9 +17,7 @@
 // #![allow(clippy::too_many_lines)]
 // #![allow(clippy::doc_markdown)]
 
-//
-#[allow(unused_imports)]
-use crate::ast_print::AstPrinter;
+// use crate::ast_print::AstPrinter;
 use crate::emit::EmitLua;
 use crate::parser::Parser;
 use crate::scope::ScopeCheck;
@@ -29,12 +26,10 @@ use anyhow::Result;
 use mlua::{prelude::LuaResult, LuaOptions, StdLib};
 use std::env;
 use std::fs;
-#[allow(unused_imports)]
-use std::io::Write;
 use std::path::Path;
 
 pub mod ast;
-pub mod ast_print;
+// pub mod ast_print;
 pub mod emit;
 pub mod lexer;
 pub mod parser;
@@ -51,18 +46,18 @@ pub mod visitor;
 mod tests;
 
 fn main() -> Result<()> {
-	let filename = "blua/test.blua";
-	let input = fs::read_to_string(filename).unwrap();
+	let filename = "test";
 
-	let mut ast = Parser::parse(&input);
+	let (mut ast, files) = Parser::parse(filename);
+
 	// println!("----- input:");
 	// println!("{input}");
 
-	let symbol_table = ScopeCheck::check(&mut ast, &input)?;
-	TypeCheck::check(&ast, &input, &symbol_table)?;
+	let symbol_table = ScopeCheck::check(&mut ast, &files)?;
+	TypeCheck::check(&ast, &files, &symbol_table)?;
 
-	// println!("----- AST:");
-	// AstPrinter::print_ast(&mut ast, &input);
+	// // println!("----- AST:");
+	// // AstPrinter::print_ast(&mut ast, &input);
 
 	println!("----- emitted code:");
 	// symbol_table.mangle();

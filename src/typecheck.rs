@@ -1,7 +1,7 @@
 use crate::ast;
 use crate::ast::*;
 use crate::span::Span;
-use crate::span::{format_err, format_note};
+use crate::span::{format_err_f, format_note_f, InputFile};
 use crate::std_lib::GLOBALS;
 use crate::symbol::SymbolId;
 use crate::symbol::SymbolTable;
@@ -25,7 +25,7 @@ type RetPair = Option<(TyId, Span)>;
 
 #[derive(Debug)]
 pub struct TypeCheck<'a> {
-	input: &'a str,
+	input: &'a [InputFile],
 	errors: Vec<String>,
 	env: FxHashMap<SymbolId, TyId>, // TODO: this can be Vec<Option>
 	types: Vec<TyNode>,
@@ -33,7 +33,7 @@ pub struct TypeCheck<'a> {
 }
 
 impl<'a> TypeCheck<'a> {
-	pub fn check(file: &File, input: &'a str, symbol_table: &SymbolTable) -> Result<()> {
+	pub fn check(file: &File, input: &'a [InputFile], symbol_table: &SymbolTable) -> Result<()> {
 		let mut this = Self {
 			input,
 			errors: Vec::new(),
@@ -59,10 +59,10 @@ impl<'a> TypeCheck<'a> {
 		if let Some((ret_ty, _)) = ret {
 			println!("Main return: {}", this.ty_to_string(ret_ty));
 		}
-		// println!("----- types ");
-		// for (i, _) in this.types.iter().enumerate() {
-		// 	println!("{i}: {}", this.ty_to_string(i));
-		// }
+		println!("----- types ");
+		for (i, v) in this.types.iter().enumerate() {
+			println!("{i}: {:?} {} {}", v, this.get_parent(i), this.ty_to_string(i));
+		}
 		println!("----- env ");
 		for (i, s) in symbol_table.symbols.iter().enumerate().skip(1) {
 			if let Some(id) = this.lookup(i) {
@@ -76,6 +76,7 @@ impl<'a> TypeCheck<'a> {
 		}
 	}
 	fn ty_to_string(&self, id: TyId) -> String {
+		let id = self.get_parent(id);
 		match self.get_type(id) {
 			Ty::Any => "Any".to_string(),
 			Ty::Bottom => "Bottom".to_string(),
@@ -88,8 +89,8 @@ impl<'a> TypeCheck<'a> {
 			Ty::Free => format!("T{id}"),
 			Ty::Table(table_id) => {
 				let mut s = String::new();
-				for (p, ty) in self.tables[table_id].fields.iter() {
-					s.push_str(&format!("{} = {}, ", p, self.ty_to_string(*ty)))
+				for (p, ty) in &self.tables[table_id].fields {
+					s.push_str(&format!("{} = {}, ", p, self.ty_to_string(*ty)));
 				}
 				format!("{{ {s} }}")
 			},
@@ -159,6 +160,7 @@ impl<'a> TypeCheck<'a> {
 
 	// promote unbound type variables to free variables
 	fn promote_free(&mut self, id: TyId) {
+		let id = self.get_parent(id);
 		match self.get_type(id) {
 			Ty::Any | Ty::Bottom | Ty::Nil | Ty::Bool | Ty::Str | Ty::Num | Ty::Int | Ty::Free => (),
 			Ty::TyVar => {
@@ -280,9 +282,9 @@ impl<'a> TypeCheck<'a> {
 							self.ty_to_string(new_ty),
 							self.ty_to_string(ty)
 						);
-						format_err(&msg, new_span, self.input);
+						format_err_f(&msg, new_span, self.input);
 						let msg2 = "Previous return value defined here:".to_string();
-						format_note(&msg2, prev_span, self.input);
+						format_note_f(&msg2, prev_span, self.input);
 						self.errors.push(msg);
 						Some((ERR_TY, new_span))
 					}
@@ -438,13 +440,13 @@ impl<'a> TypeCheck<'a> {
 				self.ty_to_string(ty),
 				self.ty_to_string(ret_id)
 			);
-			format_err(&msg, prev_span, self.input);
+			format_err_f(&msg, prev_span, self.input);
 			self.errors.push(msg);
 		};
 
 		self.promote_free(fn_id);
 
-		println!("infer fn def: {} {}", fn_id, self.ty_to_string(fn_id));
+		println!("infer fn def: {}", self.ty_to_string(fn_id));
 	}
 
 	// span should refer to the place where the function is defined
@@ -467,11 +469,11 @@ impl<'a> TypeCheck<'a> {
 				self.ty_to_string(ty),
 				self.ty_to_string(ret_id)
 			);
-			format_err(&msg, prev_span, self.input);
+			format_err_f(&msg, prev_span, self.input);
 			self.errors.push(msg);
 		}
 		self.promote_free(fn_id);
-		println!("infer lambda: {} {}", fn_id, self.ty_to_string(fn_id));
+		println!("infer lambda: {}", self.ty_to_string(fn_id));
 		fn_id
 	}
 
@@ -480,13 +482,13 @@ impl<'a> TypeCheck<'a> {
 		let fn_ty = self.instantiate(fn_ty_id);
 		if let Ty::Fn(params, ret_ty) = self.get_type(fn_ty) {
 			// TODO: get rid of hardcoded "print" here
-			if params.len() != c.args.len() && c.expr.span.as_str(self.input) != "print" {
+			if params.len() != c.args.len() && c.expr.span.as_str_f(self.input) != "print" {
 				let msg = format!(
 					"Function takes {} argument(s), {} supplied.",
 					params.len(),
 					c.args.len()
 				);
-				format_err(&msg, c.expr.span, self.input);
+				format_err_f(&msg, c.expr.span, self.input);
 				self.errors.push(msg);
 			} else {
 				for (p, a) in zip(params, c.args.iter()) {
@@ -497,7 +499,7 @@ impl<'a> TypeCheck<'a> {
 							self.ty_to_string(p),
 							self.ty_to_string(arg_ty)
 						);
-						format_err(&msg, a.span, self.input);
+						format_err_f(&msg, a.span, self.input);
 						self.errors.push(msg);
 					}
 				}
@@ -505,7 +507,7 @@ impl<'a> TypeCheck<'a> {
 			ret_ty
 		} else {
 			let msg = format!("Type `{}` is not callable.", self.ty_to_string(fn_ty));
-			format_err(&msg, c.expr.span, self.input);
+			format_err_f(&msg, c.expr.span, self.input);
 			self.errors.push(msg);
 			ERR_TY
 		}
@@ -534,7 +536,7 @@ impl<'a> TypeCheck<'a> {
 							self.ty_to_string(new_ty),
 							self.ty_to_string(ty)
 						);
-						format_err(&msg, e.span, self.input);
+						format_err_f(&msg, e.span, self.input);
 						self.errors.push(msg);
 						return ERR_TY;
 					}
@@ -548,9 +550,9 @@ impl<'a> TypeCheck<'a> {
 				} else {
 					let msg = format!(
 						"(compiler error) couldn't find type for `{}`",
-						expr.span.as_str(self.input)
+						expr.span.as_str_f(self.input)
 					);
-					format_err(&msg, e.span, self.input);
+					format_err_f(&msg, e.span, self.input);
 					panic!("{}", &msg);
 				}
 			},
@@ -567,8 +569,8 @@ impl<'a> TypeCheck<'a> {
 		let mut fields = FxHashMap::default();
 		for f in &ast_table.fields {
 			match f {
-				Field::Assign(p, a) => fields.insert(p.name.clone(), self.eval_expr(&a)),
-				Field::Fn(p, f) => fields.insert(p.name.clone(), self.eval_lambda(&f, p.span)),
+				Field::Assign(p, a) => fields.insert(p.name.clone(), self.eval_expr(a)),
+				Field::Fn(p, f) => fields.insert(p.name.clone(), self.eval_lambda(f, p.span)),
 			};
 		}
 		let table = Table { fields };
@@ -591,32 +593,31 @@ impl<'a> TypeCheck<'a> {
 							p_id
 						} else {
 							let msg = format!("Table doesn't have property `{}`.", p.name);
-							format_err(&msg, p.span, self.input);
+							format_err_f(&msg, p.span, self.input);
 							self.errors.push(msg);
 							ERR_TY
 						}
 					} else {
 						let msg = format!("Can get property on type `{}`.", self.ty_to_string(ty));
-						format_err(&msg, expr.span, self.input);
+						format_err_f(&msg, expr.span, self.input);
 						self.errors.push(msg);
 						ERR_TY
 					};
 				},
 				Suffix::Index(e) => {
-					ty = match self.get_type(ty) {
-						Ty::Array(inner_ty) => inner_ty,
-						_ => {
-							let msg = format!("Can not index type `{}`.", self.ty_to_string(ty));
-							format_err(&msg, expr.span, self.input);
-							self.errors.push(msg);
-							ERR_TY
-						},
+					ty = if let Ty::Array(inner_ty) = self.get_type(ty) {
+						inner_ty
+					} else {
+						let msg = format!("Can not index type `{}`.", self.ty_to_string(ty));
+						format_err_f(&msg, expr.span, self.input);
+						self.errors.push(msg);
+						ERR_TY
 					};
 					let index_ty = self.eval_expr(e);
 					let ty_int = self.new_ty(Ty::Int);
 					if self.unify(index_ty, ty_int).is_err() {
 						let msg = format!("Index must be type `int` but found `{}`.", self.ty_to_string(index_ty));
-						format_err(&msg, e.span, self.input);
+						format_err_f(&msg, e.span, self.input);
 						self.errors.push(msg);
 					}
 				},
@@ -642,7 +643,7 @@ impl<'a> TypeCheck<'a> {
 						self.ty_to_string(rhs_ty),
 						self.ty_to_string(ty_id)
 					);
-					format_err(&msg, node.span, self.input);
+					format_err_f(&msg, node.span, self.input);
 					self.errors.push(msg);
 				}
 				self.new_def(n.name.id, self.to_ty(ty));
@@ -675,7 +676,7 @@ impl<'a> TypeCheck<'a> {
 					self.ty_to_string(rhs_ty),
 					self.ty_to_string(ty)
 				);
-				format_err(&msg, node.span, self.input);
+				format_err_f(&msg, node.span, self.input);
 				self.errors.push(msg);
 			};
 		}
@@ -694,7 +695,7 @@ impl<'a> TypeCheck<'a> {
 				self.ty_to_string(new_lhs),
 				self.ty_to_string(lhs)
 			);
-			format_err(&msg, node.span, self.input);
+			format_err_f(&msg, node.span, self.input);
 			self.errors.push(msg);
 		}
 	}
@@ -717,7 +718,7 @@ impl<'a> TypeCheck<'a> {
 			},
 		}
 		let msg = format!("Operator `{op}` cannot by applied to `{}`.", self.ty_to_string(id));
-		format_err(&msg, span, self.input);
+		format_err_f(&msg, span, self.input);
 		self.errors.push(msg);
 		ERR_TY
 	}
@@ -729,13 +730,14 @@ impl<'a> TypeCheck<'a> {
 				self.ty_to_string(lhs),
 				self.ty_to_string(rhs)
 			);
-			format_err(&msg, span, self.input);
+			format_err_f(&msg, span, self.input);
 			self.errors.push(msg);
 			return ERR_TY;
 		}
 		let ty = self.get_type(lhs);
 		match op {
 			BinOp::Plus | BinOp::Minus | BinOp::Mul | BinOp::Pow | BinOp::Mod | BinOp::Div => {
+				// TODO: currently div and pow on int have type `(int, int) -> int` but this is wrong!
 				if ty == Ty::Int || ty == Ty::Num {
 					return lhs;
 				}
@@ -761,7 +763,7 @@ impl<'a> TypeCheck<'a> {
 		}
 
 		let msg = format!("Failed to infer if we can apply `{op}` here.");
-		format_err(&msg, span, self.input);
+		format_err_f(&msg, span, self.input);
 		self.errors.push(msg);
 		ERR_TY
 	}

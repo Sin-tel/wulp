@@ -1,22 +1,38 @@
 use std::cmp;
 
+pub type FileId = usize;
+
+#[derive(Debug)]
+pub struct InputFile {
+	pub contents: String,
+	pub filename: String,
+	pub id: FileId,
+}
+
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct Span {
 	pub start: usize,
 	pub end: usize,
+	pub file_id: FileId,
 }
 
 impl Span {
-	pub fn new(start: usize, end: usize) -> Self {
-		Self { start, end }
+	pub fn new(start: usize, end: usize, file_id: FileId) -> Self {
+		Self { start, end, file_id }
 	}
-	pub fn at(c: usize) -> Self {
-		Self { start: c, end: c + 1 }
+	pub fn at(c: usize, file_id: FileId) -> Self {
+		Self {
+			start: c,
+			end: c + 1,
+			file_id,
+		}
 	}
 	pub fn join(s1: Self, s2: Self) -> Self {
+		assert!(s1.file_id == s2.file_id);
 		Self {
 			start: cmp::min(s1.start, s2.start),
 			end: cmp::max(s1.end, s2.end),
+			file_id: s1.file_id,
 		}
 	}
 
@@ -28,6 +44,12 @@ impl Span {
 
 	pub fn as_str<'a>(&self, input: &'a str) -> &'a str {
 		&input[self.start..self.end]
+		// &input.file_list[self.file_id].contents[self.start..self.end]
+		// &input.contents[self.start..self.end]
+	}
+
+	pub fn as_str_f<'a>(&self, files: &'a [InputFile]) -> &'a str {
+		&files[self.file_id].contents[self.start..self.end]
 	}
 
 	pub fn as_string(&self, input: &str) -> String {
@@ -49,39 +71,74 @@ fn line_col(input: &str, pos: usize) -> (usize, usize) {
 	}
 }
 
-pub fn format_err(message: &str, span: Span, input: &str) {
-	print_message(message, span, input, "error");
+pub fn format_err_f(message: &str, span: Span, files: &[InputFile]) {
+	print_message(
+		message,
+		span,
+		&files[span.file_id].contents,
+		&files[span.file_id].filename,
+		"error",
+	);
 }
 
-pub fn format_warning(message: &str, span: Span, input: &str) {
-	print_message(message, span, input, "warning");
+pub fn format_note_f(message: &str, span: Span, files: &[InputFile]) {
+	print_message(
+		message,
+		span,
+		&files[span.file_id].contents,
+		&files[span.file_id].filename,
+		"note",
+	);
 }
 
-pub fn format_note(message: &str, span: Span, input: &str) {
-	print_message(message, span, input, "note");
+pub fn format_warning_f(message: &str, span: Span, files: &[InputFile]) {
+	print_message(
+		message,
+		span,
+		&files[span.file_id].contents,
+		&files[span.file_id].filename,
+		"warning",
+	);
 }
 
-pub fn print_message(message: &str, span: Span, input: &str, level: &'static str) {
-	let (startl, startc, endl, endc) = span.line_col(input);
+pub fn format_err(message: &str, span: Span, input: &str, filename: &str) {
+	print_message(message, span, input, filename, "error");
+}
+
+pub fn format_warning(message: &str, span: Span, input: &str, filename: &str) {
+	print_message(message, span, input, filename, "warning");
+}
+
+pub fn format_note(message: &str, span: Span, input: &str, filename: &str) {
+	print_message(message, span, input, filename, "note");
+}
+
+pub fn print_message(message: &str, span: Span, input: &str, filename: &str, level: &'static str) {
+	// let this_file = input.file_list[span.file_id];
+	// let contents = &this_file.contents;
+	// let filename = &this_file.filename;
+	let contents = input;
+
+	let (startl, startc, endl, endc) = span.line_col(contents);
 
 	let width = (endl + 1).to_string().chars().count();
 	let spaces = " ".repeat(width);
 
 	// TODO fix the filename
-	eprintln!("{level}: blua\\test.blua:{}: {message}", startl + 1);
+	eprintln!("{level}: {filename}:{}: {message}", startl + 1);
 	eprintln!("{spaces} |");
 
-	for (lc, l) in input.lines().skip(startl).enumerate() {
+	for (lc, l) in contents.lines().skip(startl).enumerate() {
 		if l.is_empty() {
 			continue;
 		}
 		let mut start = startc;
 		let mut end = endc;
 		if lc > 0 {
-			start = 0
+			start = 0;
 		}
-		if lc < end {
-			end = l.len()
+		if lc < endl - startl {
+			end = l.len();
 		}
 
 		let mut underline = String::new();
@@ -96,7 +153,7 @@ pub fn print_message(message: &str, span: Span, input: &str, level: &'static str
 		}
 
 		let linepos = lc + startl + 1;
-		eprintln!("{linepos:width$} | {l}", width = width);
+		eprintln!("{linepos:width$} | {l}");
 		eprintln!("{spaces} | {underline}");
 		// linepos += 1;
 		if lc >= endl - startl {

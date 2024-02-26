@@ -1,6 +1,8 @@
 use crate::ast::*;
 use crate::fs;
 use crate::lexer::Lexer;
+use crate::span::FileId;
+use crate::span::InputFile;
 use crate::span::Span;
 use crate::span::{format_err, format_warning};
 use crate::token::{Token, TokenKind};
@@ -9,14 +11,27 @@ use crate::ty::TyAst;
 #[derive(Debug)]
 pub struct Parser<'a> {
 	input: &'a str,
+	file_id: FileId,
+	next_id: FileId,
 	tokens: Lexer<'a>,
+	filename: String,
+	files: Vec<InputFile>,
 }
 
 impl<'a> Parser<'a> {
-	pub fn parse(input: &str) -> File {
+	pub fn parse(filename: &str) -> (File, Vec<InputFile>) {
+		let filename = format!("blua/{filename}.blua");
+		let input = fs::read_to_string(filename.clone()).unwrap();
+		let mut files = Vec::new();
+		let file_id = 0;
+		let next_id = 1;
 		let mut this = Parser {
-			input,
-			tokens: Lexer::new(input),
+			input: &input,
+			file_id,
+			next_id,
+			tokens: Lexer::new(&input, file_id, filename.clone()),
+			filename: filename.clone(),
+			files: Vec::new(),
 		};
 		let ast = this.parse_file();
 
@@ -25,28 +40,56 @@ impl<'a> Parser<'a> {
 		if tk.kind != TokenKind::Eof {
 			this.error(format!("Expected end of file but found: {tk}."), tk.span);
 		}
-		ast
+		files.append(&mut this.files);
+		files.push({
+			InputFile {
+				contents: input,
+				filename,
+				id: file_id,
+			}
+		});
+		files.sort_by_key(|f| f.id);
+		for (i, v) in files.iter().enumerate() {
+			assert_eq!(i, v.id);
+		}
+		(ast, files)
 	}
 
-	fn parse_module(filename: &str) -> Table {
+	fn parse_module(&mut self, filename: &str) -> Table {
 		let filename = format!("blua/{filename}.blua");
-		let input = &fs::read_to_string(filename).unwrap();
-		let mut this = Parser {
-			input,
-			tokens: Lexer::new(input),
+		let input = fs::read_to_string(filename.clone()).unwrap();
+		let file_id = self.next_id;
+		let next_id = self.next_id + 1;
+		let mut parser = Parser {
+			input: &input,
+			file_id,
+			next_id,
+			tokens: Lexer::new(&input, file_id, filename.clone()),
+			filename: filename.clone(),
+			files: Vec::new(),
 		};
-		let fields = this.parse_fields();
+		let fields = parser.parse_fields();
 
 		// make sure we are done
-		let tk = this.tokens.next();
+		let tk = parser.tokens.next();
 		if tk.kind != TokenKind::Eof {
-			this.error(format!("Expected end of file but found: {tk}."), tk.span);
+			parser.error(format!("Expected end of file but found: {tk}."), tk.span);
 		}
-		return Table { fields };
+
+		self.next_id = parser.next_id;
+		self.files.append(&mut parser.files);
+		self.files.push({
+			InputFile {
+				contents: input,
+				filename,
+				id: file_id,
+			}
+		});
+		Table { fields }
 	}
 
 	fn error(&mut self, msg: String, span: Span) -> ! {
-		format_err(&msg, span, self.input);
+		format_err(&msg, span, self.input, &self.filename);
 		panic!("{msg}");
 	}
 
@@ -63,13 +106,13 @@ impl<'a> Parser<'a> {
 					Name { id: 0, span }
 				};
 
-				let module = Self::parse_module(&filename);
+				let module = self.parse_module(&filename);
 
-				return Import {
+				Import {
 					filename,
 					alias,
 					module,
-				};
+				}
 			},
 			TokenKind::From => todo!(),
 			_ => unreachable!(),
@@ -456,7 +499,7 @@ impl<'a> Parser<'a> {
 					let tk = self.tokens.peek();
 					if tk.kind == TokenKind::LParen && tk.line != start_line {
 						let msg = "Ambiguous syntax.";
-						format_warning(msg, tk.span, self.input);
+						format_warning(msg, tk.span, self.input, &self.filename);
 						eprintln!("note: Add a semicolon to the previous statement if this is intentional.");
 						panic!("{msg}");
 					}
@@ -489,7 +532,7 @@ impl<'a> Parser<'a> {
 					Suffix::Index(e) => e.span.end + 1,
 				};
 				Expr {
-					span: Span::new(expr.span.start, end),
+					span: Span::new(expr.span.start, end, self.file_id),
 					kind: ExprKind::SuffixExpr(Box::new(expr), suffix),
 				}
 			},

@@ -1,19 +1,18 @@
-use crate::span::format_err;
-use crate::span::Span;
+use crate::span::{format_err, FileId, Span};
 use crate::token::*;
 use std::iter::zip;
 
 #[derive(Debug)]
 pub struct Lexer<'a> {
-	lexer: LexIter<'a>,
+	lex_iter: LexIter<'a>,
 	peeked: Option<Token>,
 }
 
 // This is mostly copypasta from peekable in std
 impl<'a> Lexer<'a> {
-	pub fn new(input: &'a str) -> Self {
+	pub fn new(input: &'a str, id: FileId, filename: String) -> Self {
 		Lexer {
-			lexer: LexIter::new(input),
+			lex_iter: LexIter::new(input, id, filename),
 			peeked: None,
 		}
 	}
@@ -36,7 +35,7 @@ impl<'a> Lexer<'a> {
 	}
 	fn filter_next(&mut self) -> Token {
 		// consume token, filter out comment, add end of file
-		match self.lexer.next() {
+		match self.lex_iter.next() {
 			Some(Token {
 				kind: TokenKind::Comment,
 				..
@@ -44,8 +43,8 @@ impl<'a> Lexer<'a> {
 			Some(tk) => tk,
 			None => Token {
 				kind: TokenKind::Eof,
-				span: Span::at(self.lexer.cursor - 1), // point to last character
-				line: self.lexer.line,
+				span: Span::at(self.lex_iter.cursor - 1, self.lex_iter.id), // point to last character
+				line: self.lex_iter.line,
 			},
 		}
 	}
@@ -55,16 +54,20 @@ impl<'a> Lexer<'a> {
 pub struct LexIter<'a> {
 	input: &'a str,
 	bytes: &'a [u8],
+	id: FileId,
+	filename: String,
 	pub cursor: usize,
 	pub line: usize,
 	handle_escape: bool,
 }
 
 impl<'a> LexIter<'a> {
-	pub fn new(input: &'a str) -> Self {
+	pub fn new(input: &'a str, id: FileId, filename: String) -> Self {
 		LexIter {
 			input,
 			bytes: input.as_bytes(),
+			id,
+			filename,
 			cursor: 0,
 			line: 0,
 			handle_escape: false,
@@ -74,7 +77,7 @@ impl<'a> LexIter<'a> {
 	fn newtoken(&self, kind: TokenKind, start: usize, end: usize) -> Token {
 		Token {
 			kind,
-			span: Span { start, end },
+			span: Span::new(start, end, self.id),
 			line: self.line,
 		}
 	}
@@ -147,7 +150,12 @@ impl<'a> LexIter<'a> {
 				Some('\\') => self.handle_escape = true,
 				Some('\n') | None => {
 					let msg = "Failed to close string.";
-					format_err(msg, Span::new(start, self.cursor - 1), self.input);
+					format_err(
+						msg,
+						Span::new(start, self.cursor - 1, self.id),
+						self.input,
+						&self.filename,
+					);
 					panic!("{msg}");
 				},
 				_ => self.handle_escape = false,
@@ -194,7 +202,7 @@ impl<'a> LexIter<'a> {
 		}
 		let end = self.cursor;
 
-		let span = Span { start, end };
+		let span = Span::new(start, end, self.id);
 
 		let kind = match s.as_str() {
 			"import" => TokenKind::Import,
@@ -250,10 +258,7 @@ impl<'a> LexIter<'a> {
 			}
 		}
 
-		let span = Span {
-			start,
-			end: self.cursor,
-		};
+		let span = Span::new(start, self.cursor, self.id);
 
 		Token {
 			kind: TokenKind::Number,
@@ -445,7 +450,7 @@ impl Iterator for LexIter<'_> {
 				},
 				tk => {
 					let msg = format!("Unexpected token: `{tk}`");
-					format_err(&msg, Span::at(self.cursor), self.input);
+					format_err(&msg, Span::at(self.cursor, self.id), self.input, &self.filename);
 					panic!("{msg}");
 				},
 			}

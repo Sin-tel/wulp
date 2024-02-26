@@ -1,6 +1,6 @@
 import module
 
-
 print(module)
 
 print(module.is_even(2))
+print(module.id(false))

@@ -1,13 +1,14 @@
 use crate::ast::*;
 use crate::visitor::*;
+use crate::InputFiles;
 use debug_tree::*;
 
 pub struct AstPrinter<'a> {
-	input: &'a str,
+	input: &'a InputFiles,
 }
 
 impl<'a> AstPrinter<'a> {
-	pub fn print_ast(ast: &mut File, input: &'a str) {
+	pub fn print_ast(ast: &mut File, input: &'a InputFiles) {
 		let mut printer = Self { input };
 		defer_print!();
 		add_branch!("ast");

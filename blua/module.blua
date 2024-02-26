@@ -1,3 +1,7 @@
 fn is_even(a: int) {
-	return a % 2 == 0;
+	return a % 2 == 0
+}
+
+fn id(x, y) {
+	return x*y
 }

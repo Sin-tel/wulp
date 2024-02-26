@@ -1,5 +1,6 @@
 use crate::ast::*;
-use crate::span::format_err;
+use crate::span::format_err_f;
+use crate::span::InputFile;
 use crate::std_lib::GLOBALS;
 use crate::symbol::{Symbol, SymbolId, SymbolTable};
 use crate::visitor::{VisitNode, Visitor};
@@ -9,13 +10,13 @@ use rustc_hash::FxHashMap;
 pub struct ScopeCheck<'a> {
 	scope_stack: Vec<FxHashMap<&'a str, SymbolId>>,
 	symbol_table: SymbolTable,
-	input: &'a str,
+	input: &'a [InputFile],
 	errors: Vec<String>,
 	hoist_fn_def: bool,
 }
 
 impl<'a> ScopeCheck<'a> {
-	pub fn check(ast: &mut File, input: &'a str) -> Result<SymbolTable> {
+	pub fn check(ast: &mut File, input: &'a [InputFile]) -> Result<SymbolTable> {
 		let mut this = Self {
 			scope_stack: Vec::new(),
 			symbol_table: SymbolTable::new(),
@@ -64,16 +65,16 @@ impl<'a> ScopeCheck<'a> {
 	fn check_lvalue(&mut self, var: &mut Expr) {
 		match &mut var.kind {
 			ExprKind::Name(n) => {
-				let name = n.span.as_str(self.input);
+				let name = n.span.as_str_f(self.input);
 
 				if let Some(id) = self.lookup(name) {
 					if self.symbol_table.get(id).is_fn_def {
 						let msg = format!("Function `{name}` already defined.");
-						format_err(&msg, n.span, self.input);
+						format_err_f(&msg, n.span, self.input);
 						self.errors.push(msg);
 					} else if self.symbol_table.get(id).is_const {
 						let msg = format!("Can't assign to constant `{name}`.");
-						format_err(&msg, n.span, self.input);
+						format_err_f(&msg, n.span, self.input);
 						self.errors.push(msg);
 					}
 				}
@@ -104,10 +105,10 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		// TODO: each file should have its own scope!
 		self.scope_stack.push(FxHashMap::default());
 		for field in &mut node.module.fields {
-			field.visit(self)
+			field.visit(self);
 		}
 		self.scope_stack.pop();
-		let name_str = node.alias.span.as_str(self.input);
+		let name_str = node.alias.span.as_str_f(self.input);
 		self.new_variable(name_str, true, false);
 		node.alias.visit(self);
 	}
@@ -129,7 +130,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		self.scope_stack.push(FxHashMap::default());
 
 		for n in &mut node.names {
-			let name = n.span.as_str(self.input);
+			let name = n.span.as_str_f(self.input);
 			// marked as const since we should never assign to loop variable
 			self.new_variable(name, true, false);
 			n.visit(self);
@@ -142,12 +143,12 @@ impl<'a> Visitor for ScopeCheck<'a> {
 
 	fn visit_fn_def(&mut self, node: &mut FnDef) {
 		if self.hoist_fn_def {
-			let name = node.name.span.as_str(self.input);
+			let name = node.name.span.as_str_f(self.input);
 			let lookup = self.lookup(name);
 			// plain fn def
 			if lookup.is_some() {
 				let msg = format!("Function `{name}` already defined.");
-				format_err(&msg, node.name.span, self.input);
+				format_err_f(&msg, node.name.span, self.input);
 				self.errors.push(msg);
 			} else {
 				// function defs are always const
@@ -161,7 +162,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 	fn visit_fn_body(&mut self, node: &mut FnBody) {
 		self.scope_stack.push(FxHashMap::default());
 		for n in &mut node.params {
-			let name = n.name.span.as_str(self.input);
+			let name = n.name.span.as_str_f(self.input);
 			// function args are mutable
 			self.new_variable(name, false, false);
 			n.visit(self);
@@ -198,7 +199,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		// make new variables for lhs
 		for n in &mut node.names {
 			// TODO: make sure we don't do anything stupid like let x, x = 1, 2
-			let name_str = n.name.span.as_str(self.input);
+			let name_str = n.name.span.as_str_f(self.input);
 			self.new_variable(name_str, false, false);
 			n.name.visit(self);
 		}
@@ -207,12 +208,12 @@ impl<'a> Visitor for ScopeCheck<'a> {
 	fn visit_name(&mut self, node: &mut Name) {
 		assert!(node.id == 0); // make sure we don't visit twice
 
-		let name = node.span.as_str(self.input);
+		let name = node.span.as_str_f(self.input);
 		if let Some(id) = self.lookup(name) {
 			node.id = id;
 		} else {
 			let msg = format!("Undefined variable: `{name}`.");
-			format_err(&msg, node.span, self.input);
+			format_err_f(&msg, node.span, self.input);
 			self.errors.push(msg);
 			// to suppress further errors, we add a new variable anyway
 			self.new_variable(name, false, false);
