@@ -239,19 +239,29 @@ impl<'a> LexIter<'a> {
 		}
 	}
 
-	// This still works for malformed numbers like '0.1.1' or '.1..1' etc.
-	// We check for this in the parser
 	fn number(&mut self) -> Token {
 		let start = self.cursor;
 		let mut s = String::new();
+		let mut dot = false;
 
 		while let Some(n) = self.cur_char() {
 			match n {
-				'0'..='9' | '.' => {
+				'0'..='9' => {
 					if let Some(c) = self.eat_char() {
 						s.push(c);
 					} else {
+						unreachable!()
+					}
+				},
+				'.' => {
+					if dot {
 						break;
+					}
+					if let Some(c) = self.eat_char() {
+						s.push(c);
+						dot = true;
+					} else {
+						unreachable!()
 					}
 				},
 				_ => break,
