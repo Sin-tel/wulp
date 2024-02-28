@@ -84,7 +84,7 @@ impl<'a> ScopeCheck<'a> {
 				self.check_lvalue(expr);
 				for suffix in s {
 					match suffix {
-						Suffix::Property(_) => todo!(),
+						Suffix::Property(_) => (), // this gets done in typechecker
 						Suffix::Index(e) => e.visit(self),
 					};
 				}
@@ -163,12 +163,10 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		self.scope_stack.push(FxHashMap::default());
 		for n in &mut node.params {
 			let name = n.name.span.as_str_f(self.input);
-			// function args are mutable
 			self.new_variable(name, false, false);
 			n.visit(self);
 		}
 		node.body.visit(self);
-
 		self.scope_stack.pop();
 	}
 
@@ -206,7 +204,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 	}
 
 	fn visit_name(&mut self, node: &mut Name) {
-		assert!(node.id == 0); // make sure we don't visit twice
+		assert_eq!(node.id, 0); // make sure we don't visit twice
 
 		let name = node.span.as_str_f(self.input);
 		if let Some(id) = self.lookup(name) {

@@ -43,6 +43,9 @@ pub trait Visitor: Sized {
 	fn visit_expr(&mut self, node: &mut Expr) {
 		node.walk(self);
 	}
+	fn visit_table(&mut self, node: &mut Table) {
+		node.walk(self);
+	}
 	fn visit_name_ty(&mut self, node: &mut NameTy) {
 		node.walk(self);
 	}
@@ -85,9 +88,7 @@ impl<V: Visitor> VisitNode<V> for Import {
 	}
 	fn walk(&mut self, v: &mut V) {
 		v.visit_name(&mut self.alias);
-		for e in &mut self.module.fields {
-			v.visit_field(e);
-		}
+		v.visit_table(&mut self.module);
 	}
 }
 
@@ -285,9 +286,7 @@ impl<V: Visitor> VisitNode<V> for Expr {
 				}
 			},
 			ExprKind::Table(t) => {
-				for e in &mut t.fields {
-					v.visit_field(e);
-				}
+				v.visit_table(t);
 			},
 			ExprKind::Array(t) => {
 				for e in t {
@@ -306,6 +305,17 @@ impl<V: Visitor> VisitNode<V> for Suffix {
 		match self {
 			Suffix::Property(e) => v.visit_property(e),
 			Suffix::Index(e) => v.visit_expr(e),
+		}
+	}
+}
+
+impl<V: Visitor> VisitNode<V> for Table {
+	fn visit(&mut self, v: &mut V) {
+		v.visit_table(self);
+	}
+	fn walk(&mut self, v: &mut V) {
+		for e in &mut self.fields {
+			v.visit_field(e);
 		}
 	}
 }

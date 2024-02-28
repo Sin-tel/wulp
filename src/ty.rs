@@ -21,6 +21,8 @@ pub enum Ty {
 	Int,
 	TyVar, // type variable
 	Free,  // free type varaible
+	TySelf(TableId),
+	Instance(TableId),
 	Table(TableId),
 	Array(TyId),
 	Maybe(TyId),

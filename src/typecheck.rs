@@ -30,16 +30,18 @@ pub struct TypeCheck<'a> {
 	env: FxHashMap<SymbolId, TyId>, // TODO: this can be Vec<Option>
 	types: Vec<TyNode>,
 	tables: Vec<Table>,
+	symbol_table: &'a SymbolTable,
 }
 
 impl<'a> TypeCheck<'a> {
-	pub fn check(file: &File, input: &'a [InputFile], symbol_table: &SymbolTable) -> Result<()> {
+	pub fn check(file: &File, input: &'a [InputFile], symbol_table: &'a SymbolTable) -> Result<()> {
 		let mut this = Self {
 			input,
 			errors: Vec::new(),
 			types: Vec::new(),
 			env: FxHashMap::default(),
 			tables: Vec::new(),
+			symbol_table,
 		};
 
 		this.types.push(TyNode::Ty(Ty::Bottom));
@@ -87,12 +89,14 @@ impl<'a> TypeCheck<'a> {
 			Ty::Int => "int".to_string(),
 			Ty::TyVar => format!("T{id}?"),
 			Ty::Free => format!("T{id}"),
+			Ty::TySelf(table_id) => format!("self_{table_id}"),
+			Ty::Instance(table_id) => format!("instance_{table_id}"),
 			Ty::Table(table_id) => {
 				let mut s = String::new();
 				for (p, ty) in &self.tables[table_id].fields {
 					s.push_str(&format!("{} = {}, ", p, self.ty_to_string(*ty)));
 				}
-				format!("{{ {s} }}")
+				format!("table_{table_id} {{ {s} }}")
 			},
 			Ty::Array(ty) => format!("[{}]", self.ty_to_string(ty)),
 			Ty::Maybe(ty) => format!("maybe({})", self.ty_to_string(ty)),
@@ -162,12 +166,21 @@ impl<'a> TypeCheck<'a> {
 	fn promote_free(&mut self, id: TyId) {
 		let id = self.get_parent(id);
 		match self.get_type(id) {
-			Ty::Any | Ty::Bottom | Ty::Nil | Ty::Bool | Ty::Str | Ty::Num | Ty::Int | Ty::Free => (),
+			Ty::Any
+			| Ty::Bottom
+			| Ty::Nil
+			| Ty::Bool
+			| Ty::Str
+			| Ty::Num
+			| Ty::Int
+			| Ty::Free
+			| Ty::TySelf(_)
+			| Ty::Instance(_)
+			| Ty::Table(_) => (),
 			Ty::TyVar => {
 				let parent_id = self.get_parent(id);
 				self.types[parent_id] = TyNode::Ty(Ty::Free);
 			},
-			Ty::Table(_) => todo!(),
 			Ty::Array(t) | Ty::Maybe(t) => self.promote_free(t),
 			Ty::Fn(args, ret) => {
 				for a in args {
@@ -186,7 +199,11 @@ impl<'a> TypeCheck<'a> {
 		let ty = self.get_type(id);
 		let parent_id = self.get_parent(id);
 		match ty {
-			Ty::Any | Ty::Bottom | Ty::Nil | Ty::Bool | Ty::Str | Ty::Num | Ty::Int | Ty::TyVar => parent_id,
+			Ty::Any | Ty::Bottom | Ty::Nil | Ty::Bool | Ty::Str | Ty::Num | Ty::Int | Ty::TyVar | Ty::Instance(_) => {
+				parent_id
+			},
+			Ty::TySelf(table_id) => self.new_ty(Ty::Instance(table_id)),
+			Ty::Table(table_id) => self.new_ty(Ty::Instance(table_id)),
 			Ty::Free => {
 				// keep track of which variables were already instantiated
 				for &(old, new) in subs.iter() {
@@ -198,7 +215,6 @@ impl<'a> TypeCheck<'a> {
 				subs.push((parent_id, t));
 				t
 			},
-			Ty::Table(_) => todo!(),
 			Ty::Array(t) | Ty::Maybe(t) => self.instantiate_inner(t, subs),
 			Ty::Fn(args, ret) => {
 				let mut new_args = Vec::new();
@@ -213,8 +229,18 @@ impl<'a> TypeCheck<'a> {
 
 	fn occurs(&mut self, ty: Ty, id: TyId) -> Result<(), ()> {
 		match ty {
-			Ty::Any | Ty::Bottom | Ty::Nil | Ty::Bool | Ty::Str | Ty::Num | Ty::Int | Ty::TyVar | Ty::Free => Ok(()),
-			Ty::Table(_) => todo!(),
+			Ty::Any
+			| Ty::Bottom
+			| Ty::Nil
+			| Ty::Bool
+			| Ty::Str
+			| Ty::Num
+			| Ty::Int
+			| Ty::TyVar
+			| Ty::TySelf(_)
+			| Ty::Instance(_)
+			| Ty::Table(_)
+			| Ty::Free => Ok(()),
 			Ty::Array(t_id) | Ty::Maybe(t_id) => {
 				if t_id == id {
 					return Err(());
@@ -389,14 +415,27 @@ impl<'a> TypeCheck<'a> {
 		(current_pair, false)
 	}
 
-	fn eval_fn_params(&mut self, params: &[Param]) -> Vec<TyId> {
+	fn eval_fn_params(&mut self, params: &[Param], table: Option<TableId>) -> Vec<TyId> {
 		let mut param_ty = Vec::new();
-		for p in params {
-			let ty = match &p.ty {
-				Some(ty) => self.to_ty(ty),
-				None => Ty::TyVar,
+
+		for (i, p) in params.iter().enumerate() {
+			let id = if self.symbol_table.get(p.name.id).name == "self" {
+				// TODO nicer err messages
+				assert!(i == 0, "self must be first argument!");
+				assert!(p.ty.is_none());
+				// self.lookup(p.name.id).expect("Self argument could not be resolved")
+				if let Some(table_id) = table {
+					self.new_def(p.name.id, Ty::TySelf(table_id))
+				} else {
+					panic!("Can not use `self` here")
+				}
+			} else {
+				let ty = match &p.ty {
+					Some(ty) => self.to_ty(ty),
+					None => Ty::TyVar,
+				};
+				self.new_def(p.name.id, ty)
 			};
-			let id = self.new_def(p.name.id, ty);
 			param_ty.push(id);
 		}
 		param_ty
@@ -413,7 +452,7 @@ impl<'a> TypeCheck<'a> {
 	}
 
 	fn hoist_fn_def(&mut self, node: &FnDef) {
-		let param_ty = self.eval_fn_params(&node.body.params);
+		let param_ty = self.eval_fn_params(&node.body.params, None);
 		let ty = match &node.body.ty {
 			Some(ty) => self.to_ty(ty),
 			None => Ty::TyVar,
@@ -451,8 +490,8 @@ impl<'a> TypeCheck<'a> {
 
 	// span should refer to the place where the function is defined
 	// TODO: get span info from AST and remove this argument
-	fn eval_lambda(&mut self, node: &FnBody, span: Span) -> TyId {
-		let param_ty = self.eval_fn_params(&node.params);
+	fn eval_lambda(&mut self, node: &FnBody, span: Span, table: Option<TableId>) -> TyId {
+		let param_ty = self.eval_fn_params(&node.params, table);
 		let ty = match &node.ty {
 			Some(ty) => self.to_ty(ty),
 			None => Ty::TyVar,
@@ -480,36 +519,41 @@ impl<'a> TypeCheck<'a> {
 	fn eval_fn_call(&mut self, c: &Call) -> TyId {
 		let fn_ty_id = self.eval_expr(&c.expr);
 		let fn_ty = self.instantiate(fn_ty_id);
-		if let Ty::Fn(params, ret_ty) = self.get_type(fn_ty) {
-			// TODO: get rid of hardcoded "print" here
-			if params.len() != c.args.len() && c.expr.span.as_str_f(self.input) != "print" {
-				let msg = format!(
-					"Function takes {} argument(s), {} supplied.",
-					params.len(),
-					c.args.len()
-				);
-				format_err_f(&msg, c.expr.span, self.input);
-				self.errors.push(msg);
-			} else {
-				for (p, a) in zip(params, c.args.iter()) {
-					let arg_ty = self.eval_expr(a);
-					if self.unify(arg_ty, p).is_err() {
-						let msg = format!(
-							"Expected argument type `{}`, found `{}`",
-							self.ty_to_string(p),
-							self.ty_to_string(arg_ty)
-						);
-						format_err_f(&msg, a.span, self.input);
-						self.errors.push(msg);
+		match self.get_type(fn_ty) {
+			Ty::Fn(params, ret_ty) => {
+				// TODO: get rid of hardcoded "print" here
+				if params.len() != c.args.len() && c.expr.span.as_str_f(self.input) != "print" {
+					let msg = format!(
+						"Function takes {} argument(s), {} supplied.",
+						params.len(),
+						c.args.len()
+					);
+					format_err_f(&msg, c.expr.span, self.input);
+					self.errors.push(msg);
+				} else {
+					for (p, a) in zip(params, c.args.iter()) {
+						let arg_ty = self.eval_expr(a);
+						if self.unify(arg_ty, p).is_err() {
+							let msg = format!(
+								"Expected argument type `{}`, found `{}`",
+								self.ty_to_string(p),
+								self.ty_to_string(arg_ty)
+							);
+							format_err_f(&msg, a.span, self.input);
+							self.errors.push(msg);
+						}
 					}
 				}
-			}
-			ret_ty
-		} else {
-			let msg = format!("Type `{}` is not callable.", self.ty_to_string(fn_ty));
-			format_err_f(&msg, c.expr.span, self.input);
-			self.errors.push(msg);
-			ERR_TY
+				ret_ty
+			},
+			Ty::Instance(_) => fn_ty,
+
+			_ => {
+				let msg = format!("Type `{}` is not callable.", self.ty_to_string(fn_ty));
+				format_err_f(&msg, c.expr.span, self.input);
+				self.errors.push(msg);
+				ERR_TY
+			},
 		}
 	}
 
@@ -560,23 +604,32 @@ impl<'a> TypeCheck<'a> {
 			ExprKind::Literal(e) => self.eval_literal(e),
 			ExprKind::Call(e) => self.eval_fn_call(e),
 			ExprKind::Expr(e) => self.eval_expr(e),
-			ExprKind::Lambda(e) => self.eval_lambda(e, expr.span),
+			ExprKind::Lambda(e) => self.eval_lambda(e, expr.span, None),
 			ExprKind::Table(e) => self.eval_table(e),
 		}
 	}
 
-	fn eval_table(&mut self, ast_table: &ast::Table) -> TyId {
-		let mut fields = FxHashMap::default();
-		for f in &ast_table.fields {
-			match f {
-				Field::Assign(p, a) => fields.insert(p.name.clone(), self.eval_expr(a)),
-				Field::Fn(p, f) => fields.insert(p.name.clone(), self.eval_lambda(f, p.span)),
-			};
-		}
-		let table = Table { fields };
+	fn new_table(&mut self) -> TableId {
+		let table = Table {
+			fields: FxHashMap::default(),
+		};
 		let table_id = self.tables.len();
 		self.tables.push(table);
-		self.new_ty(Ty::Table(table_id))
+		table_id
+	}
+
+	fn eval_table(&mut self, ast_table: &ast::Table) -> TyId {
+		let table_id = self.new_table();
+		let ty = Ty::Table(table_id);
+		let ty_id = self.new_ty(ty);
+		for f in &ast_table.fields {
+			let (k, v) = match f {
+				Field::Assign(p, a) => (p.name.clone(), self.eval_expr(a)),
+				Field::Fn(p, f) => (p.name.clone(), self.eval_lambda(f, p.span, Some(table_id))),
+			};
+			self.tables[table_id].fields.insert(k, v);
+		}
+		ty_id
 	}
 
 	fn get_property(&mut self, table: TableId, p: &Property) -> Option<TyId> {
@@ -588,20 +641,23 @@ impl<'a> TypeCheck<'a> {
 		for suffix in s {
 			match suffix {
 				Suffix::Property(p) => {
-					ty = if let Ty::Table(table) = self.get_type(ty) {
-						if let Some(p_id) = self.get_property(table, p) {
-							p_id
-						} else {
-							let msg = format!("Table doesn't have property `{}`.", p.name);
-							format_err_f(&msg, p.span, self.input);
+					ty = match self.get_type(ty) {
+						Ty::Table(table) | Ty::TySelf(table) | Ty::Instance(table) => {
+							if let Some(p_id) = self.get_property(table, p) {
+								p_id
+							} else {
+								let msg = format!("Table doesn't have property `{}`.", p.name);
+								format_err_f(&msg, p.span, self.input);
+								self.errors.push(msg);
+								ERR_TY
+							}
+						},
+						_ => {
+							let msg = format!("Can not get property on type `{}`.", self.ty_to_string(ty));
+							format_err_f(&msg, expr.span, self.input);
 							self.errors.push(msg);
 							ERR_TY
-						}
-					} else {
-						let msg = format!("Can get property on type `{}`.", self.ty_to_string(ty));
-						format_err_f(&msg, expr.span, self.input);
-						self.errors.push(msg);
-						ERR_TY
+						},
 					};
 				},
 				Suffix::Index(e) => {
