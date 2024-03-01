@@ -234,31 +234,33 @@ impl Visitor for EmitLua {
 				let name_str = self.symbol_table.get(t.name.id).name.clone();
 				self.statement.push_str(&name_str);
 				self.statement.push_str(" = {");
-				self.push_list(&mut t.table.fields, ", ");
+				for f in &mut t.table.fields {
+					match f {
+						Field::Assign(_, _) => (),
+						Field::Fn(_, _) => {
+							self.visit_field(f);
+							self.statement.push_str(",\n");
+						},
+					}
+				}
 				self.statement.push('}');
 				self.put_statement();
 				self.statement.push_str(&format!(
-					"local mt_{0} = {{ __index = {0} }};\n\
-					setmetatable({0}, {{\n\
+					"setmetatable({0}, {{\n\
 					\t__call = function(_, args)\n\
 					\t\tlocal new = {{",
 					&name_str
 				));
 				for f in &mut t.table.fields {
 					match f {
-						Field::Assign(p, e) => {
-							self.visit_property(p);
-							self.statement.push_str(" = ");
-							self.visit_expr(e);
+						Field::Assign(_, _) => {
+							self.visit_field(f);
 							self.statement.push_str(", ");
 						},
 						Field::Fn(_, _) => (),
 					}
 				}
-				self.statement.push_str(&format!(
-					"}}\n\t\tsetmetatable(new, mt_{0})\n\t\treturn new\n\tend\n}})",
-					&name_str
-				));
+				self.statement.push_str("}\n\t\treturn new\n\tend\n})");
 			},
 			Stat::WhileBlock(_)
 			| Stat::IfBlock(_)

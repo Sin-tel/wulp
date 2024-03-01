@@ -1,6 +1,35 @@
-import module
+// let str = {
+// 	fn double(self) {
+// 		return self .. self
+// 	}
+// }
 
-print(module)
+// let num = {
+// 	fn sqrt(self) {
+// 		return self ^ 0.5
+// 	}
+// }
 
-print(module.is_even(2))
-print(module.id(false))
+struct Test = {
+	x = 1
+	fn inc(self) {
+		self.x += 1
+	}
+	fn add(self, n) {
+		self.x += n
+	}
+	// fn add_test(self, other: self) {
+	// 	self.x += other.x
+	// }
+}
+
+let t = Test()
+
+Test.inc(t)
+print(t.x)
+t.add(5)
+print(t.x)
+
+// print(Str.double("a"))
+// print(Num.sqrt(2.0))
+// print(2.0.sqrt())

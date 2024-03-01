@@ -606,7 +606,7 @@ impl<'a> Parser<'a> {
 			fields.push(f);
 
 			match self.tokens.peek().kind {
-				TokenKind::Comma | TokenKind::SemiColon => {
+				TokenKind::SemiColon => {
 					self.tokens.next();
 					continue;
 				},

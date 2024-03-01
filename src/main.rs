@@ -54,7 +54,11 @@ fn main() -> Result<()> {
 	// println!("{input}");
 
 	let symbol_table = ScopeCheck::check(&mut ast, &files)?;
-	TypeCheck::check(&ast, &files, &symbol_table)?;
+	// for s in symbol_table.symbols.iter() {
+	// 	dbg!(s);
+	// }
+
+	TypeCheck::check(&mut ast, &files, &symbol_table)?;
 
 	// // println!("----- AST:");
 	// // AstPrinter::print_ast(&mut ast, &input);

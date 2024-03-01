@@ -1,4 +1,3 @@
-use crate::ast;
 use crate::ast::*;
 use crate::span::Span;
 use crate::span::{format_err_f, format_note_f, InputFile};
@@ -14,9 +13,9 @@ use std::iter::zip;
 type TableId = usize;
 
 #[derive(Debug)]
-struct Table {
+struct Struct {
 	fields: FxHashMap<String, TyId>,
-	// name: String,
+	symbol_id: SymbolId,
 }
 
 const ERR_TY: TyId = 0;
@@ -29,18 +28,18 @@ pub struct TypeCheck<'a> {
 	errors: Vec<String>,
 	env: FxHashMap<SymbolId, TyId>, // TODO: this can be Vec<Option>
 	types: Vec<TyNode>,
-	tables: Vec<Table>,
+	structs: Vec<Struct>,
 	symbol_table: &'a SymbolTable,
 }
 
 impl<'a> TypeCheck<'a> {
-	pub fn check(file: &File, input: &'a [InputFile], symbol_table: &'a SymbolTable) -> Result<()> {
+	pub fn check(file: &mut File, input: &'a [InputFile], symbol_table: &'a SymbolTable) -> Result<()> {
 		let mut this = Self {
 			input,
 			errors: Vec::new(),
 			types: Vec::new(),
 			env: FxHashMap::default(),
-			tables: Vec::new(),
+			structs: Vec::new(),
 			symbol_table,
 		};
 
@@ -56,7 +55,7 @@ impl<'a> TypeCheck<'a> {
 			this.new_def(item.id, Ty::Fn(param_ty, ret_ty));
 		}
 
-		let (ret, _) = this.eval_block(&file.block);
+		let (ret, _) = this.eval_block(&mut file.block);
 
 		if let Some((ret_ty, _)) = ret {
 			println!("Main return: {}", this.ty_to_string(ret_ty));
@@ -92,7 +91,7 @@ impl<'a> TypeCheck<'a> {
 			Ty::Instance(table_id) => format!("instance_{table_id}"),
 			Ty::Table(table_id) => {
 				let mut s = String::new();
-				for (p, ty) in &self.tables[table_id].fields {
+				for (p, ty) in &self.structs[table_id].fields {
 					s.push_str(&format!("{} = {}, ", p, self.ty_to_string(*ty)));
 				}
 				format!("table_{table_id} {{ {s} }}")
@@ -321,14 +320,14 @@ impl<'a> TypeCheck<'a> {
 	// Returns the type and span of any return statements
 	// Otherwise return None
 	// Bool indicates if the block always returns
-	fn eval_block(&mut self, block: &Block) -> (RetPair, bool) {
+	fn eval_block(&mut self, block: &mut Block) -> (RetPair, bool) {
 		for stat in &block.stats {
 			if let Stat::FnDef(s) = stat {
 				self.hoist_fn_def(s);
 			}
 		}
 		let mut current_pair: RetPair = None;
-		for stat in &block.stats {
+		for stat in &mut block.stats {
 			match stat {
 				Stat::Break => return (current_pair, false),
 				Stat::Block(block) => {
@@ -344,25 +343,25 @@ impl<'a> TypeCheck<'a> {
 					} else {
 						// TODO: multiple return
 						assert!(ret.exprs.len() == 1);
-						Some((self.eval_expr(&ret.exprs[0]), ret.span))
+						Some((self.eval_expr(&mut ret.exprs[0]), ret.span))
 					};
 					current_pair = self.unify_return(current_pair, new_pair);
 					return (current_pair, true);
 				},
 				Stat::IfBlock(if_block) => {
 					// TODO: check bool
-					self.eval_expr(&if_block.expr);
-					let (if_pair, ret) = self.eval_block(&if_block.block);
+					self.eval_expr(&mut if_block.expr);
+					let (if_pair, ret) = self.eval_block(&mut if_block.block);
 					let mut all_return = ret;
 					current_pair = self.unify_return(current_pair, if_pair);
 
-					for elif in &if_block.elseif {
-						self.eval_expr(&elif.expr);
-						let (elif_pair, ret) = self.eval_block(&elif.block);
+					for elif in &mut if_block.elseif {
+						self.eval_expr(&mut elif.expr);
+						let (elif_pair, ret) = self.eval_block(&mut elif.block);
 						all_return &= ret;
 						current_pair = self.unify_return(current_pair, elif_pair);
 					}
-					if let Some(else_block) = &if_block.else_block {
+					if let Some(else_block) = &mut if_block.else_block {
 						let (else_pair, ret) = self.eval_block(else_block);
 						all_return &= ret;
 						current_pair = self.unify_return(current_pair, else_pair);
@@ -374,12 +373,12 @@ impl<'a> TypeCheck<'a> {
 				},
 				Stat::WhileBlock(s) => {
 					// TODO: check bool
-					self.eval_expr(&s.expr);
-					let (pair, _) = self.eval_block(&s.block);
+					self.eval_expr(&mut s.expr);
+					let (pair, _) = self.eval_block(&mut s.block);
 					current_pair = self.unify_return(current_pair, pair);
 				},
 				Stat::ForBlock(s) => {
-					let ty = self.eval_expr(&s.expr);
+					let ty = self.eval_expr(&mut s.expr);
 					assert!(s.names.len() == 1);
 
 					// make new i: U
@@ -392,7 +391,7 @@ impl<'a> TypeCheck<'a> {
 						panic!("error: currently iteration is only supported on arrays.");
 					}
 
-					let (pair, _) = self.eval_block(&s.block);
+					let (pair, _) = self.eval_block(&mut s.block);
 					current_pair = self.unify_return(current_pair, pair);
 				},
 				Stat::Call(s) => {
@@ -403,9 +402,10 @@ impl<'a> TypeCheck<'a> {
 				Stat::Let(s) => self.eval_let(s),
 				Stat::FnDef(s) => self.eval_fn_def(s),
 				Stat::StructDef(s) => self.eval_struct_def(s),
-				Stat::Import(s) => {
-					let table = self.eval_table(&s.module);
-					self.new_def(s.alias.id, self.get_type(table));
+				Stat::Import(_s) => {
+					todo!();
+					// let table = self.eval_table(&mut s.module);
+					// self.new_def(s.alias.id, self.get_type(table));
 				},
 			};
 		}
@@ -438,8 +438,8 @@ impl<'a> TypeCheck<'a> {
 		param_ty
 	}
 
-	fn eval_fn_body(&mut self, node: &FnBody, span: Span) -> (TyId, Span) {
-		let (mut ret_pair, ret_all) = self.eval_block(&node.body);
+	fn eval_fn_body(&mut self, node: &mut FnBody, span: Span) -> (TyId, Span) {
+		let (mut ret_pair, ret_all) = self.eval_block(&mut node.body);
 		// There is an implied 'return nil' at the end of every body
 		if !ret_all {
 			let nil = self.new_ty(Ty::Nil);
@@ -459,7 +459,7 @@ impl<'a> TypeCheck<'a> {
 		self.new_def(node.name.id, fn_ty);
 	}
 
-	fn eval_fn_def(&mut self, node: &FnDef) {
+	fn eval_fn_def(&mut self, node: &mut FnDef) {
 		let fn_id = self.lookup(node.name.id).unwrap();
 		let fn_ty = self.get_type(fn_id);
 		let ret_id = if let Ty::Fn(_, ret_id) = fn_ty {
@@ -468,7 +468,7 @@ impl<'a> TypeCheck<'a> {
 			panic!("lookup failed");
 		};
 
-		let (ty, prev_span) = self.eval_fn_body(&node.body, node.name.span);
+		let (ty, prev_span) = self.eval_fn_body(&mut node.body, node.name.span);
 
 		if self.unify(ty, ret_id).is_err() {
 			let msg = format!(
@@ -487,7 +487,7 @@ impl<'a> TypeCheck<'a> {
 
 	// span should refer to the place where the function is defined
 	// TODO: get span info from AST and remove this argument
-	fn eval_lambda(&mut self, node: &FnBody, span: Span, ty: Option<Ty>) -> TyId {
+	fn eval_lambda(&mut self, node: &mut FnBody, span: Span, ty: Option<Ty>) -> TyId {
 		let param_ty = self.eval_fn_params(&node.params, ty);
 		let ty = match &node.ty {
 			Some(ty) => self.to_ty(ty),
@@ -513,8 +513,43 @@ impl<'a> TypeCheck<'a> {
 		fn_id
 	}
 
-	fn eval_fn_call(&mut self, c: &Call) -> TyId {
-		let fn_ty_id = self.eval_expr(&c.expr);
+	fn eval_fn_call(&mut self, c: &mut Call) -> TyId {
+		if let ExprKind::SuffixExpr(expr, s) = &mut c.expr.kind {
+			let mut ty = self.eval_expr(expr);
+			let last_suffix = s.pop().expect("should have at least one suffix");
+			for suffix in s.iter_mut() {
+				ty = self.eval_suffix(ty, expr.span, suffix);
+			}
+			if let Ty::Instance(table_id) = self.get_type(ty) {
+				// fix up the AST for method call
+				let inst_expr = std::mem::replace(
+					expr,
+					Box::new(Expr {
+						span: expr.span,
+						kind: ExprKind::Name(Name {
+							span: expr.span,
+							id: self.structs[table_id].symbol_id,
+						}),
+					}),
+				);
+				let inst_s = std::mem::replace(s, vec![last_suffix]);
+				c.args.insert(
+					0,
+					if inst_s.is_empty() {
+						*inst_expr
+					} else {
+						Expr {
+							span: expr.span,
+							kind: ExprKind::SuffixExpr(inst_expr, inst_s),
+						}
+					},
+				);
+			} else {
+				s.push(last_suffix);
+			}
+		}
+
+		let fn_ty_id = self.eval_expr(&mut c.expr);
 		let fn_ty = self.instantiate(fn_ty_id);
 		match self.get_type(fn_ty) {
 			Ty::Fn(params, ret_ty) => {
@@ -528,7 +563,7 @@ impl<'a> TypeCheck<'a> {
 					format_err_f(&msg, c.expr.span, self.input);
 					self.errors.push(msg);
 				} else {
-					for (p, a) in zip(params, c.args.iter()) {
+					for (p, a) in zip(params, c.args.iter_mut()) {
 						let arg_ty = self.eval_expr(a);
 						if self.unify(arg_ty, p).is_err() {
 							let msg = format!(
@@ -554,15 +589,15 @@ impl<'a> TypeCheck<'a> {
 		}
 	}
 
-	fn eval_expr(&mut self, expr: &Expr) -> TyId {
-		match &expr.kind {
+	fn eval_expr(&mut self, expr: &mut Expr) -> TyId {
+		match &mut expr.kind {
 			ExprKind::BinExpr(e) => {
-				let lhs = self.eval_expr(&e.lhs);
-				let rhs = self.eval_expr(&e.rhs);
+				let lhs = self.eval_expr(&mut e.lhs);
+				let rhs = self.eval_expr(&mut e.rhs);
 				self.eval_bin_op(&e.op, lhs, rhs, expr.span)
 			},
 			ExprKind::UnExpr(e) => {
-				let ty = self.eval_expr(&e.expr);
+				let ty = self.eval_expr(&mut e.expr);
 				self.eval_un_op(&e.op, ty, expr.span)
 			},
 			ExprKind::Array(array) => {
@@ -605,25 +640,10 @@ impl<'a> TypeCheck<'a> {
 		}
 	}
 
-	fn eval_struct_def(&mut self, node: &StructDef) {
-		let rhs = self.eval_table(&node.table);
-		self.new_def(node.name.id, self.get_type(rhs));
-	}
-
-	fn new_table(&mut self) -> TableId {
-		let table = Table {
-			fields: FxHashMap::default(),
-		};
-		let table_id = self.tables.len();
-		self.tables.push(table);
-		table_id
-	}
-
-	fn eval_table(&mut self, ast_table: &ast::Table) -> TyId {
-		let table_id = self.new_table();
+	fn eval_struct_def(&mut self, node: &mut StructDef) {
+		let table_id = self.new_struct(node.name.id);
 		let ty = Ty::Table(table_id);
-		let ty_id = self.new_ty(ty);
-		for f in &ast_table.fields {
+		for f in &mut node.table.fields {
 			let (k, v) = match f {
 				Field::Assign(p, a) => (p.name.clone(), self.eval_expr(a)),
 				Field::Fn(p, f) => (
@@ -631,66 +651,79 @@ impl<'a> TypeCheck<'a> {
 					self.eval_lambda(f, p.span, Some(Ty::Instance(table_id))),
 				),
 			};
-			self.tables[table_id].fields.insert(k, v);
+			self.structs[table_id].fields.insert(k, v);
 		}
-		ty_id
+		self.new_def(node.name.id, ty);
 	}
 
-	fn get_property(&mut self, table: TableId, p: &Property) -> Option<TyId> {
-		self.tables[table].fields.get(&p.name).copied()
+	fn new_struct(&mut self, symbol_id: SymbolId) -> TableId {
+		let table = Struct {
+			fields: FxHashMap::default(),
+			symbol_id,
+		};
+		let table_id = self.structs.len();
+		self.structs.push(table);
+		table_id
 	}
 
-	fn eval_suffix_expr(&mut self, expr: &Expr, s: &Vec<Suffix>) -> TyId {
+	fn get_property(&mut self, table: TableId, p: &mut Property) -> Option<TyId> {
+		self.structs[table].fields.get(&p.name).copied()
+	}
+
+	fn eval_suffix_expr(&mut self, expr: &mut Expr, s: &mut Vec<Suffix>) -> TyId {
 		let mut ty = self.eval_expr(expr);
 		for suffix in s {
-			match suffix {
-				Suffix::Property(p) => {
-					ty = match self.get_type(ty) {
-						Ty::Table(table) | Ty::Instance(table) => {
-							if let Some(p_id) = self.get_property(table, p) {
-								p_id
-							} else {
-								let msg = format!("Table doesn't have property `{}`.", p.name);
-								format_err_f(&msg, p.span, self.input);
-								self.errors.push(msg);
-								ERR_TY
-							}
-						},
-						_ => {
-							let msg = format!("Can not get property on type `{}`.", self.ty_to_string(ty));
-							format_err_f(&msg, expr.span, self.input);
-							self.errors.push(msg);
-							ERR_TY
-						},
-					};
-				},
-				Suffix::Index(e) => {
-					ty = if let Ty::Array(inner_ty) = self.get_type(ty) {
-						inner_ty
-					} else {
-						let msg = format!("Can not index type `{}`.", self.ty_to_string(ty));
-						format_err_f(&msg, expr.span, self.input);
-						self.errors.push(msg);
-						ERR_TY
-					};
-					let index_ty = self.eval_expr(e);
-					let ty_int = self.new_ty(Ty::Int);
-					if self.unify(index_ty, ty_int).is_err() {
-						let msg = format!("Index must be type `int` but found `{}`.", self.ty_to_string(index_ty));
-						format_err_f(&msg, e.span, self.input);
-						self.errors.push(msg);
-					}
-				},
-			}
+			ty = self.eval_suffix(ty, expr.span, suffix);
 		}
 		ty
 	}
 
-	fn eval_let(&mut self, node: &Let) {
+	fn eval_suffix(&mut self, expr_ty: TyId, expr_span: Span, suffix: &mut Suffix) -> TyId {
+		match suffix {
+			Suffix::Property(p) => match self.get_type(expr_ty) {
+				Ty::Table(table) | Ty::Instance(table) => {
+					if let Some(p_id) = self.get_property(table, p) {
+						p_id
+					} else {
+						let msg = format!("Table doesn't have property `{}`.", p.name);
+						format_err_f(&msg, p.span, self.input);
+						self.errors.push(msg);
+						ERR_TY
+					}
+				},
+				_ => {
+					let msg = format!("Can not get property on type `{}`.", self.ty_to_string(expr_ty));
+					format_err_f(&msg, expr_span, self.input);
+					self.errors.push(msg);
+					ERR_TY
+				},
+			},
+			Suffix::Index(e) => {
+				let ty = if let Ty::Array(inner_ty) = self.get_type(expr_ty) {
+					inner_ty
+				} else {
+					let msg = format!("Can not index type `{}`.", self.ty_to_string(expr_ty));
+					format_err_f(&msg, expr_span, self.input);
+					self.errors.push(msg);
+					return ERR_TY;
+				};
+				let index_ty = self.eval_expr(e);
+				let ty_int = self.new_ty(Ty::Int);
+				if self.unify(index_ty, ty_int).is_err() {
+					let msg = format!("Index must be type `int` but found `{}`.", self.ty_to_string(index_ty));
+					format_err_f(&msg, e.span, self.input);
+					self.errors.push(msg);
+				}
+				ty
+			},
+		}
+	}
+
+	fn eval_let(&mut self, node: &mut Let) {
 		assert!(node.exprs.len() == node.names.len());
 
 		let mut rhs = Vec::new();
-		for e in &node.exprs {
+		for e in &mut node.exprs {
 			rhs.push(self.eval_expr(e));
 		}
 		for (n, rhs_ty) in zip(&node.names, rhs) {
@@ -713,22 +746,22 @@ impl<'a> TypeCheck<'a> {
 		}
 	}
 
-	fn eval_lvalue(&mut self, var: &Expr) -> TyId {
-		match &var.kind {
+	fn eval_lvalue(&mut self, var: &mut Expr) -> TyId {
+		match &mut var.kind {
 			ExprKind::Name(n) => self.lookup(n.id).expect("lookup failed"),
 			ExprKind::SuffixExpr(e, s) => self.eval_suffix_expr(e, s),
 			_ => unreachable!(),
 		}
 	}
 
-	fn eval_assignment(&mut self, node: &Assignment) {
+	fn eval_assignment(&mut self, node: &mut Assignment) {
 		assert!(node.exprs.len() == node.vars.len());
 
 		let mut rhs = Vec::new();
-		for e in &node.exprs {
+		for e in &mut node.exprs {
 			rhs.push(self.eval_expr(e));
 		}
-		for (var, rhs_ty) in zip(&node.vars, rhs) {
+		for (var, rhs_ty) in zip(&mut node.vars, rhs) {
 			let ty = self.eval_lvalue(var);
 			if self.unify(rhs_ty, ty).is_err() {
 				let msg = format!(
@@ -742,12 +775,12 @@ impl<'a> TypeCheck<'a> {
 		}
 	}
 
-	fn eval_assign_op(&mut self, node: &AssignOp) {
+	fn eval_assign_op(&mut self, node: &mut AssignOp) {
 		// TODO: refactor to use binop code
-		let rhs = self.eval_expr(&node.expr);
-		let lhs = self.eval_lvalue(&node.var);
+		let rhs = self.eval_expr(&mut node.expr);
+		let lhs = self.eval_lvalue(&mut node.var);
 
-		let new_lhs = self.eval_bin_op(&node.op, lhs, rhs, node.span);
+		let new_lhs = self.eval_bin_op(&mut node.op, lhs, rhs, node.span);
 
 		if self.unify(new_lhs, lhs).is_err() {
 			let msg = format!(
