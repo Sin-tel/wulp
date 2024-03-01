@@ -203,6 +203,13 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		}
 	}
 
+	fn visit_struct_def(&mut self, node: &mut StructDef) {
+		let name_str = node.name.span.as_str_f(self.input);
+		self.new_variable(name_str, true, false);
+		node.name.visit(self);
+		node.table.visit(self);
+	}
+
 	fn visit_name(&mut self, node: &mut Name) {
 		assert_eq!(node.id, 0); // make sure we don't visit twice
 

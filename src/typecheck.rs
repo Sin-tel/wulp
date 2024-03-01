@@ -61,10 +61,10 @@ impl<'a> TypeCheck<'a> {
 		if let Some((ret_ty, _)) = ret {
 			println!("Main return: {}", this.ty_to_string(ret_ty));
 		}
-		println!("----- types ");
-		for (i, v) in this.types.iter().enumerate() {
-			println!("{i}: {:?} {} {}", v, this.get_parent(i), this.ty_to_string(i));
-		}
+		// println!("----- types ");
+		// for (i, v) in this.types.iter().enumerate() {
+		// 	println!("{i}: {:?} {} {}", v, this.get_parent(i), this.ty_to_string(i));
+		// }
 		println!("----- env ");
 		for (i, s) in symbol_table.symbols.iter().enumerate().skip(1) {
 			if let Some(id) = this.lookup(i) {
@@ -89,7 +89,6 @@ impl<'a> TypeCheck<'a> {
 			Ty::Int => "int".to_string(),
 			Ty::TyVar => format!("T{id}?"),
 			Ty::Free => format!("T{id}"),
-			Ty::TySelf(table_id) => format!("self_{table_id}"),
 			Ty::Instance(table_id) => format!("instance_{table_id}"),
 			Ty::Table(table_id) => {
 				let mut s = String::new();
@@ -174,7 +173,6 @@ impl<'a> TypeCheck<'a> {
 			| Ty::Num
 			| Ty::Int
 			| Ty::Free
-			| Ty::TySelf(_)
 			| Ty::Instance(_)
 			| Ty::Table(_) => (),
 			Ty::TyVar => {
@@ -202,7 +200,6 @@ impl<'a> TypeCheck<'a> {
 			Ty::Any | Ty::Bottom | Ty::Nil | Ty::Bool | Ty::Str | Ty::Num | Ty::Int | Ty::TyVar | Ty::Instance(_) => {
 				parent_id
 			},
-			Ty::TySelf(table_id) => self.new_ty(Ty::Instance(table_id)),
 			Ty::Table(table_id) => self.new_ty(Ty::Instance(table_id)),
 			Ty::Free => {
 				// keep track of which variables were already instantiated
@@ -237,7 +234,6 @@ impl<'a> TypeCheck<'a> {
 			| Ty::Num
 			| Ty::Int
 			| Ty::TyVar
-			| Ty::TySelf(_)
 			| Ty::Instance(_)
 			| Ty::Table(_)
 			| Ty::Free => Ok(()),
@@ -406,16 +402,17 @@ impl<'a> TypeCheck<'a> {
 				Stat::AssignOp(s) => self.eval_assign_op(s),
 				Stat::Let(s) => self.eval_let(s),
 				Stat::FnDef(s) => self.eval_fn_def(s),
+				Stat::StructDef(s) => self.eval_struct_def(s),
 				Stat::Import(s) => {
 					let table = self.eval_table(&s.module);
-					self.new_def(s.alias.id, self.get_type(table).clone());
+					self.new_def(s.alias.id, self.get_type(table));
 				},
 			};
 		}
 		(current_pair, false)
 	}
 
-	fn eval_fn_params(&mut self, params: &[Param], table: Option<TableId>) -> Vec<TyId> {
+	fn eval_fn_params(&mut self, params: &[Param], self_ty: Option<Ty>) -> Vec<TyId> {
 		let mut param_ty = Vec::new();
 
 		for (i, p) in params.iter().enumerate() {
@@ -424,8 +421,8 @@ impl<'a> TypeCheck<'a> {
 				assert!(i == 0, "self must be first argument!");
 				assert!(p.ty.is_none());
 				// self.lookup(p.name.id).expect("Self argument could not be resolved")
-				if let Some(table_id) = table {
-					self.new_def(p.name.id, Ty::TySelf(table_id))
+				if let Some(ref ty) = self_ty {
+					self.new_def(p.name.id, ty.clone())
 				} else {
 					panic!("Can not use `self` here")
 				}
@@ -490,8 +487,8 @@ impl<'a> TypeCheck<'a> {
 
 	// span should refer to the place where the function is defined
 	// TODO: get span info from AST and remove this argument
-	fn eval_lambda(&mut self, node: &FnBody, span: Span, table: Option<TableId>) -> TyId {
-		let param_ty = self.eval_fn_params(&node.params, table);
+	fn eval_lambda(&mut self, node: &FnBody, span: Span, ty: Option<Ty>) -> TyId {
+		let param_ty = self.eval_fn_params(&node.params, ty);
 		let ty = match &node.ty {
 			Some(ty) => self.to_ty(ty),
 			None => Ty::TyVar,
@@ -609,6 +606,11 @@ impl<'a> TypeCheck<'a> {
 		}
 	}
 
+	fn eval_struct_def(&mut self, node: &StructDef) {
+		let rhs = self.eval_table(&node.table);
+		self.new_def(node.name.id, self.get_type(rhs));
+	}
+
 	fn new_table(&mut self) -> TableId {
 		let table = Table {
 			fields: FxHashMap::default(),
@@ -625,7 +627,10 @@ impl<'a> TypeCheck<'a> {
 		for f in &ast_table.fields {
 			let (k, v) = match f {
 				Field::Assign(p, a) => (p.name.clone(), self.eval_expr(a)),
-				Field::Fn(p, f) => (p.name.clone(), self.eval_lambda(f, p.span, Some(table_id))),
+				Field::Fn(p, f) => (
+					p.name.clone(),
+					self.eval_lambda(f, p.span, Some(Ty::Instance(table_id))),
+				),
 			};
 			self.tables[table_id].fields.insert(k, v);
 		}
@@ -642,7 +647,7 @@ impl<'a> TypeCheck<'a> {
 			match suffix {
 				Suffix::Property(p) => {
 					ty = match self.get_type(ty) {
-						Ty::Table(table) | Ty::TySelf(table) | Ty::Instance(table) => {
+						Ty::Table(table) | Ty::Instance(table) => {
 							if let Some(p_id) = self.get_property(table, p) {
 								p_id
 							} else {
@@ -704,7 +709,7 @@ impl<'a> TypeCheck<'a> {
 				}
 				self.new_def(n.name.id, self.to_ty(ty));
 			} else {
-				self.new_def(n.name.id, self.get_type(rhs_ty).clone());
+				self.new_def(n.name.id, self.get_type(rhs_ty));
 			}
 		}
 	}

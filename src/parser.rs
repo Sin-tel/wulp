@@ -177,6 +177,7 @@ impl<'a> Parser<'a> {
 			TokenKind::Import | TokenKind::From => Stat::Import(self.parse_import()),
 			TokenKind::Return => Stat::Return(self.parse_return()),
 			TokenKind::Let => Stat::Let(self.parse_let()),
+			TokenKind::Struct => Stat::StructDef(self.parse_struct_def()),
 			TokenKind::LCurly => Stat::Block(self.parse_block()),
 			TokenKind::While => Stat::WhileBlock(self.parse_while_block()),
 			TokenKind::If => Stat::IfBlock(self.parse_if_block()),
@@ -274,6 +275,21 @@ impl<'a> Parser<'a> {
 		let exprs = self.parse_exprs();
 		let span = Span::join(start, exprs.last().unwrap().span);
 		Let { names, exprs, span }
+	}
+
+	fn parse_struct_def(&mut self) -> StructDef {
+		self.assert_next(TokenKind::Struct);
+
+		let name = self.parse_name();
+
+		self.assert_next(TokenKind::Assign);
+		self.assert_next(TokenKind::LCurly);
+		let fields = self.parse_fields();
+		self.assert_next(TokenKind::RCurly);
+
+		let table = Table { fields };
+
+		StructDef { name, table }
 	}
 
 	fn parse_fn_def(&mut self) -> FnDef {
@@ -496,6 +512,7 @@ impl<'a> Parser<'a> {
 					let end = self.assert_next(TokenKind::RParen).span;
 
 					// check for ambiguous function call on next line
+					// TODO: also for {} !
 					let tk = self.tokens.peek();
 					if tk.kind == TokenKind::LParen && tk.line != start_line {
 						let msg = "Ambiguous syntax.";

@@ -25,6 +25,9 @@ pub trait Visitor: Sized {
 	fn visit_fn_def(&mut self, node: &mut FnDef) {
 		node.walk(self);
 	}
+	fn visit_struct_def(&mut self, node: &mut StructDef) {
+		node.walk(self);
+	}
 	fn visit_fn_call(&mut self, node: &mut Call) {
 		node.walk(self);
 	}
@@ -113,6 +116,7 @@ impl<V: Visitor> VisitNode<V> for Stat {
 			Stat::AssignOp(s) => v.visit_assign_op(s),
 			Stat::Let(s) => v.visit_let(s),
 			Stat::FnDef(s) => v.visit_fn_def(s),
+			Stat::StructDef(s) => v.visit_struct_def(s),
 			Stat::Call(s) => v.visit_fn_call(s),
 			Stat::IfBlock(s) => v.visit_if_block(s),
 			Stat::ForBlock(s) => v.visit_for_block(s),
@@ -225,6 +229,16 @@ impl<V: Visitor> VisitNode<V> for FnDef {
 	fn walk(&mut self, v: &mut V) {
 		v.visit_name(&mut self.name);
 		v.visit_fn_body(&mut self.body);
+	}
+}
+
+impl<V: Visitor> VisitNode<V> for StructDef {
+	fn visit(&mut self, v: &mut V) {
+		v.visit_struct_def(self);
+	}
+	fn walk(&mut self, v: &mut V) {
+		v.visit_name(&mut self.name);
+		v.visit_table(&mut self.table);
 	}
 }
 

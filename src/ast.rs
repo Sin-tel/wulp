@@ -24,6 +24,7 @@ pub enum Stat {
 	IfBlock(IfBlock),
 	ForBlock(ForBlock),
 	FnDef(FnDef),
+	StructDef(StructDef),
 	Break,
 	Return(Return),
 	Import(Import),
@@ -138,6 +139,12 @@ pub struct Call {
 pub struct FnDef {
 	pub name: Name,
 	pub body: FnBody,
+}
+
+#[derive(Debug)]
+pub struct StructDef {
+	pub name: Name,
+	pub table: Table,
 }
 
 #[derive(Debug)]

@@ -206,13 +206,14 @@ impl Visitor for EmitLua {
 				self.statement.push_str("end");
 			},
 			Stat::Import(s) => {
+				// TODO: emit this as a block instead of a table
+				// struct and fn defs should be in export table
 				self.statement.push_str("local ");
 				s.alias.visit(self);
 				self.statement.push_str(" = ");
 				self.statement.push('{');
 				self.push_list(&mut s.module.fields, ", ");
 				self.statement.push('}');
-					// self.new_def(s.alias.id, self.get_type(table).clone());
 			},
 			Stat::AssignOp(s) => {
 				// Copy any evaluations to a temp var
@@ -228,16 +229,46 @@ impl Visitor for EmitLua {
 				self.statement.push(' ');
 				self.visit_expr(&mut s.expr);
 			},
+			Stat::StructDef(t) => {
+				self.statement.push_str("local ");
+				let name_str = self.symbol_table.get(t.name.id).name.clone();
+				self.statement.push_str(&name_str);
+				self.statement.push_str(" = {");
+				self.push_list(&mut t.table.fields, ", ");
+				self.statement.push('}');
+				self.put_statement();
+				self.statement.push_str(&format!(
+					"local mt_{0} = {{ __index = {0} }};\n\
+					setmetatable({0}, {{\n\
+					\t__call = function(_, args)\n\
+					\t\tlocal new = {{",
+					&name_str
+				));
+				for f in &mut t.table.fields {
+					match f {
+						Field::Assign(p, e) => {
+							self.visit_property(p);
+							self.statement.push_str(" = ");
+							self.visit_expr(e);
+							self.statement.push_str(", ");
+						},
+						Field::Fn(_, _) => (),
+					}
+				}
+				self.statement.push_str(&format!(
+					"}}\n\t\tsetmetatable(new, mt_{0})\n\t\treturn new\n\tend\n}})",
+					&name_str
+				));
+			},
 			Stat::WhileBlock(_)
 			| Stat::IfBlock(_)
 			| Stat::ForBlock(_)
 			| Stat::Assignment(_)
 			| Stat::Let(_)
-			// | Stat::FnDef(_)
 			| Stat::Call(_) => {
 				node.walk(self);
 			},
-			Stat::FnDef(_) => (),
+			Stat::FnDef(_) => (), // already done
 		};
 
 		self.put_statement();

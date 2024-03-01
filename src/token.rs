@@ -30,6 +30,7 @@ pub enum TokenKind {
 	Import,
 	As,
 	From,
+	Struct,
 
 	Period,
 	LParen,
@@ -145,6 +146,7 @@ impl fmt::Display for TokenKind {
 				Import => "import",
 				As => "as",
 				From => "from",
+				Struct => "struct",
 
 				Period => ".",
 				LParen => "(",
