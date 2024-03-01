@@ -302,11 +302,6 @@ impl Visitor for EmitLua {
 				node.walk(self);
 				self.statement.push(')');
 			},
-			ExprKind::Table(t) => {
-				self.statement.push('{');
-				self.push_list(&mut t.fields, ", ");
-				self.statement.push('}');
-			},
 			ExprKind::Array(t) => {
 				self.statement.push('{');
 				if !t.is_empty() {

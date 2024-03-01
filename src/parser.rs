@@ -462,7 +462,6 @@ impl<'a> Parser<'a> {
 			},
 			TokenKind::Str => self.parse_string(),
 			TokenKind::Number => self.parse_number(),
-			TokenKind::LCurly => self.parse_table_constructor(),
 			TokenKind::LBracket => self.parse_array_constructor(),
 			_ => self.parse_suffix_expr(),
 		}
@@ -582,16 +581,6 @@ impl<'a> Parser<'a> {
 	}
 
 	/// Constructors
-
-	fn parse_table_constructor(&mut self) -> Expr {
-		let start = self.assert_next(TokenKind::LCurly).span;
-		let fields = self.parse_fields();
-		let end = self.assert_next(TokenKind::RCurly).span;
-		Expr {
-			span: Span::join(start, end),
-			kind: ExprKind::Table(Table { fields }),
-		}
-	}
 
 	fn parse_array_constructor(&mut self) -> Expr {
 		let start = self.assert_next(TokenKind::LBracket).span;

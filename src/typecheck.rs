@@ -602,7 +602,6 @@ impl<'a> TypeCheck<'a> {
 			ExprKind::Call(e) => self.eval_fn_call(e),
 			ExprKind::Expr(e) => self.eval_expr(e),
 			ExprKind::Lambda(e) => self.eval_lambda(e, expr.span, None),
-			ExprKind::Table(e) => self.eval_table(e),
 		}
 	}
 

@@ -299,9 +299,6 @@ impl<V: Visitor> VisitNode<V> for Expr {
 					v.visit_suffix(s);
 				}
 			},
-			ExprKind::Table(t) => {
-				v.visit_table(t);
-			},
 			ExprKind::Array(t) => {
 				for e in t {
 					v.visit_expr(e);

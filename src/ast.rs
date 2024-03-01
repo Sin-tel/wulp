@@ -113,7 +113,6 @@ pub enum ExprKind {
 	Call(Call),
 	Lambda(FnBody),
 	Array(Vec<Expr>),
-	Table(Table),
 	SuffixExpr(Box<Expr>, Vec<Suffix>),
 	Expr(Box<Expr>), // bracketed expression
 }
