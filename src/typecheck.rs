@@ -15,6 +15,7 @@ type TableId = usize;
 #[derive(Debug)]
 struct Struct {
 	fields: FxHashMap<String, TyId>,
+	required_fields: Vec<String>,
 	symbol_id: SymbolId,
 }
 
@@ -270,7 +271,7 @@ impl<'a> TypeCheck<'a> {
 			Ok(())
 		} else {
 			match (self.get_type(a_id), self.get_type(b_id)) {
-				(_, Ty::Free) | (Ty::Free, _) => panic!("Can not unify free type variables"),
+				(_, Ty::Free) | (Ty::Free, _) => Err(()),
 				(_, Ty::Bottom) | (Ty::Bottom, _) | (_, Ty::Any) | (Ty::Any, _) => Ok(()), // bail
 				(ty, Ty::TyVar) => {
 					self.occurs(ty, b_id)?;
@@ -556,6 +557,7 @@ impl<'a> TypeCheck<'a> {
 		}
 
 		let fn_ty_id = self.eval_expr(&mut c.expr);
+		println!("fn_ty_id {}", self.ty_to_string(fn_ty_id));
 		let fn_ty = self.instantiate(fn_ty_id);
 		match self.get_type(fn_ty) {
 			Ty::Fn(params, ret_ty) => {
@@ -588,10 +590,27 @@ impl<'a> TypeCheck<'a> {
 			},
 			// constructor
 			Ty::Instance(table_id) => {
+				// TODO: instantiate does not take care of generics on struct
 				if !c.args.is_empty() {
 					let msg = "constructor can only contain named arguments".to_string();
 					format_err_f(&msg, c.args[0].span, self.input);
 					self.errors.push(msg);
+					return ERR_TY;
+				}
+				for k in &self.structs[table_id].required_fields {
+					let mut check = false;
+					for a in &mut c.named_args {
+						if &a.name == k {
+							check = true;
+							break;
+						}
+					}
+					if !check {
+						let msg = format!("Missing required field `{k}`");
+						format_err_f(&msg, c.expr.span, self.input);
+						self.errors.push(msg);
+						return ERR_TY;
+					}
 				}
 				for a in &mut c.named_args {
 					if let Some(&p) = self.structs[table_id].fields.get(&a.name) {
@@ -604,11 +623,13 @@ impl<'a> TypeCheck<'a> {
 							);
 							format_err_f(&msg, a.span, self.input);
 							self.errors.push(msg);
+							return ERR_TY;
 						}
 					} else {
 						let msg = "field doesn't exist".to_string();
 						format_err_f(&msg, a.span, self.input);
 						self.errors.push(msg);
+						return ERR_TY;
 					}
 				}
 				fn_ty
@@ -620,26 +641,6 @@ impl<'a> TypeCheck<'a> {
 				self.errors.push(msg);
 				ERR_TY
 			},
-		}
-	}
-
-	fn is_const(&mut self, expr: &Expr) -> bool {
-		match &expr.kind {
-			ExprKind::BinExpr(e) => self.is_const(&e.lhs) && self.is_const(&e.rhs),
-			ExprKind::UnExpr(e) => self.is_const(&e.expr),
-			ExprKind::Array(array) => {
-				let mut c = true;
-				for e in array {
-					c &= self.is_const(e);
-				}
-				c
-			},
-			ExprKind::Name(_) => false,
-			ExprKind::SuffixExpr(_, _) => false,
-			ExprKind::Literal(_) => true,
-			ExprKind::Call(_) => false,
-			ExprKind::Expr(e) => self.is_const(e),
-			ExprKind::Lambda(_) => true,
 		}
 	}
 
@@ -698,18 +699,46 @@ impl<'a> TypeCheck<'a> {
 		let table_id = self.new_struct(node.name.id);
 		self.new_def(node.name.id, Ty::Table(table_id));
 		for f in &mut node.table.fields {
-			let (k, v) = match f {
-				Field::Assign(p, a) => {
-					if !self.is_const(a) {
+			let (k, v) = match &mut f.kind {
+				FieldKind::Empty => {
+					self.structs[table_id]
+						.required_fields
+						.push(f.field.property.name.clone());
+
+					if let Some(ty) = &f.field.ty {
+						(f.field.property.name.clone(), self.new_ty(self.to_ty(ty)))
+					} else {
+						let msg = "Need type annotation here";
+						format_err_f(msg, f.field.property.span, self.input);
+						// self.errors.push(msg);
+						panic!("{}", &msg);
+					}
+				},
+				FieldKind::Assign(a) => {
+					if !a.is_const() {
 						let msg = "Default field must be a constant expression".to_string();
 						format_err_f(&msg, a.span, self.input);
 						self.errors.push(msg);
 					}
-					(p.name.clone(), self.eval_expr(a))
+					let mut expr_ty = self.eval_expr(a);
+					if let Some(ty) = &f.field.ty {
+						let ty_id = self.new_ty(self.to_ty(ty));
+						if self.unify(ty_id, expr_ty).is_err() {
+							let msg = format!(
+								"Incompatible types `{}` and `{}`",
+								self.ty_to_string(ty_id),
+								self.ty_to_string(expr_ty)
+							);
+							format_err_f(&msg, a.span, self.input);
+							self.errors.push(msg);
+						}
+						expr_ty = ty_id;
+					}
+					(f.field.property.name.clone(), expr_ty)
 				},
-				Field::Fn(p, f) => (
-					p.name.clone(),
-					self.eval_lambda(f, p.span, Some(Ty::Instance(table_id))),
+				FieldKind::Fn(func) => (
+					f.field.property.name.clone(),
+					self.eval_lambda(func, f.field.property.span, Some(Ty::Instance(table_id))),
 				),
 			};
 			self.structs[table_id].fields.insert(k, v);
@@ -719,6 +748,7 @@ impl<'a> TypeCheck<'a> {
 	fn new_struct(&mut self, symbol_id: SymbolId) -> TableId {
 		let table = Struct {
 			fields: FxHashMap::default(),
+			required_fields: Vec::new(),
 			symbol_id,
 		};
 		let table_id = self.structs.len();
@@ -840,7 +870,7 @@ impl<'a> TypeCheck<'a> {
 		let rhs = self.eval_expr(&mut node.expr);
 		let lhs = self.eval_lvalue(&mut node.var);
 
-		let new_lhs = self.eval_bin_op(&mut node.op, lhs, rhs, node.span);
+		let new_lhs = self.eval_bin_op(&node.op, lhs, rhs, node.span);
 
 		if self.unify(new_lhs, lhs).is_err() {
 			let msg = format!(

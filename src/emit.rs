@@ -252,9 +252,9 @@ impl Visitor for EmitLua {
 				self.statement.push_str(&name_str);
 				self.statement.push_str(" = {");
 				for f in &mut t.table.fields {
-					match f {
-						Field::Assign(_, _) => (),
-						Field::Fn(_, _) => {
+					match f.kind {
+						FieldKind::Empty | FieldKind::Assign(_) => (),
+						FieldKind::Fn(_) => {
 							self.visit_field(f);
 							self.statement.push_str(",\n");
 						},
@@ -271,16 +271,22 @@ impl Visitor for EmitLua {
 					&name_str
 				));
 				for f in &mut t.table.fields {
-					match f {
-						Field::Assign(p, e) => {
-							self.visit_property(p);
+					match &mut f.kind {
+						FieldKind::Empty => {
+							self.visit_property(&mut f.field.property);
+							self.statement.push_str(" = args.");
+							self.visit_property(&mut f.field.property);
+							self.statement.push_str(", ");
+						},
+						FieldKind::Assign(e) => {
+							self.visit_property(&mut f.field.property);
 							self.statement.push_str(" = default(args.");
-							self.visit_property(p);
+							self.visit_property(&mut f.field.property);
 							self.statement.push_str(", ");
 							self.visit_expr(e);
 							self.statement.push_str("), ");
 						},
-						Field::Fn(_, _) => (),
+						FieldKind::Fn(_) => (),
 					}
 				}
 				self.statement.push_str("}\n\t\treturn new\n\tend\n})");
@@ -386,14 +392,14 @@ impl Visitor for EmitLua {
 	}
 
 	fn visit_field(&mut self, node: &mut Field) {
-		match node {
-			Field::Assign(p, e) => {
-				self.visit_property(p);
+		self.visit_property(&mut node.field.property);
+		match &mut node.kind {
+			FieldKind::Empty => (),
+			FieldKind::Assign(e) => {
 				self.statement.push_str(" = ");
 				self.visit_expr(e);
 			},
-			Field::Fn(p, f) => {
-				self.visit_property(p);
+			FieldKind::Fn(f) => {
 				self.statement.push_str(" = function");
 				self.visit_fn_body(f);
 			},

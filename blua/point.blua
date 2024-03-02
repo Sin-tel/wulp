@@ -1,16 +1,14 @@
 struct Point = {
-	x = 0.0
-	y = 0.0
-	fn new(x, y) -> self {
-		let new = Point(x=x, y=y)
-		return new
+	x: num, y: num
+	fn new(x, y) {
+		return Point(x=x, y=y)
 	}
 	fn add(self, other: self) {
 		return Point.new(self.x + other.x, self.y + other.y)
 	}
 }
 
-let a, b = Point(x=1.5, y=2.5), Point(x=3.25, y=4.75)
+let a, b = Point.new(1.5, 2.5), Point.new(3.25, 4.75)
 
 a = a.add(b).add(b)
 

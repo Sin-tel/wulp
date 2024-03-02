@@ -259,12 +259,7 @@ impl<'a> Parser<'a> {
 		let mut names = Vec::new();
 		loop {
 			let name = self.parse_name();
-			let ty = if self.tokens.peek().kind == TokenKind::Colon {
-				self.tokens.next();
-				Some(self.parse_type())
-			} else {
-				None
-			};
+			let ty = self.parse_option_ty();
 			names.push(NameTy { name, ty });
 
 			if self.tokens.peek().kind == TokenKind::Assign {
@@ -609,7 +604,7 @@ impl<'a> Parser<'a> {
 			fields.push(f);
 
 			match self.tokens.peek().kind {
-				TokenKind::SemiColon => {
+				TokenKind::SemiColon | TokenKind::Comma => {
 					self.tokens.next();
 					continue;
 				},
@@ -647,18 +642,30 @@ impl<'a> Parser<'a> {
 		match self.tokens.peek().kind {
 			TokenKind::Name => {
 				let property = self.parse_property();
-				self.assert_next(TokenKind::Assign);
-				let expr = self.parse_expr();
-
-				Field::Assign(property, expr)
+				let ty = self.parse_option_ty();
+				if self.tokens.peek().kind == TokenKind::Assign {
+					self.tokens.next();
+					let expr = self.parse_expr();
+					Field {
+						field: PropertyTy { property, ty },
+						kind: FieldKind::Assign(expr),
+					}
+				} else {
+					Field {
+						field: PropertyTy { property, ty },
+						kind: FieldKind::Empty,
+					}
+				}
 			},
 			TokenKind::Fn => {
 				self.tokens.next();
 
-				let name = self.parse_property();
+				let property = self.parse_property();
 				let body = self.parse_fn_body();
-
-				Field::Fn(name, body)
+				Field {
+					field: PropertyTy { property, ty: None },
+					kind: FieldKind::Fn(body),
+				}
 			},
 			_ => {
 				let tk = self.tokens.next();
@@ -748,12 +755,7 @@ impl<'a> Parser<'a> {
 				break;
 			}
 			let name = self.parse_name();
-			let ty = if self.tokens.peek().kind == TokenKind::Colon {
-				self.tokens.next();
-				Some(self.parse_type())
-			} else {
-				None
-			};
+			let ty = self.parse_option_ty();
 			params.push(NameTy { name, ty });
 			if self.tokens.peek().kind == TokenKind::RParen {
 				break;
@@ -829,6 +831,15 @@ impl<'a> Parser<'a> {
 		let name = span.as_string(self.input);
 		self.assert_next(TokenKind::Name);
 		Property { span, name }
+	}
+
+	fn parse_option_ty(&mut self) -> Option<TyAst> {
+		if self.tokens.peek().kind == TokenKind::Colon {
+			self.tokens.next();
+			Some(self.parse_type())
+		} else {
+			None
+		}
 	}
 
 	fn parse_type(&mut self) -> TyAst {

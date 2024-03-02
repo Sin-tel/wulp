@@ -93,12 +93,6 @@ pub struct Let {
 }
 
 #[derive(Debug)]
-pub struct NameTy {
-	pub name: Name,
-	pub ty: Option<TyAst>,
-}
-
-#[derive(Debug)]
 pub struct Expr {
 	pub span: Span,
 	pub kind: ExprKind,
@@ -162,15 +156,34 @@ pub struct FnBody {
 }
 
 #[derive(Debug)]
-pub enum Field {
-	Assign(Property, Expr),
-	Fn(Property, FnBody),
+pub struct Field {
+	pub field: PropertyTy,
+	pub kind: FieldKind,
+}
+
+#[derive(Debug)]
+pub enum FieldKind {
+	Empty,
+	Assign(Expr),
+	Fn(FnBody),
+}
+
+#[derive(Debug)]
+pub struct NameTy {
+	pub name: Name,
+	pub ty: Option<TyAst>,
 }
 
 #[derive(Debug)]
 pub struct Name {
 	pub span: Span,
 	pub id: SymbolId,
+}
+
+#[derive(Debug)]
+pub struct PropertyTy {
+	pub property: Property,
+	pub ty: Option<TyAst>,
 }
 
 #[derive(Debug)]
@@ -226,6 +239,24 @@ pub enum UnOp {
 	Not,
 }
 
+impl Expr {
+	pub fn is_const(&self) -> bool {
+		match &self.kind {
+			ExprKind::BinExpr(e) => e.lhs.is_const() && e.rhs.is_const(),
+			ExprKind::UnExpr(e) => e.expr.is_const(),
+			ExprKind::Array(array) => {
+				let mut c = true;
+				for e in array {
+					c &= e.is_const();
+				}
+				c
+			},
+			ExprKind::Expr(e) => e.is_const(),
+			ExprKind::Literal(_) | ExprKind::Lambda(_) => true,
+			ExprKind::Name(_) | ExprKind::SuffixExpr(_, _) | ExprKind::Call(_) => false,
+		}
+	}
+}
 impl BinOp {
 	pub fn priority(&self) -> i32 {
 		match self {

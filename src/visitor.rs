@@ -327,14 +327,17 @@ impl<V: Visitor> VisitNode<V> for Field {
 		v.visit_field(self);
 	}
 	fn walk(&mut self, v: &mut V) {
-		match self {
-			Field::Assign(p, e) => {
+		match &mut self.kind {
+			FieldKind::Empty => {
+				v.visit_property(&mut self.field.property);
+			},
+			FieldKind::Assign(e) => {
 				// rhs first!
 				v.visit_expr(e);
-				v.visit_property(p);
+				v.visit_property(&mut self.field.property);
 			},
-			Field::Fn(p, f) => {
-				v.visit_property(p);
+			FieldKind::Fn(f) => {
+				v.visit_property(&mut self.field.property);
 				v.visit_fn_body(f);
 			},
 		}
