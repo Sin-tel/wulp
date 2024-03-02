@@ -233,6 +233,9 @@ impl Visitor for EmitLua {
 				self.statement.push_str("local ");
 				let name_str = self.symbol_table.get(t.name.id).name.clone();
 				self.statement.push_str(&name_str);
+				self.put_statement();
+				self.indent();
+				self.statement.push_str(&name_str);
 				self.statement.push_str(" = {");
 				for f in &mut t.table.fields {
 					match f {

@@ -116,6 +116,7 @@ impl<'a> TypeCheck<'a> {
 			TyAst::Str => Ty::Str,
 			TyAst::Num => Ty::Num,
 			TyAst::Int => Ty::Int,
+			TyAst::SelfTy => unreachable!(),
 			_ => todo!(),
 		}
 	}
@@ -428,7 +429,10 @@ impl<'a> TypeCheck<'a> {
 				}
 			} else {
 				let ty = match &p.ty {
-					Some(ty) => self.to_ty(ty),
+					Some(ty) => match ty {
+						TyAst::SelfTy => self_ty.clone().expect("can't use `self` here"),
+						_ => self.to_ty(ty),
+					},
 					None => Ty::TyVar,
 				};
 				self.new_def(p.name.id, ty)
@@ -486,11 +490,13 @@ impl<'a> TypeCheck<'a> {
 	}
 
 	// span should refer to the place where the function is defined
-	// TODO: get span info from AST and remove this argument
-	fn eval_lambda(&mut self, node: &mut FnBody, span: Span, ty: Option<Ty>) -> TyId {
-		let param_ty = self.eval_fn_params(&node.params, ty);
+	fn eval_lambda(&mut self, node: &mut FnBody, span: Span, self_ty: Option<Ty>) -> TyId {
+		let param_ty = self.eval_fn_params(&node.params, self_ty.clone());
 		let ty = match &node.ty {
-			Some(ty) => self.to_ty(ty),
+			Some(ty) => match ty {
+				TyAst::SelfTy => self_ty.expect("can't use `self` here"),
+				_ => self.to_ty(ty),
+			},
 			None => Ty::TyVar,
 		};
 		let ret_id = self.new_ty(ty);
@@ -642,7 +648,7 @@ impl<'a> TypeCheck<'a> {
 
 	fn eval_struct_def(&mut self, node: &mut StructDef) {
 		let table_id = self.new_struct(node.name.id);
-		let ty = Ty::Table(table_id);
+		self.new_def(node.name.id, Ty::Table(table_id));
 		for f in &mut node.table.fields {
 			let (k, v) = match f {
 				Field::Assign(p, a) => (p.name.clone(), self.eval_expr(a)),
@@ -653,7 +659,6 @@ impl<'a> TypeCheck<'a> {
 			};
 			self.structs[table_id].fields.insert(k, v);
 		}
-		self.new_def(node.name.id, ty);
 	}
 
 	fn new_struct(&mut self, symbol_id: SymbolId) -> TableId {

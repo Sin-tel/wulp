@@ -225,11 +225,7 @@ impl<'a> LexIter<'a> {
 			"if" => TokenKind::If,
 			"elseif" => TokenKind::ElseIf,
 			"else" => TokenKind::Else,
-			"num" => TokenKind::TyNum,
-			"int" => TokenKind::TyInt,
-			"str" => TokenKind::TyStr,
-			"bool" => TokenKind::TyBool,
-			"maybe" => TokenKind::TyMaybe,
+			"maybe" => TokenKind::Maybe,
 			_ => TokenKind::Name,
 		};
 

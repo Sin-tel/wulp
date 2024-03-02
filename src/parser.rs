@@ -802,46 +802,51 @@ impl<'a> Parser<'a> {
 		// TODO: fn types
 		let tk = self.tokens.next();
 		match tk.kind {
+			TokenKind::Name => {
+				let name_str = tk.span.as_string(self.input);
+				match name_str.as_ref() {
+					"self" => TyAst::SelfTy,
+					"num" => TyAst::Num,
+					"int" => TyAst::Int,
+					"str" => TyAst::Str,
+					"bool" => TyAst::Bool,
+					_ => todo!(),
+				}
+			},
 			TokenKind::Nil => TyAst::Nil,
-			TokenKind::TyNum => TyAst::Num,
-			TokenKind::TyInt => TyAst::Int,
-			TokenKind::TyStr => TyAst::Str,
-			TokenKind::TyBool => TyAst::Bool,
 			TokenKind::LBracket => {
 				// Array type
-				todo!()
-				// let ty = TyAst::Array(Box::new(self.parse_type()));
-				// self.assert_next(TokenKind::RBracket);
-				// ty
+				let ty = TyAst::Array(Box::new(self.parse_type()));
+				self.assert_next(TokenKind::RBracket);
+				ty
 			},
 			TokenKind::Fn => {
 				// Function type
-				todo!()
-				// let mut arg_ty = Vec::new();
-				// self.assert_next(TokenKind::LParen);
-				// loop {
-				// 	if self.tokens.peek().kind == TokenKind::RParen {
-				// 		break;
-				// 	}
-				// 	arg_ty.push(self.parse_type());
-				// 	if self.tokens.peek().kind == TokenKind::RParen {
-				// 		break;
-				// 	}
-				// 	self.assert_next(TokenKind::Comma);
-				// }
-				// self.assert_next(TokenKind::RParen);
-				// self.assert_next(TokenKind::Arrow);
-				// let ret_ty = self.parse_type();
+				let mut arg_ty = Vec::new();
+				self.assert_next(TokenKind::LParen);
+				loop {
+					if self.tokens.peek().kind == TokenKind::RParen {
+						break;
+					}
+					arg_ty.push(self.parse_type());
+					if self.tokens.peek().kind == TokenKind::RParen {
+						break;
+					}
+					self.assert_next(TokenKind::Comma);
+				}
+				self.assert_next(TokenKind::RParen);
+				self.assert_next(TokenKind::Arrow);
+				let ret_ty = self.parse_type();
 
-				// TyAst::Fn(arg_ty, Box::new(ret_ty))
+				TyAst::Fn(arg_ty, Box::new(ret_ty))
 			},
-			TokenKind::TyMaybe => {
-				todo!()
-				// self.assert_next(TokenKind::LParen);
-				// let inner = self.parse_type();
-				// self.assert_next(TokenKind::RParen);
-				// TyAst::Maybe(Box::new(inner))
+			TokenKind::Maybe => {
+				self.assert_next(TokenKind::LParen);
+				let inner = self.parse_type();
+				self.assert_next(TokenKind::RParen);
+				TyAst::Maybe(Box::new(inner))
 			},
+
 			_ => {
 				self.error(format!("Expected type but found `{}`.", tk.kind), tk.span);
 			},
