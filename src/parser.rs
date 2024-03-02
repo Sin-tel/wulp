@@ -854,7 +854,7 @@ impl<'a> Parser<'a> {
 					"int" => TyAst::Int,
 					"str" => TyAst::Str,
 					"bool" => TyAst::Bool,
-					_ => todo!(),
+					s => TyAst::Named(s.to_string()),
 				}
 			},
 			TokenKind::Nil => TyAst::Nil,

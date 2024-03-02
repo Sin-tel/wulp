@@ -3,7 +3,7 @@ struct Point = {
 	fn new(x, y) {
 		return Point(x=x, y=y)
 	}
-	fn add(self, other: self) {
+	fn add(self, other: Point) {
 		return Point.new(self.x + other.x, self.y + other.y)
 	}
 }

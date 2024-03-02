@@ -117,6 +117,17 @@ impl<'a> TypeCheck<'a> {
 			TyAst::Str => Ty::Str,
 			TyAst::Num => Ty::Num,
 			TyAst::Int => Ty::Int,
+			TyAst::Named(s) => {
+				// linear search, whatever
+				dbg!(&s);
+				for (i, k) in self.structs.iter().enumerate() {
+					dbg!(&self.symbol_table.get(k.symbol_id).name);
+					if s == &self.symbol_table.get(k.symbol_id).name {
+						return Ty::Instance(i);
+					}
+				}
+				panic!("Unknown type `{}`.", s,);
+			},
 			TyAst::SelfTy => unreachable!(),
 			_ => todo!(),
 		}
@@ -323,9 +334,12 @@ impl<'a> TypeCheck<'a> {
 	// Otherwise return None
 	// Bool indicates if the block always returns
 	fn eval_block(&mut self, block: &mut Block) -> (RetPair, bool) {
-		for stat in &block.stats {
+		for stat in &mut block.stats {
 			if let Stat::FnDef(s) = stat {
 				self.hoist_fn_def(s);
+			}
+			if let Stat::StructDef(s) = stat {
+				self.eval_struct_def(s);
 			}
 		}
 		let mut current_pair: RetPair = None;
@@ -403,7 +417,7 @@ impl<'a> TypeCheck<'a> {
 				Stat::AssignOp(s) => self.eval_assign_op(s),
 				Stat::Let(s) => self.eval_let(s),
 				Stat::FnDef(s) => self.eval_fn_def(s),
-				Stat::StructDef(s) => self.eval_struct_def(s),
+				Stat::StructDef(_) => (),
 				Stat::Import(_s) => {
 					todo!();
 					// let table = self.eval_table(&mut s.module);
@@ -626,7 +640,7 @@ impl<'a> TypeCheck<'a> {
 							return ERR_TY;
 						}
 					} else {
-						let msg = "field doesn't exist".to_string();
+						let msg = format!("Struct does not have a field named `{}`.", a.name);
 						format_err_f(&msg, a.span, self.input);
 						self.errors.push(msg);
 						return ERR_TY;
@@ -696,7 +710,7 @@ impl<'a> TypeCheck<'a> {
 	}
 
 	fn eval_struct_def(&mut self, node: &mut StructDef) {
-		let table_id = self.new_struct(node.name.id);
+		let table_id = self.new_struct(&node.name);
 		self.new_def(node.name.id, Ty::Table(table_id));
 		for f in &mut node.table.fields {
 			let (k, v) = match &mut f.kind {
@@ -745,11 +759,20 @@ impl<'a> TypeCheck<'a> {
 		}
 	}
 
-	fn new_struct(&mut self, symbol_id: SymbolId) -> TableId {
+	fn new_struct(&mut self, name: &Name) -> TableId {
+		let name_str = &self.symbol_table.get(name.id).name;
+		for k in self.structs.iter() {
+			if name_str == &self.symbol_table.get(k.symbol_id).name {
+				let msg = format!("Struct `{}` already defined.", name_str);
+				format_err_f(&msg, name.span, self.input);
+				self.errors.push(msg);
+			}
+		}
+
 		let table = Struct {
 			fields: FxHashMap::default(),
 			required_fields: Vec::new(),
-			symbol_id,
+			symbol_id: name.id,
 		};
 		let table_id = self.structs.len();
 		self.structs.push(table);

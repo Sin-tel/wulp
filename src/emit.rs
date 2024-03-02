@@ -9,7 +9,7 @@ pub struct EmitLua {
 	indent_level: usize,
 	symbol_table: SymbolTable,
 	patch_temp_lvalue: bool,
-	hoist_fn_def: bool,
+	hoist_defs: bool,
 }
 
 impl EmitLua {
@@ -20,7 +20,7 @@ impl EmitLua {
 			indent_level: 0,
 			symbol_table,
 			patch_temp_lvalue: false,
-			hoist_fn_def: false,
+			hoist_defs: false,
 		};
 		this.code.push_str(include_str!("../lua/std_preamble.lua"));
 		ast.block.visit(&mut this);
@@ -88,6 +88,10 @@ impl EmitLua {
 		self.statement.push_str("local ");
 		self.visit_name(&mut node.name);
 	}
+	fn emit_struct_local(&mut self, node: &mut StructDef) {
+		self.statement.push_str("local ");
+		self.visit_name(&mut node.name);
+	}
 	fn emit_fn_def(&mut self, node: &mut FnDef) {
 		self.statement.push_str("function ");
 		self.visit_name(&mut node.name);
@@ -98,11 +102,16 @@ impl EmitLua {
 impl Visitor for EmitLua {
 	fn visit_block(&mut self, node: &mut Block) {
 		self.indent_level += 1;
-		self.hoist_fn_def = true;
+		self.hoist_defs = true;
 		for b in &mut node.stats {
 			if let Stat::FnDef(f) = b {
 				self.indent();
 				self.emit_fn_local(f);
+				self.put_statement();
+			}
+			if let Stat::StructDef(s) = b {
+				self.indent();
+				self.emit_struct_local(s);
 				self.put_statement();
 			}
 		}
@@ -113,7 +122,7 @@ impl Visitor for EmitLua {
 				self.put_statement();
 			}
 		}
-		self.hoist_fn_def = false;
+		self.hoist_defs = false;
 		node.walk(self);
 		self.indent_level -= 1;
 	}
@@ -244,22 +253,21 @@ impl Visitor for EmitLua {
 				self.visit_expr(&mut s.expr);
 			},
 			Stat::StructDef(t) => {
-				self.statement.push_str("local ");
 				let name_str = self.symbol_table.get(t.name.id).name.clone();
 				self.statement.push_str(&name_str);
-				self.put_statement();
-				self.indent();
-				self.statement.push_str(&name_str);
-				self.statement.push_str(" = {");
+				self.statement.push_str(" = {\n");
+				self.indent_level += 1;
 				for f in &mut t.table.fields {
 					match f.kind {
 						FieldKind::Empty | FieldKind::Assign(_) => (),
 						FieldKind::Fn(_) => {
+							self.indent();
 							self.visit_field(f);
-							self.statement.push_str(",\n");
+							self.put_statement();
 						},
 					}
 				}
+				self.indent_level -= 1;
 				self.statement.push('}');
 				self.put_statement();
 				// TODO: try to get rid of the `args = args or {}`

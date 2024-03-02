@@ -37,6 +37,7 @@ pub enum TyAst {
 	Num,
 	Int,
 	SelfTy,
+	Named(String),
 	Table(TableId),
 	Array(Box<TyAst>),
 	Maybe(Box<TyAst>),
@@ -54,6 +55,7 @@ impl fmt::Display for TyAst {
 			TyAst::Int => "int".to_string(),
 			TyAst::SelfTy => "self".to_string(),
 			TyAst::Table(_) => "table".to_string(),
+			TyAst::Named(s) => s.clone(),
 			TyAst::Array(ty) => format!("[{ty}]"),
 			TyAst::Maybe(ty) => format!("maybe({ty})"),
 			TyAst::Fn(args, ret) => {
