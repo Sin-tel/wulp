@@ -1,0 +1,56 @@
+file ::= statlist
+block ::= `{` statlist `}` | stat | laststat
+statlist ::= {stat} [laststat]
+
+stat ::= assignment
+       | let_stat
+       | fn_call
+       | block
+       | WHILE expr block
+       | IF expr block {ELSEIF expr block} [ELSE block]
+       | FOR names IN expr_list block
+       | FN Name fn_body
+       | STRUCT Name struct
+
+laststat ::= RETURN [expr_list] | BREAK
+
+let_stat ::= LET {} `=` expr_list
+name_ty_list ::= name_ty {`,` name_ty}
+name_ty ::= Name [`:` type]
+
+assignment ::= vars `=` expr_list
+vars ::= suffix_expr {`,` suffix_expr}
+
+fn_call   ::= suffix_expr args
+fn_body   ::= `(` [name_ty_list] `)` block
+args      ::= `(` [expr_list] `)`
+expr_list ::= expr {`,` expr}
+
+expr ::= literal
+       | FN fn_body
+       | suffix_expr
+       | fn_call
+       | expr binop expr
+       | unop expr
+       | array
+
+primary_expr ::= Name | `(` expr `)`
+literal ::= nil | Bool | Numeral | String
+suffix_expr ::= prefix { suffix }
+prefix ::= primary_expr | fn_call
+suffix ::= `.` Property
+         | `[` expr `]`
+array ::= `[` {expr [sep]} `]`
+
+Type ::= Name
+       | `int`
+       | `num`
+       | `str`
+       | `bool`
+       | `[` Type `]`
+
+struct ::= `{` [fieldlist] `}`
+fieldlist ::= field {[sep] field}
+sep ::= `,` | `;`
+field ::= Property [`:` type] | Property [`:` type] `=` expr | FN Property fn_body
+Property ::= Name
