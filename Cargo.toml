@@ -1,5 +1,5 @@
 [package]
-name = "better_lua"
+name = "wulp"
 version = "0.0.1"
 description = "better lua"
 edition = "2021"

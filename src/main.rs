@@ -78,7 +78,7 @@ fn main() -> Result<()> {
 	display_return(res, filename);
 
 	// env::set_current_dir(Path::new(".."))?;
-	// let mut file = fs::File::create(filename.replace("blua", "lua"))?;
+	// let mut file = fs::File::create(filename.replace("wulp", "lua"))?;
 	// file.write_all(code.as_bytes())?;
 
 	Ok(())

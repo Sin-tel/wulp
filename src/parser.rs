@@ -21,7 +21,7 @@ pub struct Parser<'a> {
 
 impl<'a> Parser<'a> {
 	pub fn parse(filename: &str) -> Result<(File, Vec<InputFile>)> {
-		let filename = format!("blua/{filename}.blua");
+		let filename = format!("wulp/{filename}.wulp");
 		let input = fs::read_to_string(filename.clone())?;
 		let mut files = Vec::new();
 		let file_id = 0;
@@ -57,7 +57,7 @@ impl<'a> Parser<'a> {
 	}
 
 	fn parse_module(&mut self, filename: &str) -> Table {
-		let filename = format!("blua/{filename}.blua");
+		let filename = format!("wulp/{filename}.wulp");
 		// TODO: return result
 		let input = fs::read_to_string(filename.clone()).unwrap();
 		let file_id = self.next_id;
