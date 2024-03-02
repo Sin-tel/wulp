@@ -10,3 +10,4 @@ notes.md
 types.md
 iter.md
 lua_test/**
+blua/test.blua
