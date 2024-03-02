@@ -1,10 +1,12 @@
+// basic syntax
+
 fn fact(n: int) -> int {
 	assert(n >= 0)
 	if n != 0 return n * fact(n - 1)
-	else {{return 1}}
+	else return 1
 }
 
-// let add = fn(a: int, b: int) {return a + b}
+let add = fn(a: int, b: int) {return a + b}
 
 let list = [2 3 4 5]
 
@@ -12,10 +14,10 @@ for i in list {
 	print(i, fact(i))
 }
 
-// let i = 4
-// while true {
-// 	print(i, fact(i))
-// 	i = i - 1
-// 	if i <= 0 break
-// }
+let i = 4
+while true {
+	print(i, fact(i))
+	i = i - 1
+	if i <= 0 break
+}
 

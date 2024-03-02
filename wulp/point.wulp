@@ -1,9 +1,9 @@
-struct Point = {
+struct Point {
 	x: num, y: num
 	fn new(x, y) {
 		return Point(x=x, y=y)
 	}
-	fn add(self, other: Point) {
+	fn add(self, other: self) {
 		return Point.new(self.x + other.x, self.y + other.y)
 	}
 }

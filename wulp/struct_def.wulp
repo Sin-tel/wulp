@@ -1,4 +1,4 @@
-struct Test = {
+struct Test {
 	x = 0
 
 	fn inc(self) {

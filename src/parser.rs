@@ -279,7 +279,6 @@ impl<'a> Parser<'a> {
 
 		let name = self.parse_name();
 
-		self.assert_next(TokenKind::Assign);
 		self.assert_next(TokenKind::LCurly);
 		let fields = self.parse_fields();
 		self.assert_next(TokenKind::RCurly);
