@@ -132,6 +132,14 @@ pub enum Suffix {
 pub struct Call {
 	pub expr: Box<Expr>,
 	pub args: Vec<Expr>,
+	pub named_args: Vec<NamedArg>,
+}
+
+#[derive(Debug)]
+pub struct NamedArg {
+	pub name: String,
+	pub expr: Expr,
+	pub span: Span,
 }
 
 #[derive(Debug)]
@@ -148,15 +156,9 @@ pub struct StructDef {
 
 #[derive(Debug)]
 pub struct FnBody {
-	pub params: Vec<Param>,
+	pub params: Vec<NameTy>,
 	pub body: Block,
 	pub ty: Option<TyAst>, // return type
-}
-
-#[derive(Debug)]
-pub struct Param {
-	pub name: Name,
-	pub ty: Option<TyAst>,
 }
 
 #[derive(Debug)]

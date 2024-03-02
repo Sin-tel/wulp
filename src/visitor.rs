@@ -58,9 +58,6 @@ pub trait Visitor: Sized {
 	fn visit_field(&mut self, node: &mut Field) {
 		node.walk(self);
 	}
-	fn visit_param(&mut self, node: &mut Param) {
-		node.walk(self);
-	}
 	// leaf nodes
 	fn visit_name(&mut self, _node: &mut Name) {}
 	fn visit_property(&mut self, _node: &mut Property) {}
@@ -251,6 +248,9 @@ impl<V: Visitor> VisitNode<V> for Call {
 		for e in &mut self.args {
 			v.visit_expr(e);
 		}
+		for a in &mut self.named_args {
+			v.visit_expr(&mut a.expr);
+		}
 	}
 }
 
@@ -260,18 +260,9 @@ impl<V: Visitor> VisitNode<V> for FnBody {
 	}
 	fn walk(&mut self, v: &mut V) {
 		for p in &mut self.params {
-			v.visit_param(p);
+			v.visit_name_ty(p);
 		}
 		v.visit_block(&mut self.body);
-	}
-}
-
-impl<V: Visitor> VisitNode<V> for Param {
-	fn visit(&mut self, v: &mut V) {
-		v.visit_param(self);
-	}
-	fn walk(&mut self, v: &mut V) {
-		v.visit_name(&mut self.name);
 	}
 }
 

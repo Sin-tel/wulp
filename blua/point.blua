@@ -1,0 +1,17 @@
+struct Point = {
+	x = 0.0
+	y = 0.0
+	fn new(x, y) -> self {
+		let new = Point(x=x, y=y)
+		return new
+	}
+	fn add(self, other: self) {
+		return Point.new(self.x + other.x, self.y + other.y)
+	}
+}
+
+let a, b = Point(x=1.5, y=2.5), Point(x=3.25, y=4.75)
+
+a = a.add(b).add(b)
+
+print(a.x, a.y)

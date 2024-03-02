@@ -48,7 +48,7 @@ mod tests;
 fn main() -> Result<()> {
 	let filename = "test";
 
-	let (mut ast, files) = Parser::parse(filename);
+	let (mut ast, files) = Parser::parse(filename)?;
 
 	// println!("----- input:");
 	// println!("{input}");

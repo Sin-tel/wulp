@@ -187,6 +187,20 @@ impl Visitor for EmitLua {
 		self.visit_expr(&mut node.expr);
 		self.statement.push('(');
 		self.push_list(&mut node.args, ", ");
+		if !node.named_args.is_empty() {
+			if !node.args.is_empty() {
+				self.statement.push_str(", ");
+			}
+			self.statement.push('{');
+			for a in &mut node.named_args {
+				self.statement.push_str(&a.name);
+				self.statement.push('=');
+				self.visit_expr(&mut a.expr);
+				self.statement.push_str(", ");
+			}
+			self.statement.push('}');
+		}
+
 		self.statement.push(')');
 	}
 	fn visit_stat(&mut self, node: &mut Stat) {
@@ -248,17 +262,23 @@ impl Visitor for EmitLua {
 				}
 				self.statement.push('}');
 				self.put_statement();
+				// TODO: try to get rid of the `args = args or {}`
 				self.statement.push_str(&format!(
 					"setmetatable({0}, {{\n\
 					\t__call = function(_, args)\n\
+					\t\targs = args or {{}};\n\
 					\t\tlocal new = {{",
 					&name_str
 				));
 				for f in &mut t.table.fields {
 					match f {
-						Field::Assign(_, _) => {
-							self.visit_field(f);
+						Field::Assign(p, e) => {
+							self.visit_property(p);
+							self.statement.push_str(" = default(args.");
+							self.visit_property(p);
 							self.statement.push_str(", ");
+							self.visit_expr(e);
+							self.statement.push_str("), ");
 						},
 						Field::Fn(_, _) => (),
 					}

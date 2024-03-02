@@ -1,0 +1,39 @@
+struct Test = {
+	x = 0
+
+	fn inc(self) {
+		self.x += 1
+	}
+	fn add(self, n) {
+		self.x += n
+	}
+	fn add_test(self, other: self) {
+		self.x += other.x
+	}
+	fn new(x) -> self {
+		let new = Test(x=x)
+		return new
+	}
+}
+
+let t = Test()
+print(t.x)
+
+let t1 = Test(x = 1)
+print(t1.x)
+
+let t2 = Test.new(2)
+print(t2.x)
+
+Test.inc(t)
+print(t.x)
+t.add(5)
+print(t.x)
+
+let t2 = Test.new(10)
+print(t2.x)
+
+t.add_test(t2)
+print(t.x)
+print(t2.x)
+

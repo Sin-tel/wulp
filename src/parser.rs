@@ -7,6 +7,7 @@ use crate::span::Span;
 use crate::span::{format_err, format_warning};
 use crate::token::{Token, TokenKind};
 use crate::ty::TyAst;
+use anyhow::Result;
 
 #[derive(Debug)]
 pub struct Parser<'a> {
@@ -19,9 +20,9 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-	pub fn parse(filename: &str) -> (File, Vec<InputFile>) {
+	pub fn parse(filename: &str) -> Result<(File, Vec<InputFile>)> {
 		let filename = format!("blua/{filename}.blua");
-		let input = fs::read_to_string(filename.clone()).unwrap();
+		let input = fs::read_to_string(filename.clone())?;
 		let mut files = Vec::new();
 		let file_id = 0;
 		let next_id = 1;
@@ -52,11 +53,12 @@ impl<'a> Parser<'a> {
 		for (i, v) in files.iter().enumerate() {
 			assert_eq!(i, v.id);
 		}
-		(ast, files)
+		Ok((ast, files))
 	}
 
 	fn parse_module(&mut self, filename: &str) -> Table {
 		let filename = format!("blua/{filename}.blua");
+		// TODO: return result
 		let input = fs::read_to_string(filename.clone()).unwrap();
 		let file_id = self.next_id;
 		let next_id = self.next_id + 1;
@@ -507,7 +509,7 @@ impl<'a> Parser<'a> {
 					let start_line = self.tokens.peek().line;
 
 					self.assert_next(TokenKind::LParen);
-					let args = self.parse_args();
+					let (args, named_args) = self.parse_args();
 					let end = self.assert_next(TokenKind::RParen).span;
 
 					// check for ambiguous function call on next line
@@ -528,6 +530,7 @@ impl<'a> Parser<'a> {
 						kind: ExprKind::Call(Call {
 							expr: Box::new(expr),
 							args,
+							named_args,
 						}),
 					};
 				},
@@ -664,11 +667,41 @@ impl<'a> Parser<'a> {
 		}
 	}
 
-	fn parse_args(&mut self) -> Vec<Expr> {
+	fn parse_args(&mut self) -> (Vec<Expr>, Vec<NamedArg>) {
+		// TODO check all named arguments come after the non-named ones
+		let mut args = Vec::new();
+		let mut named_args = Vec::new();
 		if self.tokens.peek().kind == TokenKind::RParen {
-			return Vec::new();
+			return (args, named_args);
 		}
-		self.parse_exprs()
+
+		loop {
+			let expr = self.parse_expr();
+			if self.tokens.peek().kind == TokenKind::Assign {
+				self.tokens.next();
+				if let ExprKind::Name(name) = expr.kind {
+					let expr = self.parse_expr();
+					let span = expr.span;
+					named_args.push(NamedArg {
+						name: name.span.as_string(self.input),
+						expr,
+						span: Span::join(name.span, span),
+					});
+				} else {
+					panic!("lhs must be a name")
+				}
+			} else {
+				args.push(expr);
+			}
+
+			if self.tokens.peek().kind == TokenKind::Comma {
+				self.tokens.next();
+			} else {
+				break;
+			}
+		}
+
+		(args, named_args)
 	}
 
 	fn parse_exprs(&mut self) -> Vec<Expr> {
@@ -700,7 +733,7 @@ impl<'a> Parser<'a> {
 		names
 	}
 
-	fn parse_parlist(&mut self) -> Vec<Param> {
+	fn parse_parlist(&mut self) -> Vec<NameTy> {
 		self.assert_next(TokenKind::LParen);
 
 		let mut params = Vec::new();
@@ -721,7 +754,7 @@ impl<'a> Parser<'a> {
 			} else {
 				None
 			};
-			params.push(Param { name, ty });
+			params.push(NameTy { name, ty });
 			if self.tokens.peek().kind == TokenKind::RParen {
 				break;
 			}

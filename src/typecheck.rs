@@ -413,7 +413,7 @@ impl<'a> TypeCheck<'a> {
 		(current_pair, false)
 	}
 
-	fn eval_fn_params(&mut self, params: &[Param], self_ty: Option<Ty>) -> Vec<TyId> {
+	fn eval_fn_params(&mut self, params: &[NameTy], self_ty: Option<Ty>) -> Vec<TyId> {
 		let mut param_ty = Vec::new();
 
 		for (i, p) in params.iter().enumerate() {
@@ -569,8 +569,10 @@ impl<'a> TypeCheck<'a> {
 					format_err_f(&msg, c.expr.span, self.input);
 					self.errors.push(msg);
 				} else {
+					assert!(c.named_args.is_empty(), "Named arguments not implemented yet!");
 					for (p, a) in zip(params, c.args.iter_mut()) {
 						let arg_ty = self.eval_expr(a);
+
 						if self.unify(arg_ty, p).is_err() {
 							let msg = format!(
 								"Expected argument type `{}`, found `{}`",
@@ -584,7 +586,33 @@ impl<'a> TypeCheck<'a> {
 				}
 				ret_ty
 			},
-			Ty::Instance(_) => fn_ty,
+			// constructor
+			Ty::Instance(table_id) => {
+				if !c.args.is_empty() {
+					let msg = "constructor can only contain named arguments".to_string();
+					format_err_f(&msg, c.args[0].span, self.input);
+					self.errors.push(msg);
+				}
+				for a in &mut c.named_args {
+					if let Some(&p) = self.structs[table_id].fields.get(&a.name) {
+						let arg_ty = self.eval_expr(&mut a.expr);
+						if self.unify(arg_ty, p).is_err() {
+							let msg = format!(
+								"Field has type `{}`, found `{}`",
+								self.ty_to_string(p),
+								self.ty_to_string(arg_ty)
+							);
+							format_err_f(&msg, a.span, self.input);
+							self.errors.push(msg);
+						}
+					} else {
+						let msg = "field doesn't exist".to_string();
+						format_err_f(&msg, a.span, self.input);
+						self.errors.push(msg);
+					}
+				}
+				fn_ty
+			},
 
 			_ => {
 				let msg = format!("Type `{}` is not callable.", self.ty_to_string(fn_ty));
@@ -592,6 +620,26 @@ impl<'a> TypeCheck<'a> {
 				self.errors.push(msg);
 				ERR_TY
 			},
+		}
+	}
+
+	fn is_const(&mut self, expr: &Expr) -> bool {
+		match &expr.kind {
+			ExprKind::BinExpr(e) => self.is_const(&e.lhs) && self.is_const(&e.rhs),
+			ExprKind::UnExpr(e) => self.is_const(&e.expr),
+			ExprKind::Array(array) => {
+				let mut c = true;
+				for e in array {
+					c &= self.is_const(e);
+				}
+				c
+			},
+			ExprKind::Name(_) => false,
+			ExprKind::SuffixExpr(_, _) => false,
+			ExprKind::Literal(_) => true,
+			ExprKind::Call(_) => false,
+			ExprKind::Expr(e) => self.is_const(e),
+			ExprKind::Lambda(_) => true,
 		}
 	}
 
@@ -651,7 +699,14 @@ impl<'a> TypeCheck<'a> {
 		self.new_def(node.name.id, Ty::Table(table_id));
 		for f in &mut node.table.fields {
 			let (k, v) = match f {
-				Field::Assign(p, a) => (p.name.clone(), self.eval_expr(a)),
+				Field::Assign(p, a) => {
+					if !self.is_const(a) {
+						let msg = "Default field must be a constant expression".to_string();
+						format_err_f(&msg, a.span, self.input);
+						self.errors.push(msg);
+					}
+					(p.name.clone(), self.eval_expr(a))
+				},
 				Field::Fn(p, f) => (
 					p.name.clone(),
 					self.eval_lambda(f, p.span, Some(Ty::Instance(table_id))),
