@@ -1,56 +1,67 @@
 file ::= statlist
-block ::= `{` statlist `}` | stat | laststat
+block ::= '{' statlist '}' | stat | laststat
 statlist ::= {stat} [laststat]
 
 stat ::= assignment
        | let_stat
+       | assign_op_stat
        | fn_call
        | block
-       | WHILE expr block
-       | IF expr block {ELSEIF expr block} [ELSE block]
-       | FOR names IN expr_list block
-       | FN Name fn_body
-       | STRUCT Name struct
+       | 'while' expr block
+       | 'if' expr block {'elseif' expr block} ['else' block]
+       | 'for' names 'in' expr_list block
+       | 'fn' Name fn_body
+       | 'struct' Name struct
 
-laststat ::= RETURN [expr_list] | BREAK
+laststat ::= 'return' [expr_list] | 'break'
 
-let_stat ::= LET {} `=` expr_list
-name_ty_list ::= name_ty {`,` name_ty}
-name_ty ::= Name [`:` type]
+let_stat ::= 'let' {} '=' expr_list
+name_ty_list ::= name_ty {',' name_ty}
+name_ty ::= Name [':' type]
 
-assignment ::= vars `=` expr_list
-vars ::= suffix_expr {`,` suffix_expr}
+assign_op_stat ::= suffix_expr assign_op expr
 
-fn_call   ::= suffix_expr args
-fn_body   ::= `(` [name_ty_list] `)` block
-args      ::= `(` [expr_list] `)`
-expr_list ::= expr {`,` expr}
+assignment ::= vars '=' expr_list
+vars ::= suffix_expr {',' suffix_expr}
+
+fn_call   ::= suffix_expr '(' [expr_list] ')'
+fn_body   ::= '(' [name_ty_list] ')' block
+expr_list ::= expr {',' expr}
 
 expr ::= literal
-       | FN fn_body
+       | 'fn' fn_body
        | suffix_expr
        | fn_call
-       | expr binop expr
-       | unop expr
+       | expr bin_op expr
+       | un_op expr
        | array
 
-primary_expr ::= Name | `(` expr `)`
-literal ::= nil | Bool | Numeral | String
+primary_expr ::= Name | '(' expr ')'
 suffix_expr ::= prefix { suffix }
 prefix ::= primary_expr | fn_call
-suffix ::= `.` Property
-         | `[` expr `]`
-array ::= `[` {expr [sep]} `]`
+suffix ::= '.' Property
+         | '[' expr ']'
+array  ::= '[' {expr [sep]} ']'
+literal ::= 'nil' | 'true' | 'false' | Numeral | String
 
-Type ::= Name
-       | `int`
-       | `num`
-       | `str`
-       | `bool`
-       | `[` Type `]`
-
-struct ::= `{` [fieldlist] `}`
+struct ::= '{' [fieldlist] '}'
 fieldlist ::= field {[sep] field}
-sep ::= `,` | `;`
-field ::= Property [`:` type] | Property [`:` type] `=` expr | FN Property fn_body
+sep ::= ',' | ';'
+field ::= Property [':' type] | Property [':' type] '=' expr | 'fn' Property fn_body
 Property ::= Name
+
+type ::= Name
+       | 'int'
+       | 'num'
+       | 'str'
+       | 'bool'
+       | '[' Type ']'
+       | 'maybe(' Type ')'
+
+bin_op ::= '+' | '-' | '*' | '/' | '^' | '%' | '..'
+        | '==' | '!=' | '<' | '>' | '<=' | '>='
+        | 'and' | 'or'
+
+un_op ::= '-' | 'not'
+
+assign_op ::= '+=' | '-=' | '*=' | '/=' | '^=' | '%=' | '..='
