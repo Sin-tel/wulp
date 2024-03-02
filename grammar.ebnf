@@ -15,7 +15,7 @@ stat ::= assignment
 
 laststat ::= 'return' [expr_list] | 'break'
 
-let_stat ::= 'let' {} '=' expr_list
+let_stat ::= 'let' name_ty_list '=' expr_list
 name_ty_list ::= name_ty {',' name_ty}
 name_ty ::= Name [':' type]
 
