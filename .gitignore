@@ -2,12 +2,12 @@
 **/*.rs.bk
 Cargo.lock
 .vscode
-better_lua.sublime-project
-better_lua.sublime-workspace
+*.sublime-project
+*.sublime-workspace
 tarpaulin-report.html
 todo.md
 notes.md
 types.md
 iter.md
 lua_test/**
-blua/test.blua
+wulp/test.wulp
