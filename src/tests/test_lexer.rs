@@ -2,11 +2,16 @@ use crate::lexer::*;
 use crate::span::Span;
 use crate::token::*;
 
+#[cfg(test)]
+fn new_lexer(input: &'static str) -> LexIter {
+	LexIter::new(input, 0, "test".to_string())
+}
+
 #[test]
 fn whitespace() {
 	let ws = "  ";
 
-	let mut lex = LexIter::new(ws);
+	let mut lex = new_lexer(ws);
 	lex.next();
 
 	assert_eq!(lex.next(), None);
@@ -16,13 +21,17 @@ fn whitespace() {
 fn single_line_comment() {
 	let single_line_comment = "// This is an example lua comment";
 
-	let mut lex = LexIter::new(single_line_comment);
+	let mut lex = new_lexer(single_line_comment);
 
 	assert_eq!(
 		lex.next(),
 		Some(Token {
 			kind: TokenKind::Comment,
-			span: Span { start: 0, end: 34 },
+			span: Span {
+				start: 0,
+				end: 34,
+				file_id: 0
+			},
 			line: 0
 		})
 	);
@@ -31,23 +40,31 @@ fn single_line_comment() {
 #[test]
 fn single_line_string() {
 	let single_quote = r#"'example string'"#;
-	let mut lex = LexIter::new(single_quote);
+	let mut lex = new_lexer(single_quote);
 	assert_eq!(
 		lex.next(),
 		Some(Token {
 			kind: TokenKind::Str,
-			span: Span { start: 0, end: 16 },
+			span: Span {
+				start: 0,
+				end: 16,
+				file_id: 0
+			},
 			line: 0
 		})
 	);
 
 	let double_quote = r#""example string""#;
-	let mut lex = LexIter::new(double_quote);
+	let mut lex = new_lexer(double_quote);
 	assert_eq!(
 		lex.next(),
 		Some(Token {
 			kind: TokenKind::Str,
-			span: Span { start: 0, end: 16 },
+			span: Span {
+				start: 0,
+				end: 16,
+				file_id: 0
+			},
 			line: 0
 		})
 	);
@@ -56,12 +73,16 @@ fn single_line_string() {
 #[test]
 fn multi_line_string() {
 	let multi_line = r##"#" multi-line	# "" 'raw string "#"##;
-	let mut lex = LexIter::new(multi_line);
+	let mut lex = new_lexer(multi_line);
 	assert_eq!(
 		lex.next(),
 		Some(Token {
 			kind: TokenKind::Str,
-			span: Span { start: 0, end: 33 },
+			span: Span {
+				start: 0,
+				end: 33,
+				file_id: 0
+			},
 			line: 0
 		})
 	);
@@ -72,7 +93,7 @@ fn basic_assignment() {
 	use TokenKind::*;
 
 	let nil_assignment = r#"x =nil"#;
-	let actual: Vec<_> = LexIter::new(nil_assignment).map(|tk| tk.kind).collect();
+	let actual: Vec<_> = new_lexer(nil_assignment).map(|tk| tk.kind).collect();
 
 	assert_eq!(actual, vec![Name, Assign, Nil]);
 }
@@ -83,18 +104,18 @@ fn assignment() {
 
 	let string_assignment = r#"x = 'foo'"#;
 
-	let lex = LexIter::new(string_assignment);
+	let lex = new_lexer(string_assignment);
 	let actual: Vec<_> = lex.map(|tk| tk.kind).collect();
 	assert_eq!(actual, vec![Name, Assign, Str]);
 
 	let bool_assignment = r#"x = false"#;
-	let lex = LexIter::new(bool_assignment);
+	let lex = new_lexer(bool_assignment);
 	let actual: Vec<_> = lex.map(|tk| tk.kind).collect();
 
 	assert_eq!(actual, vec![Name, Assign, False]);
 
 	let var_assignment = r#"x = y"#;
-	let lex = LexIter::new(var_assignment);
+	let lex = new_lexer(var_assignment);
 	let actual: Vec<_> = lex.map(|tk| tk.kind).collect();
 	assert_eq!(actual, vec![Name, Assign, Name]);
 }
@@ -103,7 +124,7 @@ fn assignment() {
 fn string_concat() {
 	let p = r#"'foo' .. bar"#;
 
-	let actual: Vec<_> = LexIter::new(p).map(|tk| tk.kind).collect();
+	let actual: Vec<_> = new_lexer(p).map(|tk| tk.kind).collect();
 
 	use TokenKind::*;
 	assert_eq!(actual, vec![Str, Concat, Name])
@@ -113,7 +134,7 @@ fn string_concat() {
 fn not_expressions() {
 	let p = r#"not true"#;
 
-	let actual: Vec<_> = LexIter::new(p).map(|tk| tk.kind).collect();
+	let actual: Vec<_> = new_lexer(p).map(|tk| tk.kind).collect();
 
 	use TokenKind::*;
 	assert_eq!(actual, vec![Not, True])
@@ -123,7 +144,7 @@ fn not_expressions() {
 fn empty_table() {
 	let p = r#"x = {}"#;
 
-	let actual: Vec<_> = LexIter::new(p).map(|tk| tk.kind).collect();
+	let actual: Vec<_> = new_lexer(p).map(|tk| tk.kind).collect();
 
 	use TokenKind::*;
 	assert_eq!(actual, vec![Name, Assign, LCurly, RCurly]);
@@ -133,7 +154,7 @@ fn empty_table() {
 fn numbers() {
 	let p = r#"1 1.2 1000. .5 -1"#;
 
-	let actual: Vec<_> = LexIter::new(p).map(|tk| tk.kind).collect();
+	let actual: Vec<_> = new_lexer(p).map(|tk| tk.kind).collect();
 
 	use TokenKind::*;
 	assert_eq!(actual, vec![Number, Number, Number, Number, Minus, Number]);
@@ -143,7 +164,7 @@ fn numbers() {
 #[should_panic(expected = "Failed to close string.")]
 fn string_fail() {
 	let p = r#"'hello"#;
-	let _: Vec<_> = LexIter::new(p).collect();
+	let _: Vec<_> = new_lexer(p).collect();
 }
 
 #[test]
@@ -151,12 +172,12 @@ fn string_fail() {
 fn string_fail2() {
 	let p = r#""hello
 	""#;
-	let _: Vec<_> = LexIter::new(p).collect();
+	let _: Vec<_> = new_lexer(p).collect();
 }
 
 #[test]
 #[should_panic(expected = "Unexpected token: `$`")]
 fn bad_char() {
 	let p = r#"let x = $100"#;
-	let _: Vec<_> = LexIter::new(p).collect();
+	let _: Vec<_> = new_lexer(p).collect();
 }
