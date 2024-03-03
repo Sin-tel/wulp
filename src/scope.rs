@@ -3,6 +3,7 @@ use crate::span::format_err_f;
 use crate::span::InputFile;
 use crate::std_lib::GLOBALS;
 use crate::symbol::{Symbol, SymbolId, SymbolTable};
+use crate::ty::TyAst;
 use crate::visitor::{VisitNode, Visitor};
 use anyhow::{anyhow, Result};
 use rustc_hash::FxHashMap;
@@ -42,12 +43,13 @@ impl<'a> ScopeCheck<'a> {
 		}
 	}
 
-	fn new_variable(&mut self, name: &'a str, is_const: bool, is_fn_def: bool) {
+	fn new_variable(&mut self, name: &'a str, is_const: bool, is_fn_def: bool) -> SymbolId {
 		let symbol = Symbol::new(name, is_const, is_fn_def);
 		let id = self.symbol_table.push(symbol);
 		// unwrap: there is always at least one scope
 		let scope = self.scope_stack.last_mut().unwrap();
 		scope.insert(name, id);
+		id
 	}
 
 	fn lookup(&mut self, name: &str) -> Option<SymbolId> {
@@ -204,9 +206,10 @@ impl<'a> Visitor for ScopeCheck<'a> {
 	}
 
 	fn visit_struct_def(&mut self, node: &mut StructDef) {
-		let name_str = node.name.span.as_str_f(self.input);
-		self.new_variable(name_str, true, false);
-		node.name.visit(self);
+		if let TyAst::Named(_) = node.ty {
+			let name = node.span.as_str_f(self.input);
+			node.symbol_id = self.new_variable(name, true, false);
+		}
 		node.table.visit(self);
 	}
 

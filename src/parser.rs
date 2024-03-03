@@ -275,9 +275,11 @@ impl<'a> Parser<'a> {
 	}
 
 	fn parse_struct_def(&mut self) -> StructDef {
+		// TODO: get rid of this
 		self.assert_next(TokenKind::Struct);
 
-		let name = self.parse_name();
+		let span = self.tokens.peek().span;
+		let ty = self.parse_type();
 
 		self.assert_next(TokenKind::LCurly);
 		let fields = self.parse_fields();
@@ -285,7 +287,12 @@ impl<'a> Parser<'a> {
 
 		let table = Table { fields };
 
-		StructDef { name, table }
+		StructDef {
+			ty,
+			table,
+			symbol_id: 0,
+			span,
+		}
 	}
 
 	fn parse_fn_def(&mut self) -> FnDef {

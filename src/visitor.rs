@@ -234,7 +234,7 @@ impl<V: Visitor> VisitNode<V> for StructDef {
 		v.visit_struct_def(self);
 	}
 	fn walk(&mut self, v: &mut V) {
-		v.visit_name(&mut self.name);
+		// v.visit_name(&mut self.name);
 		v.visit_table(&mut self.table);
 	}
 }

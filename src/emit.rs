@@ -90,7 +90,7 @@ impl EmitLua {
 	}
 	fn emit_struct_local(&mut self, node: &mut StructDef) {
 		self.statement.push_str("local ");
-		self.visit_name(&mut node.name);
+		self.statement.push_str(&node.ty.to_string());
 	}
 	fn emit_fn_def(&mut self, node: &mut FnDef) {
 		self.statement.push_str("function ");
@@ -253,7 +253,8 @@ impl Visitor for EmitLua {
 				self.visit_expr(&mut s.expr);
 			},
 			Stat::StructDef(t) => {
-				let name_str = self.symbol_table.get(t.name.id).name.clone();
+				// let name_str = self.symbol_table.get(t.name.id).name.clone();
+				let name_str = t.ty.to_string();
 				self.statement.push_str(&name_str);
 				self.statement.push_str(" = {\n");
 				self.indent_level += 1;
@@ -269,35 +270,40 @@ impl Visitor for EmitLua {
 				}
 				self.indent_level -= 1;
 				self.statement.push('}');
-				self.put_statement();
-				// TODO: try to get rid of the `args = args or {}`
-				self.statement.push_str(&format!(
-					"setmetatable({0}, {{\n\
+
+				// constructor
+				// TODO: this is kind of a stupid way to check
+				if name_str != "str" && name_str != "int" && name_str != "num" {
+					self.put_statement();
+					// TODO: try to get rid of the `args = args or {}`
+					self.statement.push_str(&format!(
+						"setmetatable({0}, {{\n\
 					\t__call = function(_, args)\n\
 					\t\targs = args or {{}};\n\
 					\t\tlocal new = {{",
-					&name_str
-				));
-				for f in &mut t.table.fields {
-					match &mut f.kind {
-						FieldKind::Empty => {
-							self.visit_property(&mut f.field.property);
-							self.statement.push_str(" = args.");
-							self.visit_property(&mut f.field.property);
-							self.statement.push_str(", ");
-						},
-						FieldKind::Assign(e) => {
-							self.visit_property(&mut f.field.property);
-							self.statement.push_str(" = default(args.");
-							self.visit_property(&mut f.field.property);
-							self.statement.push_str(", ");
-							self.visit_expr(e);
-							self.statement.push_str("), ");
-						},
-						FieldKind::Fn(_) => (),
+						&name_str
+					));
+					for f in &mut t.table.fields {
+						match &mut f.kind {
+							FieldKind::Empty => {
+								self.visit_property(&mut f.field.property);
+								self.statement.push_str(" = args.");
+								self.visit_property(&mut f.field.property);
+								self.statement.push_str(", ");
+							},
+							FieldKind::Assign(e) => {
+								self.visit_property(&mut f.field.property);
+								self.statement.push_str(" = default(args.");
+								self.visit_property(&mut f.field.property);
+								self.statement.push_str(", ");
+								self.visit_expr(e);
+								self.statement.push_str("), ");
+							},
+							FieldKind::Fn(_) => (),
+						}
 					}
+					self.statement.push_str("}\n\t\treturn new\n\tend\n})");
 				}
-				self.statement.push_str("}\n\t\treturn new\n\tend\n})");
 			},
 			Stat::WhileBlock(_)
 			| Stat::IfBlock(_)
