@@ -109,7 +109,7 @@ impl<'a> TypeCheck<'a> {
 			},
 		}
 	}
-	fn to_ty(&self, ty_ast: &TyAst) -> Ty {
+	fn convert_ast_ty(&mut self, ty_ast: &TyAst) -> Ty {
 		match ty_ast {
 			TyAst::Any => Ty::Any,
 			TyAst::Nil => Ty::Nil,
@@ -126,7 +126,16 @@ impl<'a> TypeCheck<'a> {
 						return Ty::Instance(i);
 					}
 				}
-				panic!("Unknown type `{}`.", s,);
+				panic!("Unknown type `{s}`.");
+			},
+			TyAst::Fn(args, ret) => {
+				let mut t_args = Vec::new();
+				for a in args {
+					let ty = self.convert_ast_ty(a);
+					t_args.push(self.new_ty(ty));
+				}
+				let ty = self.convert_ast_ty(ret);
+				Ty::Fn(t_args, self.new_ty(ty))
 			},
 			TyAst::SelfTy => unreachable!(),
 			_ => todo!(),
@@ -297,7 +306,17 @@ impl<'a> TypeCheck<'a> {
 				(a, b) if a == b => Ok(()),
 				(Ty::Array(a), Ty::Array(b)) | (Ty::Maybe(a), Ty::Maybe(b)) => self.unify(a, b),
 
-				(_, Ty::Fn(_, _)) | (Ty::Fn(_, _), _) => todo!(),
+				(Ty::Fn(a_args, a_ret), Ty::Fn(b_args, b_ret)) => {
+					if a_args.len() != b_args.len() {
+						return Err(());
+					}
+					for (a, b) in zip(a_args, b_args) {
+						self.unify(a, b)?;
+					}
+					self.unify(a_ret, b_ret)?;
+
+					Ok(())
+				},
 
 				_ => Err(()),
 			}
@@ -446,7 +465,7 @@ impl<'a> TypeCheck<'a> {
 				let ty = match &p.ty {
 					Some(ty) => match ty {
 						TyAst::SelfTy => self_ty.clone().expect("can't use `self` here"),
-						_ => self.to_ty(ty),
+						_ => self.convert_ast_ty(ty),
 					},
 					None => Ty::TyVar,
 				};
@@ -470,7 +489,7 @@ impl<'a> TypeCheck<'a> {
 	fn hoist_fn_def(&mut self, node: &FnDef) {
 		let param_ty = self.eval_fn_params(&node.body.params, None);
 		let ty = match &node.body.ty {
-			Some(ty) => self.to_ty(ty),
+			Some(ty) => self.convert_ast_ty(ty),
 			None => Ty::TyVar,
 		};
 		let ret_id = self.new_ty(ty);
@@ -510,7 +529,7 @@ impl<'a> TypeCheck<'a> {
 		let ty = match &node.ty {
 			Some(ty) => match ty {
 				TyAst::SelfTy => self_ty.expect("can't use `self` here"),
-				_ => self.to_ty(ty),
+				_ => self.convert_ast_ty(ty),
 			},
 			None => Ty::TyVar,
 		};
@@ -720,7 +739,8 @@ impl<'a> TypeCheck<'a> {
 						.push(f.field.property.name.clone());
 
 					if let Some(ty) = &f.field.ty {
-						(f.field.property.name.clone(), self.new_ty(self.to_ty(ty)))
+						let new_ty = self.convert_ast_ty(ty);
+						(f.field.property.name.clone(), self.new_ty(new_ty))
 					} else {
 						let msg = "Need type annotation here";
 						format_err_f(msg, f.field.property.span, self.input);
@@ -736,7 +756,8 @@ impl<'a> TypeCheck<'a> {
 					}
 					let mut expr_ty = self.eval_expr(a);
 					if let Some(ty) = &f.field.ty {
-						let ty_id = self.new_ty(self.to_ty(ty));
+						let new_ty = self.convert_ast_ty(ty);
+						let ty_id = self.new_ty(new_ty);
 						if self.unify(ty_id, expr_ty).is_err() {
 							let msg = format!(
 								"Incompatible types `{}` and `{}`",
@@ -761,9 +782,9 @@ impl<'a> TypeCheck<'a> {
 
 	fn new_struct(&mut self, name: &Name) -> TableId {
 		let name_str = &self.symbol_table.get(name.id).name;
-		for k in self.structs.iter() {
+		for k in &self.structs {
 			if name_str == &self.symbol_table.get(k.symbol_id).name {
-				let msg = format!("Struct `{}` already defined.", name_str);
+				let msg = format!("Struct `{name_str}` already defined.");
 				format_err_f(&msg, name.span, self.input);
 				self.errors.push(msg);
 			}
@@ -842,7 +863,8 @@ impl<'a> TypeCheck<'a> {
 		for (n, rhs_ty) in zip(&node.names, rhs) {
 			// check if annotation fits
 			if let Some(ty) = &n.ty {
-				let ty_id = self.new_ty(self.to_ty(ty));
+				let new_ty = self.convert_ast_ty(ty);
+				let ty_id = self.new_ty(new_ty);
 				if self.unify(rhs_ty, ty_id).is_err() {
 					let msg = format!(
 						"Type error, assigning `{}` to `{}`.",
@@ -852,7 +874,8 @@ impl<'a> TypeCheck<'a> {
 					format_err_f(&msg, node.span, self.input);
 					self.errors.push(msg);
 				}
-				self.new_def(n.name.id, self.to_ty(ty));
+				let new_ty = self.convert_ast_ty(ty);
+				self.new_def(n.name.id, new_ty);
 			} else {
 				self.new_def(n.name.id, self.get_type(rhs_ty));
 			}
@@ -942,10 +965,14 @@ impl<'a> TypeCheck<'a> {
 		}
 		let ty = self.get_type(lhs);
 		match op {
-			BinOp::Plus | BinOp::Minus | BinOp::Mul | BinOp::Pow | BinOp::Mod | BinOp::Div => {
-				// TODO: currently div and pow on int have type `(int, int) -> int` but this is wrong!
+			BinOp::Plus | BinOp::Minus | BinOp::Mul | BinOp::Mod => {
 				if ty == Ty::Int || ty == Ty::Num {
 					return lhs;
+				}
+			},
+			BinOp::Pow | BinOp::Div => {
+				if ty == Ty::Int || ty == Ty::Num {
+					return self.new_ty(Ty::Num);
 				}
 			},
 			BinOp::Gt | BinOp::Lt | BinOp::Gte | BinOp::Lte => {
