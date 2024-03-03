@@ -10,7 +10,7 @@ use anyhow::Result;
 use rustc_hash::FxHashMap;
 use std::iter::zip;
 
-type TableId = usize;
+type StructId = usize;
 
 #[derive(Debug)]
 struct Struct {
@@ -89,13 +89,13 @@ impl<'a> TypeCheck<'a> {
 			Ty::Int => "int".to_string(),
 			Ty::TyVar => format!("T{id}?"),
 			Ty::Free => format!("T{id}"),
-			Ty::Instance(table_id) => format!("instance_{table_id}"),
-			Ty::Table(table_id) => {
+			Ty::Instance(struct_id) => format!("instance_{struct_id}"),
+			Ty::Struct(struct_id) => {
 				let mut s = String::new();
-				for (p, ty) in &self.structs[table_id].fields {
+				for (p, ty) in &self.structs[struct_id].fields {
 					s.push_str(&format!("{} = {}, ", p, self.ty_to_string(*ty)));
 				}
-				format!("table_{table_id} {{ {s} }}")
+				format!("table_{struct_id} {{ {s} }}")
 			},
 			Ty::Array(ty) => format!("[{}]", self.ty_to_string(ty)),
 			Ty::Maybe(ty) => format!("maybe({})", self.ty_to_string(ty)),
@@ -199,7 +199,7 @@ impl<'a> TypeCheck<'a> {
 			| Ty::Int
 			| Ty::Free
 			| Ty::Instance(_)
-			| Ty::Table(_) => (),
+			| Ty::Struct(_) => (),
 			Ty::TyVar => {
 				let parent_id = self.get_parent(id);
 				self.types[parent_id] = TyNode::Ty(Ty::Free);
@@ -225,7 +225,7 @@ impl<'a> TypeCheck<'a> {
 			Ty::Any | Ty::Bottom | Ty::Nil | Ty::Bool | Ty::Str | Ty::Num | Ty::Int | Ty::TyVar | Ty::Instance(_) => {
 				parent_id
 			},
-			Ty::Table(table_id) => self.new_ty(Ty::Instance(table_id)),
+			Ty::Struct(struct_id) => self.new_ty(Ty::Instance(struct_id)),
 			Ty::Free => {
 				// keep track of which variables were already instantiated
 				for &(old, new) in subs.iter() {
@@ -260,7 +260,7 @@ impl<'a> TypeCheck<'a> {
 			| Ty::Int
 			| Ty::TyVar
 			| Ty::Instance(_)
-			| Ty::Table(_)
+			| Ty::Struct(_)
 			| Ty::Free => Ok(()),
 			Ty::Array(t_id) | Ty::Maybe(t_id) => {
 				if t_id == id {
@@ -565,7 +565,7 @@ impl<'a> TypeCheck<'a> {
 				ty = self.eval_suffix(ty, expr.span, suffix);
 			}
 			// TODO: this doesn't work for non-method calls!
-			if let Ty::Instance(table_id) = self.get_type(ty) {
+			if let Ty::Instance(struct_id) = self.get_type(ty) {
 				// fix up the AST for method call
 				let inst_expr = std::mem::replace(
 					expr,
@@ -573,7 +573,7 @@ impl<'a> TypeCheck<'a> {
 						span: expr.span,
 						kind: ExprKind::Name(Name {
 							span: expr.span,
-							id: self.structs[table_id].symbol_id,
+							id: self.structs[struct_id].symbol_id,
 						}),
 					}),
 				);
@@ -627,7 +627,7 @@ impl<'a> TypeCheck<'a> {
 				ret_ty
 			},
 			// constructor
-			Ty::Instance(table_id) => {
+			Ty::Instance(struct_id) => {
 				// TODO: instantiate does not take care of generics on struct
 				if !c.args.is_empty() {
 					let msg = "constructor can only contain named arguments".to_string();
@@ -635,7 +635,7 @@ impl<'a> TypeCheck<'a> {
 					self.errors.push(msg);
 					return ERR_TY;
 				}
-				for k in &self.structs[table_id].required_fields {
+				for k in &self.structs[struct_id].required_fields {
 					let mut check = false;
 					for a in &mut c.named_args {
 						if &a.name == k {
@@ -651,7 +651,7 @@ impl<'a> TypeCheck<'a> {
 					}
 				}
 				for a in &mut c.named_args {
-					if let Some(&p) = self.structs[table_id].fields.get(&a.name) {
+					if let Some(&p) = self.structs[struct_id].fields.get(&a.name) {
 						let arg_ty = self.eval_expr(&mut a.expr);
 						if self.unify(arg_ty, p).is_err() {
 							let msg = format!(
@@ -734,12 +734,12 @@ impl<'a> TypeCheck<'a> {
 	}
 
 	fn eval_struct_def(&mut self, node: &mut StructDef) {
-		let table_id = self.new_struct(&node.name);
-		self.new_def(node.name.id, Ty::Table(table_id));
+		let struct_id = self.new_struct(&node.name);
+		self.new_def(node.name.id, Ty::Struct(struct_id));
 		for f in &mut node.table.fields {
 			let (k, v) = match &mut f.kind {
 				FieldKind::Empty => {
-					self.structs[table_id]
+					self.structs[struct_id]
 						.required_fields
 						.push(f.field.property.name.clone());
 
@@ -778,14 +778,14 @@ impl<'a> TypeCheck<'a> {
 				},
 				FieldKind::Fn(func) => (
 					f.field.property.name.clone(),
-					self.eval_lambda(func, f.field.property.span, Some(Ty::Instance(table_id))),
+					self.eval_lambda(func, f.field.property.span, Some(Ty::Instance(struct_id))),
 				),
 			};
-			self.structs[table_id].fields.insert(k, v);
+			self.structs[struct_id].fields.insert(k, v);
 		}
 	}
 
-	fn new_struct(&mut self, name: &Name) -> TableId {
+	fn new_struct(&mut self, name: &Name) -> StructId {
 		let name_str = &self.symbol_table.get(name.id).name;
 		for k in &self.structs {
 			if name_str == &self.symbol_table.get(k.symbol_id).name {
@@ -800,13 +800,13 @@ impl<'a> TypeCheck<'a> {
 			required_fields: Vec::new(),
 			symbol_id: name.id,
 		};
-		let table_id = self.structs.len();
+		let struct_id = self.structs.len();
 		self.structs.push(table);
-		table_id
+		struct_id
 	}
 
-	fn get_property(&mut self, table: TableId, p: &mut Property) -> Option<TyId> {
-		self.structs[table].fields.get(&p.name).copied()
+	fn get_property(&mut self, struct_id: StructId, p: &mut Property) -> Option<TyId> {
+		self.structs[struct_id].fields.get(&p.name).copied()
 	}
 
 	fn eval_suffix_expr(&mut self, expr: &mut Expr, s: &mut Vec<Suffix>) -> TyId {
@@ -820,16 +820,17 @@ impl<'a> TypeCheck<'a> {
 	fn eval_suffix(&mut self, expr_ty: TyId, expr_span: Span, suffix: &mut Suffix) -> TyId {
 		match suffix {
 			Suffix::Property(p) => match self.get_type(expr_ty) {
-				Ty::Table(table) | Ty::Instance(table) => {
-					if let Some(p_id) = self.get_property(table, p) {
+				Ty::Struct(struct_id) | Ty::Instance(struct_id) => {
+					if let Some(p_id) = self.get_property(struct_id, p) {
 						p_id
 					} else {
-						let msg = format!("Table doesn't have property `{}`.", p.name);
+						let msg = format!("Struct doesn't have property `{}`.", p.name);
 						format_err_f(&msg, p.span, self.input);
 						self.errors.push(msg);
 						ERR_TY
 					}
 				},
+				Ty::Str => todo!(),
 				Ty::Bottom => ERR_TY,
 				_ => {
 					let msg = format!("Can not get property on type `{}`.", self.ty_to_string(expr_ty));

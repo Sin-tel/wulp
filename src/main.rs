@@ -29,7 +29,6 @@ use std::fs;
 use std::path::Path;
 
 pub mod ast;
-// pub mod ast_print;
 pub mod emit;
 pub mod lexer;
 pub mod parser;
@@ -52,7 +51,6 @@ fn main() -> Result<()> {
 
 	// println!("----- input:");
 	// println!("{input}");
-
 	let symbol_table = ScopeCheck::check(&mut ast, &files)?;
 	// for s in symbol_table.symbols.iter() {
 	// 	dbg!(s);

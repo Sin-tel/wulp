@@ -2,7 +2,7 @@ use std::fmt;
 // use std::iter::zip;
 
 pub type TyId = usize;
-pub type TableId = usize;
+pub type StructId = usize;
 
 #[derive(Debug)]
 pub enum TyNode {
@@ -21,8 +21,8 @@ pub enum Ty {
 	Int,
 	TyVar, // type variable
 	Free,  // free type varaible
-	Instance(TableId),
-	Table(TableId),
+	Instance(StructId),
+	Struct(StructId),
 	Array(TyId),
 	Maybe(TyId),
 	Fn(Vec<TyId>, TyId), // args, ret
@@ -38,7 +38,7 @@ pub enum TyAst {
 	Int,
 	SelfTy,
 	Named(String),
-	Table(TableId),
+	Struct(StructId),
 	Array(Box<TyAst>),
 	Maybe(Box<TyAst>),
 	Fn(Vec<TyAst>, Box<TyAst>),
@@ -54,7 +54,7 @@ impl fmt::Display for TyAst {
 			TyAst::Num => "num".to_string(),
 			TyAst::Int => "int".to_string(),
 			TyAst::SelfTy => "self".to_string(),
-			TyAst::Table(_) => "table".to_string(),
+			TyAst::Struct(_) => "table".to_string(),
 			TyAst::Named(s) => s.clone(),
 			TyAst::Array(ty) => format!("[{ty}]"),
 			TyAst::Maybe(ty) => format!("maybe({ty})"),
