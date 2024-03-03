@@ -137,8 +137,12 @@ impl<'a> TypeCheck<'a> {
 				let ty = self.convert_ast_ty(ret);
 				Ty::Fn(t_args, self.new_ty(ty))
 			},
+			TyAst::Array(a) => {
+				let ty = self.convert_ast_ty(a);
+				Ty::Array(self.new_ty(ty))
+			},
 			TyAst::SelfTy => unreachable!(),
-			_ => todo!(),
+			e => unimplemented!("{}", e),
 		}
 	}
 
@@ -560,6 +564,7 @@ impl<'a> TypeCheck<'a> {
 			for suffix in s.iter_mut() {
 				ty = self.eval_suffix(ty, expr.span, suffix);
 			}
+			// TODO: this doesn't work for non-method calls!
 			if let Ty::Instance(table_id) = self.get_type(ty) {
 				// fix up the AST for method call
 				let inst_expr = std::mem::replace(
@@ -667,7 +672,7 @@ impl<'a> TypeCheck<'a> {
 				}
 				fn_ty
 			},
-
+			Ty::Bottom => ERR_TY,
 			_ => {
 				let msg = format!("Type `{}` is not callable.", self.ty_to_string(fn_ty));
 				format_err_f(&msg, c.expr.span, self.input);
@@ -825,6 +830,7 @@ impl<'a> TypeCheck<'a> {
 						ERR_TY
 					}
 				},
+				Ty::Bottom => ERR_TY,
 				_ => {
 					let msg = format!("Can not get property on type `{}`.", self.ty_to_string(expr_ty));
 					format_err_f(&msg, expr_span, self.input);
@@ -833,13 +839,15 @@ impl<'a> TypeCheck<'a> {
 				},
 			},
 			Suffix::Index(e) => {
-				let ty = if let Ty::Array(inner_ty) = self.get_type(expr_ty) {
-					inner_ty
-				} else {
-					let msg = format!("Can not index type `{}`.", self.ty_to_string(expr_ty));
-					format_err_f(&msg, expr_span, self.input);
-					self.errors.push(msg);
-					return ERR_TY;
+				let ty = match self.get_type(expr_ty) {
+					Ty::Array(inner_ty) => inner_ty,
+					Ty::Bottom => ERR_TY,
+					_ => {
+						let msg = format!("Can not index type `{}`.", self.ty_to_string(expr_ty));
+						format_err_f(&msg, expr_span, self.input);
+						self.errors.push(msg);
+						return ERR_TY;
+					},
 				};
 				let index_ty = self.eval_expr(e);
 				let ty_int = self.new_ty(Ty::Int);
