@@ -90,7 +90,7 @@ impl EmitLua {
 	}
 	fn emit_struct_local(&mut self, node: &mut StructDef) {
 		self.statement.push_str("local ");
-		self.statement.push_str(&node.ty.to_string());
+		self.visit_name(&mut node.name);
 	}
 	fn emit_fn_def(&mut self, node: &mut FnDef) {
 		self.statement.push_str("function ");
@@ -253,8 +253,7 @@ impl Visitor for EmitLua {
 				self.visit_expr(&mut s.expr);
 			},
 			Stat::StructDef(t) => {
-				// let name_str = self.symbol_table.get(t.name.id).name.clone();
-				let name_str = t.ty.to_string();
+				let name_str = self.symbol_table.get(t.name.id).name.clone();
 				self.statement.push_str(&name_str);
 				self.statement.push_str(" = {\n");
 				self.indent_level += 1;

@@ -4,16 +4,44 @@ pub type SymbolId = usize;
 pub struct Symbol {
 	pub name: String,
 	pub is_const: bool,
-	pub is_fn_def: bool,
+	pub kind: SymbolKind,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum SymbolKind {
+	Var,
+	FnDef,
+	Ty,
 }
 
 impl Symbol {
-	pub fn new(name: &str, is_const: bool, is_fn_def: bool) -> Self {
+	#[must_use]
+	pub fn new(name: &str) -> Self {
 		Self {
 			name: name.to_string(),
-			is_const,
-			is_fn_def,
+			is_const: false,
+			kind: SymbolKind::Var,
 		}
+	}
+
+	#[must_use]
+	pub fn make_const(mut self) -> Self {
+		self.is_const = true;
+		self
+	}
+
+	#[must_use]
+	pub fn fn_def(mut self) -> Self {
+		self.is_const = true;
+		self.kind = SymbolKind::FnDef;
+		self
+	}
+
+	#[must_use]
+	pub fn ty_def(mut self) -> Self {
+		self.is_const = true;
+		self.kind = SymbolKind::Ty;
+		self
 	}
 }
 
@@ -32,7 +60,7 @@ impl SymbolTable {
 			temp_counter: 0,
 		};
 		// id = 0 always points to this
-		new.symbols.push(Symbol::new("UNKNOWN_SYMBOL", true, false));
+		new.symbols.push(Symbol::new("UNKNOWN_SYMBOL").make_const());
 		new
 	}
 
@@ -45,7 +73,7 @@ impl SymbolTable {
 	pub fn fresh_temp(&mut self) -> (SymbolId, String) {
 		let name = format!("_t{}", self.temp_counter);
 		self.temp_counter += 1;
-		let symbol = Symbol::new(&name, false, false);
+		let symbol = Symbol::new(&name);
 
 		let id = self.push(symbol);
 		(id, name)
@@ -58,7 +86,7 @@ impl SymbolTable {
 
 	pub fn mangle(&mut self) {
 		for s in &mut self.symbols {
-			if !s.is_const && !s.is_fn_def {
+			if !s.is_const && s.kind != SymbolKind::FnDef {
 				let mut name = "_Z".to_string();
 				name.push_str(&s.name);
 				s.name = name;

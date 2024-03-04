@@ -16,6 +16,7 @@ struct Struct {
 	methods: FxHashMap<String, TyId>,
 	required_fields: Vec<String>,
 	symbol_id: SymbolId,
+	lang_type: bool,
 }
 
 const ERR_TY: TyId = 0;
@@ -88,7 +89,7 @@ impl<'a> TypeCheck<'a> {
 			Ty::Int => "int".to_string(),
 			Ty::TyVar => format!("T{id}?"),
 			Ty::Free => format!("T{id}"),
-			Ty::TyName(s) => format!("Type({})", s),
+			Ty::TyName(s) => format!("Type({s})"),
 			Ty::Named(s) => s.clone(),
 			Ty::Array(ty) => format!("[{}]", self.ty_to_string(ty)),
 			Ty::Maybe(ty) => format!("maybe({})", self.ty_to_string(ty)),
@@ -555,8 +556,12 @@ impl<'a> TypeCheck<'a> {
 			}
 
 			// TODO: this is a bit messy!
-			// TODO: do not call this
-			if let Ty::Named(struct_name) = self.get_type(ty) {
+			// TODO: do not call this when evaluating lambda field
+			if let Ty::TyName(_) = self.get_type(ty) {
+				s.push(last_suffix);
+			} else {
+				// TODO: bad idea
+				let name = self.ty_to_string(ty);
 				// fix up the AST for method call
 				let inst_expr = std::mem::replace(
 					expr,
@@ -564,7 +569,7 @@ impl<'a> TypeCheck<'a> {
 						span: expr.span,
 						kind: ExprKind::Name(Name {
 							span: expr.span,
-							id: self.structs[&struct_name].symbol_id,
+							id: self.structs[&name].symbol_id,
 						}),
 					}),
 				);
@@ -580,8 +585,6 @@ impl<'a> TypeCheck<'a> {
 						}
 					},
 				);
-			} else {
-				s.push(last_suffix);
 			}
 		}
 
@@ -620,6 +623,14 @@ impl<'a> TypeCheck<'a> {
 			// constructor
 			Ty::TyName(struct_name) => {
 				// TODO: instantiate does not take care of generics on struct
+
+				// FIXME
+				if self.structs[&struct_name].lang_type {
+					let msg = "builtin type does not have a constructor".to_string();
+					format_err_f(&msg, c.expr.span, self.input);
+					self.errors.push(msg);
+					return ERR_TY;
+				}
 				if !c.args.is_empty() {
 					let msg = "constructor can only contain named arguments".to_string();
 					format_err_f(&msg, c.args[0].span, self.input);
@@ -725,20 +736,29 @@ impl<'a> TypeCheck<'a> {
 	}
 
 	fn eval_struct_def(&mut self, node: &mut StructDef) {
+		let mut lang_type = false;
+
+		let struct_name = &self.symbol_table.get(node.name.id).name;
+
+		// TODO: add a directive for this
+		if struct_name == "str" || struct_name == "int" || struct_name == "num" {
+			lang_type = true;
+		}
 		let table = Struct {
 			fields: FxHashMap::default(),
 			methods: FxHashMap::default(),
 			required_fields: Vec::new(),
-			symbol_id: node.symbol_id,
+			symbol_id: node.name.id,
+			lang_type,
 		};
-		let struct_name = node.ty.to_string();
+
 		self.structs.insert(struct_name.clone(), table);
-		self.new_def(node.symbol_id, Ty::TyName(struct_name.clone()));
+		self.new_def(node.name.id, Ty::TyName(struct_name.clone()));
 		for f in &mut node.table.fields {
 			match &mut f.kind {
 				FieldKind::Empty => {
 					self.structs
-						.get_mut(&struct_name)
+						.get_mut(struct_name)
 						.unwrap()
 						.required_fields
 						.push(f.field.property.name.clone());
@@ -747,7 +767,7 @@ impl<'a> TypeCheck<'a> {
 						let new_ty = self.convert_ast_ty(ty);
 						let ty = self.new_ty(new_ty);
 						self.structs
-							.get_mut(&struct_name)
+							.get_mut(struct_name)
 							.unwrap()
 							.fields
 							.insert(f.field.property.name.clone(), ty);
@@ -780,7 +800,7 @@ impl<'a> TypeCheck<'a> {
 						expr_ty = ty_id;
 					}
 					self.structs
-						.get_mut(&struct_name)
+						.get_mut(struct_name)
 						.unwrap()
 						.fields
 						.insert(f.field.property.name.clone(), expr_ty);
@@ -788,7 +808,7 @@ impl<'a> TypeCheck<'a> {
 				FieldKind::Fn(func) => {
 					let ty = self.eval_lambda(func, f.field.property.span, Some(Ty::Named(struct_name.clone())));
 					self.structs
-						.get_mut(&struct_name)
+						.get_mut(struct_name)
 						.unwrap()
 						.methods
 						.insert(f.field.property.name.clone(), ty);
@@ -832,7 +852,7 @@ impl<'a> TypeCheck<'a> {
 			Suffix::Property(p) => match self.get_type(expr_ty) {
 				Ty::Named(name) => self.get_field(&name, p),
 				Ty::TyName(name) => self.get_method(&name, p),
-				Ty::Bottom => return ERR_TY,
+				Ty::Bottom => ERR_TY,
 				_ => {
 					let msg = format!("Type `{}` does not allow indexing with `.`", self.ty_to_string(expr_ty));
 					format_err_f(&msg, expr_span, self.input);

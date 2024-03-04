@@ -144,10 +144,8 @@ pub struct FnDef {
 
 #[derive(Debug)]
 pub struct StructDef {
-	pub ty: TyAst,
+	pub name: Name,
 	pub table: Table,
-	pub symbol_id: SymbolId,
-	pub span: Span,
 }
 
 #[derive(Debug)]

@@ -2,8 +2,8 @@ use crate::ast::*;
 use crate::span::format_err_f;
 use crate::span::InputFile;
 use crate::std_lib::GLOBALS;
+use crate::symbol::SymbolKind;
 use crate::symbol::{Symbol, SymbolId, SymbolTable};
-use crate::ty::TyAst;
 use crate::visitor::{VisitNode, Visitor};
 use anyhow::{anyhow, Result};
 use rustc_hash::FxHashMap;
@@ -29,7 +29,11 @@ impl<'a> ScopeCheck<'a> {
 		this.scope_stack.push(FxHashMap::default());
 
 		for item in GLOBALS.iter() {
-			this.new_variable(item.name, true, item.is_fn_def);
+			let mut sym = Symbol::new(item.name).make_const();
+			if item.is_fn_def {
+				sym = sym.fn_def();
+			}
+			this.new_variable(item.name, sym);
 			assert_eq!(this.lookup(item.name), Some(item.id));
 		}
 
@@ -43,13 +47,11 @@ impl<'a> ScopeCheck<'a> {
 		}
 	}
 
-	fn new_variable(&mut self, name: &'a str, is_const: bool, is_fn_def: bool) -> SymbolId {
-		let symbol = Symbol::new(name, is_const, is_fn_def);
+	fn new_variable(&mut self, name: &'a str, symbol: Symbol) {
 		let id = self.symbol_table.push(symbol);
 		// unwrap: there is always at least one scope
 		let scope = self.scope_stack.last_mut().unwrap();
 		scope.insert(name, id);
-		id
 	}
 
 	fn lookup(&mut self, name: &str) -> Option<SymbolId> {
@@ -70,7 +72,7 @@ impl<'a> ScopeCheck<'a> {
 				let name = n.span.as_str_f(self.input);
 
 				if let Some(id) = self.lookup(name) {
-					if self.symbol_table.get(id).is_fn_def {
+					if self.symbol_table.get(id).kind == SymbolKind::FnDef {
 						let msg = format!("Function `{name}` already defined.");
 						format_err_f(&msg, n.span, self.input);
 						self.errors.push(msg);
@@ -111,7 +113,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		}
 		self.scope_stack.pop();
 		let name_str = node.alias.span.as_str_f(self.input);
-		self.new_variable(name_str, true, false);
+		self.new_variable(name_str, Symbol::new(name_str).make_const());
 		node.alias.visit(self);
 	}
 
@@ -134,7 +136,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		for n in &mut node.names {
 			let name = n.span.as_str_f(self.input);
 			// marked as const since we should never assign to loop variable
-			self.new_variable(name, true, false);
+			self.new_variable(name, Symbol::new(name).make_const());
 			n.visit(self);
 		}
 		node.expr.visit(self);
@@ -154,7 +156,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 				self.errors.push(msg);
 			} else {
 				// function defs are always const
-				self.new_variable(name, true, true);
+				self.new_variable(name, Symbol::new(name).fn_def());
 			}
 		} else {
 			node.walk(self);
@@ -165,7 +167,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		self.scope_stack.push(FxHashMap::default());
 		for n in &mut node.params {
 			let name = n.name.span.as_str_f(self.input);
-			self.new_variable(name, false, false);
+			self.new_variable(name, Symbol::new(name));
 			n.visit(self);
 		}
 		node.body.visit(self);
@@ -200,16 +202,15 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		for n in &mut node.names {
 			// TODO: make sure we don't do anything stupid like let x, x = 1, 2
 			let name_str = n.name.span.as_str_f(self.input);
-			self.new_variable(name_str, false, false);
+			self.new_variable(name_str, Symbol::new(name_str));
 			n.name.visit(self);
 		}
 	}
 
 	fn visit_struct_def(&mut self, node: &mut StructDef) {
-		if let TyAst::Named(_) = node.ty {
-			let name = node.span.as_str_f(self.input);
-			node.symbol_id = self.new_variable(name, true, false);
-		}
+		let name = node.name.span.as_str_f(self.input);
+		self.new_variable(name, Symbol::new(name).ty_def());
+		node.name.visit(self);
 		node.table.visit(self);
 	}
 
@@ -224,7 +225,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 			format_err_f(&msg, node.span, self.input);
 			self.errors.push(msg);
 			// to suppress further errors, we add a new variable anyway
-			self.new_variable(name, false, false);
+			self.new_variable(name, Symbol::new(name));
 		}
 	}
 }
