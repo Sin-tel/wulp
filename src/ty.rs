@@ -1,4 +1,5 @@
 use crate::ast;
+use crate::symbol::SymbolId;
 
 pub type TyId = usize;
 
@@ -17,10 +18,10 @@ pub enum Ty {
 	Str,
 	Num,
 	Int,
-	TyVar,          // type variable
-	Free,           // free type varaible
-	TyName(String), // The type of the name of a type
-	Named(String),
+	TyVar,            // type variable
+	Free,             // free type varaible
+	TyName(SymbolId), // The type of the name of a type
+	Named(SymbolId),
 	Array(TyId),
 	Maybe(TyId),
 	Fn(Vec<TyId>, TyId), // args, ret

@@ -29,7 +29,7 @@ pub struct TypeCheck<'a> {
 	errors: Vec<String>,
 	env: FxHashMap<SymbolId, TyId>, // TODO: this can be Vec<Option>
 	types: Vec<TyNode>,
-	structs: FxHashMap<String, Struct>,
+	structs: FxHashMap<SymbolId, Struct>,
 	symbol_table: &'a SymbolTable,
 }
 
@@ -105,7 +105,7 @@ impl<'a> TypeCheck<'a> {
 	}
 	fn convert_ast_ty(&mut self, ty_ast: &TyAst) -> Ty {
 		match ty_ast {
-			TyAst::Named(s) => self.convert_named(&self.symbol_table.get(s.id).name.clone()),
+			TyAst::Named(s) => self.convert_named(s.id),
 			TyAst::Fn(args, ret) => {
 				let mut t_args = Vec::new();
 				for a in args {
@@ -124,11 +124,12 @@ impl<'a> TypeCheck<'a> {
 		}
 	}
 
-	fn convert_named(&self, name: &str) -> Ty {
-		let s = self.structs.get(name).unwrap();
+	fn convert_named(&self, id: SymbolId) -> Ty {
+		let s = self.structs.get(&id).unwrap();
 		if !s.lang_item {
-			Ty::Named(name.to_string())
+			Ty::Named(id)
 		} else {
+			let name = self.symbol_table.get(id).name.as_ref();
 			match name {
 				"str" => Ty::Str,
 				"int" => Ty::Int,
@@ -139,13 +140,13 @@ impl<'a> TypeCheck<'a> {
 		}
 	}
 
-	fn get_struct_id(&self, ty: TyId) -> String {
+	fn get_struct_id(&self, ty: TyId) -> SymbolId {
 		match self.get_type(ty) {
 			Ty::Named(s) => s,
-			Ty::Bool => "bool".to_string(),
-			Ty::Str => "str".to_string(),
-			Ty::Num => "num".to_string(),
-			Ty::Int => "int".to_string(),
+			Ty::Num => self.symbol_table.t_num,
+			Ty::Int => self.symbol_table.t_int,
+			Ty::Str => self.symbol_table.t_str,
+			Ty::Bool => self.symbol_table.t_bool,
 			t => unimplemented!("{:?}", t),
 		}
 	}
@@ -578,7 +579,7 @@ impl<'a> TypeCheck<'a> {
 			if let Ty::TyName(_) = self.get_type(ty) {
 				s.push(last_suffix);
 			} else {
-				// TODO: bad idea
+				dbg!(&ty);
 				let name = self.get_struct_id(ty);
 				dbg!(&name);
 				// fix up the AST for method call
@@ -755,7 +756,7 @@ impl<'a> TypeCheck<'a> {
 	}
 
 	fn eval_struct_def(&mut self, node: &mut StructDef) {
-		let struct_name = &self.symbol_table.get(node.name.id).name;
+		let id = node.name.id;
 
 		let table = Struct {
 			fields: FxHashMap::default(),
@@ -765,15 +766,18 @@ impl<'a> TypeCheck<'a> {
 			lang_item: node.lang_item,
 		};
 
-		self.structs.insert(struct_name.clone(), table);
-		let ty = Ty::TyName(struct_name.clone());
+		self.structs.insert(id, table);
+		let ty = Ty::TyName(id);
 		self.new_def(node.name.id, ty);
-		let self_ty = self.new_ty(self.convert_named(struct_name));
+		let self_ty = self.new_ty(self.convert_named(id));
+		// if node.lang_item {
+		// 	self.new_def(node.name.id, self.convert_named(id));
+		// }
 		for f in &mut node.table.fields {
 			match &mut f.kind {
 				FieldKind::Empty => {
 					self.structs
-						.get_mut(struct_name)
+						.get_mut(&id)
 						.unwrap()
 						.required_fields
 						.push(f.field.property.name.clone());
@@ -782,7 +786,7 @@ impl<'a> TypeCheck<'a> {
 						let new_ty = self.convert_ast_ty(ty);
 						let ty = self.new_ty(new_ty);
 						self.structs
-							.get_mut(struct_name)
+							.get_mut(&id)
 							.unwrap()
 							.fields
 							.insert(f.field.property.name.clone(), ty);
@@ -815,7 +819,7 @@ impl<'a> TypeCheck<'a> {
 						expr_ty = ty_id;
 					}
 					self.structs
-						.get_mut(struct_name)
+						.get_mut(&id)
 						.unwrap()
 						.fields
 						.insert(f.field.property.name.clone(), expr_ty);
@@ -823,7 +827,7 @@ impl<'a> TypeCheck<'a> {
 				FieldKind::Fn(func) => {
 					let ty = self.eval_lambda(func, f.field.property.span, Some(self_ty));
 					self.structs
-						.get_mut(struct_name)
+						.get_mut(&id)
 						.unwrap()
 						.methods
 						.insert(f.field.property.name.clone(), ty);
@@ -832,8 +836,8 @@ impl<'a> TypeCheck<'a> {
 		}
 	}
 
-	fn get_field(&mut self, struct_name: &str, p: &mut Property) -> TyId {
-		if let Some(p_id) = self.structs[struct_name].fields.get(&p.name) {
+	fn get_field(&mut self, struct_id: SymbolId, p: &mut Property) -> TyId {
+		if let Some(p_id) = self.structs[&struct_id].fields.get(&p.name) {
 			*p_id
 		} else {
 			let msg = format!("No field `{}`.", p.name);
@@ -843,8 +847,8 @@ impl<'a> TypeCheck<'a> {
 		}
 	}
 
-	fn get_method(&mut self, struct_name: &str, p: &mut Property) -> TyId {
-		if let Some(p_id) = self.structs[struct_name].methods.get(&p.name) {
+	fn get_method(&mut self, struct_id: SymbolId, p: &mut Property) -> TyId {
+		if let Some(p_id) = self.structs[&struct_id].methods.get(&p.name) {
 			*p_id
 		} else {
 			let msg = format!("No method `{}`.", p.name);
@@ -865,8 +869,8 @@ impl<'a> TypeCheck<'a> {
 	fn eval_suffix(&mut self, expr_ty: TyId, expr_span: Span, suffix: &mut Suffix) -> TyId {
 		match suffix {
 			Suffix::Property(p) => match self.get_type(expr_ty) {
-				Ty::Named(name) => self.get_field(&name, p),
-				Ty::TyName(name) => self.get_method(&name, p),
+				Ty::Named(name) => self.get_field(name, p),
+				Ty::TyName(name) => self.get_method(name, p),
 				Ty::Bottom => ERR_TY,
 				_ => {
 					let msg = format!("Type `{}` does not allow indexing with `.`", self.ty_to_string(expr_ty));

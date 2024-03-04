@@ -47,11 +47,12 @@ impl<'a> ScopeCheck<'a> {
 		}
 	}
 
-	fn new_identifier(&mut self, name: &'a str, symbol: Symbol) {
+	fn new_identifier(&mut self, name: &'a str, symbol: Symbol) -> SymbolId {
 		let id = self.symbol_table.push(symbol);
 		// unwrap: there is always at least one scope
 		let scope = self.scope_stack.last_mut().unwrap();
 		scope.insert(name, id);
+		id
 	}
 
 	fn lookup(&mut self, name: &str) -> Option<SymbolId> {
@@ -145,6 +146,30 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		self.scope_stack.pop();
 	}
 
+	fn visit_struct_def(&mut self, node: &mut StructDef) {
+		let name = node.name.span.as_str_f(self.input);
+		let lookup = self.lookup(name);
+		if lookup.is_some() {
+			let msg = format!("Struct `{name}` already defined.");
+			format_err_f(&msg, node.name.span, self.input);
+			self.errors.push(msg);
+		} else {
+			let id = self.new_identifier(name, Symbol::new(name).ty_def());
+			dbg!(id);
+			if node.lang_item {
+				match name {
+					"num" => self.symbol_table.t_num = id,
+					"int" => self.symbol_table.t_int = id,
+					"str" => self.symbol_table.t_str = id,
+					"bool" => self.symbol_table.t_bool = id,
+					e => panic!("{}", e),
+				}
+			}
+			node.name.visit(self);
+			node.table.visit(self);
+		}
+	}
+
 	fn visit_fn_def(&mut self, node: &mut FnDef) {
 		if self.hoist_fn_def {
 			let name = node.name.span.as_str_f(self.input);
@@ -213,13 +238,6 @@ impl<'a> Visitor for ScopeCheck<'a> {
 				self.visit_ty(ty);
 			}
 		}
-	}
-
-	fn visit_struct_def(&mut self, node: &mut StructDef) {
-		let name = node.name.span.as_str_f(self.input);
-		self.new_identifier(name, Symbol::new(name).ty_def());
-		node.name.visit(self);
-		node.table.visit(self);
 	}
 
 	fn visit_name(&mut self, node: &mut Name) {

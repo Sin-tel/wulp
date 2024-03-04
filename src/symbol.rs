@@ -50,6 +50,10 @@ pub struct SymbolTable {
 	pub symbols: Vec<Symbol>,
 	pub globals: Vec<SymbolId>,
 	temp_counter: usize,
+	pub t_num: SymbolId,
+	pub t_int: SymbolId,
+	pub t_str: SymbolId,
+	pub t_bool: SymbolId,
 }
 
 impl SymbolTable {
@@ -58,6 +62,10 @@ impl SymbolTable {
 			symbols: Vec::new(),
 			globals: Vec::new(),
 			temp_counter: 0,
+			t_num: 0,
+			t_int: 0,
+			t_str: 0,
+			t_bool: 0,
 		};
 		// id = 0 always points to this
 		new.symbols.push(Symbol::new("UNKNOWN_SYMBOL").make_const());
