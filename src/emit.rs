@@ -1,4 +1,5 @@
 use crate::ast::*;
+use crate::symbol::SymbolKind;
 use crate::symbol::SymbolTable;
 use crate::visitor::*;
 use std::mem;
@@ -271,8 +272,7 @@ impl Visitor for EmitLua {
 				self.statement.push('}');
 
 				// constructor
-				// TODO: this is kind of a stupid way to check
-				if name_str != "str" && name_str != "int" && name_str != "num" {
+				if !t.lang_item {
 					self.put_statement();
 					// TODO: try to get rid of the `args = args or {}`
 					self.statement.push_str(&format!(

@@ -14,6 +14,11 @@ pub struct Block {
 }
 
 #[derive(Debug)]
+pub enum Directive {
+	LangItem(StructDef),
+}
+
+#[derive(Debug)]
 pub enum Stat {
 	Assignment(Assignment),
 	AssignOp(AssignOp),
@@ -146,6 +151,7 @@ pub struct FnDef {
 pub struct StructDef {
 	pub name: Name,
 	pub table: Table,
+	pub lang_item: bool,
 }
 
 #[derive(Debug)]
@@ -176,6 +182,12 @@ pub struct NameTy {
 
 #[derive(Debug)]
 pub struct Name {
+	pub span: Span,
+	pub id: SymbolId,
+}
+
+#[derive(Debug)]
+pub struct TyName {
 	pub span: Span,
 	pub id: SymbolId,
 }

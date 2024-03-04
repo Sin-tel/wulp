@@ -33,6 +33,7 @@ pub enum TokenKind {
 	Struct,
 
 	Period,
+	Hash,
 	LParen,
 	RParen,
 	LCurly,
@@ -145,6 +146,7 @@ impl fmt::Display for TokenKind {
 				Struct => "struct",
 
 				Period => ".",
+				Hash => "#",
 				LParen => "(",
 				RParen => ")",
 				LCurly => "{",

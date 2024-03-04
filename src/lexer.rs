@@ -286,6 +286,11 @@ impl Iterator for LexIter<'_> {
 			match c {
 				'\'' | '"' => Some(self.single_line_string()),
 				'#' if next == Some('"') => self.multi_line_string(),
+				'#' => {
+					self.eat_char();
+					let end = self.cursor;
+					Some(self.newtoken(Hash, start, end))
+				},
 				'=' if next == Some('=') => {
 					self.eat_chars(2);
 					let end = self.cursor;

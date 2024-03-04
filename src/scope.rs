@@ -33,7 +33,7 @@ impl<'a> ScopeCheck<'a> {
 			if item.is_fn_def {
 				sym = sym.fn_def();
 			}
-			this.new_variable(item.name, sym);
+			this.new_identifier(item.name, sym);
 			assert_eq!(this.lookup(item.name), Some(item.id));
 		}
 
@@ -47,7 +47,7 @@ impl<'a> ScopeCheck<'a> {
 		}
 	}
 
-	fn new_variable(&mut self, name: &'a str, symbol: Symbol) {
+	fn new_identifier(&mut self, name: &'a str, symbol: Symbol) {
 		let id = self.symbol_table.push(symbol);
 		// unwrap: there is always at least one scope
 		let scope = self.scope_stack.last_mut().unwrap();
@@ -113,7 +113,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		}
 		self.scope_stack.pop();
 		let name_str = node.alias.span.as_str_f(self.input);
-		self.new_variable(name_str, Symbol::new(name_str).make_const());
+		self.new_identifier(name_str, Symbol::new(name_str).make_const());
 		node.alias.visit(self);
 	}
 
@@ -136,7 +136,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		for n in &mut node.names {
 			let name = n.span.as_str_f(self.input);
 			// marked as const since we should never assign to loop variable
-			self.new_variable(name, Symbol::new(name).make_const());
+			self.new_identifier(name, Symbol::new(name).make_const());
 			n.visit(self);
 		}
 		node.expr.visit(self);
@@ -156,7 +156,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 				self.errors.push(msg);
 			} else {
 				// function defs are always const
-				self.new_variable(name, Symbol::new(name).fn_def());
+				self.new_identifier(name, Symbol::new(name).fn_def());
 			}
 		} else {
 			node.walk(self);
@@ -167,11 +167,15 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		self.scope_stack.push(FxHashMap::default());
 		for n in &mut node.params {
 			let name = n.name.span.as_str_f(self.input);
-			self.new_variable(name, Symbol::new(name));
+			self.new_identifier(name, Symbol::new(name));
 			n.visit(self);
 		}
 		node.body.visit(self);
 		self.scope_stack.pop();
+
+		if let Some(ty) = &mut node.ty {
+			self.visit_ty(ty);
+		}
 	}
 
 	fn visit_assignment(&mut self, node: &mut Assignment) {
@@ -202,14 +206,18 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		for n in &mut node.names {
 			// TODO: make sure we don't do anything stupid like let x, x = 1, 2
 			let name_str = n.name.span.as_str_f(self.input);
-			self.new_variable(name_str, Symbol::new(name_str));
+			self.new_identifier(name_str, Symbol::new(name_str));
 			n.name.visit(self);
+
+			if let Some(ty) = &mut n.ty {
+				self.visit_ty(ty);
+			}
 		}
 	}
 
 	fn visit_struct_def(&mut self, node: &mut StructDef) {
 		let name = node.name.span.as_str_f(self.input);
-		self.new_variable(name, Symbol::new(name).ty_def());
+		self.new_identifier(name, Symbol::new(name).ty_def());
 		node.name.visit(self);
 		node.table.visit(self);
 	}
@@ -221,11 +229,26 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		if let Some(id) = self.lookup(name) {
 			node.id = id;
 		} else {
-			let msg = format!("Undefined variable: `{name}`.");
+			let msg = format!("Can not find `{name}` in this scope.");
 			format_err_f(&msg, node.span, self.input);
 			self.errors.push(msg);
 			// to suppress further errors, we add a new variable anyway
-			self.new_variable(name, Symbol::new(name));
+			self.new_identifier(name, Symbol::new(name));
+		}
+	}
+
+	fn visit_ty_name(&mut self, node: &mut TyName) {
+		assert_eq!(node.id, 0); // make sure we don't visit twice
+
+		let name = node.span.as_str_f(self.input);
+		if let Some(id) = self.lookup(name) {
+			node.id = id;
+		} else {
+			let msg = format!("Can not find `{name}` in this scope.");
+			format_err_f(&msg, node.span, self.input);
+			self.errors.push(msg);
+			// to suppress further errors, we add a new variable anyway
+			self.new_identifier(name, Symbol::new(name));
 		}
 	}
 }

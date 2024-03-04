@@ -121,6 +121,17 @@ impl<'a> Parser<'a> {
 		}
 	}
 
+	fn parse_directive(&mut self) -> Stat {
+		self.assert_next(TokenKind::Hash);
+		let span = self.assert_next(TokenKind::Name).span;
+
+		let name_str = span.as_string(self.input);
+		match name_str.as_ref() {
+			"lang_item" => Stat::StructDef(self.parse_struct_def(true)),
+			s => self.error(format!("Unknown directive `{s}`"), span),
+		}
+	}
+
 	// Block and statement rules
 
 	fn parse_file(&mut self) -> File {
@@ -177,9 +188,10 @@ impl<'a> Parser<'a> {
 				Stat::Break
 			},
 			TokenKind::Import | TokenKind::From => Stat::Import(self.parse_import()),
+			TokenKind::Hash => self.parse_directive(),
 			TokenKind::Return => Stat::Return(self.parse_return()),
 			TokenKind::Let => Stat::Let(self.parse_let()),
-			TokenKind::Struct => Stat::StructDef(self.parse_struct_def()),
+			TokenKind::Struct => Stat::StructDef(self.parse_struct_def(false)),
 			TokenKind::LCurly => Stat::Block(self.parse_block()),
 			TokenKind::While => Stat::WhileBlock(self.parse_while_block()),
 			TokenKind::If => Stat::IfBlock(self.parse_if_block()),
@@ -274,19 +286,16 @@ impl<'a> Parser<'a> {
 		Let { names, exprs, span }
 	}
 
-	fn parse_struct_def(&mut self) -> StructDef {
-		// TODO: get rid of this
+	fn parse_struct_def(&mut self, lang_item: bool) -> StructDef {
 		self.assert_next(TokenKind::Struct);
-
 		let name = self.parse_name();
 
 		self.assert_next(TokenKind::LCurly);
 		let fields = self.parse_fields();
 		self.assert_next(TokenKind::RCurly);
-
 		let table = Table { fields };
 
-		StructDef { name, table }
+		StructDef { name, table, lang_item }
 	}
 
 	fn parse_fn_def(&mut self) -> FnDef {
@@ -826,6 +835,12 @@ impl<'a> Parser<'a> {
 		Name { id: 0, span }
 	}
 
+	fn parse_ty_name(&mut self) -> TyName {
+		let span = self.tokens.peek().span;
+		self.assert_next(TokenKind::Name);
+		TyName { id: 0, span }
+	}
+
 	fn parse_property(&mut self) -> Property {
 		let span = self.tokens.peek().span;
 		let name = span.as_string(self.input);
@@ -844,27 +859,25 @@ impl<'a> Parser<'a> {
 
 	fn parse_type(&mut self) -> TyAst {
 		// TODO: fn types
-		let tk = self.tokens.next();
+		let tk = self.tokens.peek();
 		match tk.kind {
 			TokenKind::Name => {
-				let name_str = tk.span.as_string(self.input);
+				let name = self.parse_ty_name();
+				let name_str = name.span.as_string(self.input);
 				match name_str.as_ref() {
 					"self" => TyAst::SelfTy,
-					"num" => TyAst::Num,
-					"int" => TyAst::Int,
-					"str" => TyAst::Str,
-					"bool" => TyAst::Bool,
-					s => TyAst::Named(s.to_string()),
+					_ => TyAst::Named(name),
 				}
 			},
-			TokenKind::Nil => TyAst::Nil,
 			TokenKind::LBracket => {
+				self.tokens.next();
 				// Array type
 				let ty = TyAst::Array(Box::new(self.parse_type()));
 				self.assert_next(TokenKind::RBracket);
 				ty
 			},
 			TokenKind::Fn => {
+				self.tokens.next();
 				// Function type
 				let mut arg_ty = Vec::new();
 				self.assert_next(TokenKind::LParen);
@@ -885,6 +898,7 @@ impl<'a> Parser<'a> {
 				TyAst::Fn(arg_ty, Box::new(ret_ty))
 			},
 			TokenKind::Maybe => {
+				self.tokens.next();
 				self.assert_next(TokenKind::LParen);
 				let inner = self.parse_type();
 				self.assert_next(TokenKind::RParen);

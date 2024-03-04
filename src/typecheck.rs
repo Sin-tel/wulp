@@ -16,7 +16,7 @@ struct Struct {
 	methods: FxHashMap<String, TyId>,
 	required_fields: Vec<String>,
 	symbol_id: SymbolId,
-	lang_type: bool,
+	lang_item: bool,
 }
 
 const ERR_TY: TyId = 0;
@@ -90,7 +90,7 @@ impl<'a> TypeCheck<'a> {
 			Ty::TyVar => format!("T{id}?"),
 			Ty::Free => format!("T{id}"),
 			Ty::TyName(s) => format!("Type({s})"),
-			Ty::Named(s) => s.clone(),
+			Ty::Named(s) => format!("Instance {s}"),
 			Ty::Array(ty) => format!("[{}]", self.ty_to_string(ty)),
 			Ty::Maybe(ty) => format!("maybe({})", self.ty_to_string(ty)),
 			Ty::Fn(args, ret) => {
@@ -105,13 +105,7 @@ impl<'a> TypeCheck<'a> {
 	}
 	fn convert_ast_ty(&mut self, ty_ast: &TyAst) -> Ty {
 		match ty_ast {
-			TyAst::Any => Ty::Any,
-			TyAst::Nil => Ty::Nil,
-			TyAst::Bool => Ty::Bool,
-			TyAst::Str => Ty::Str,
-			TyAst::Num => Ty::Num,
-			TyAst::Int => Ty::Int,
-			TyAst::Named(s) => Ty::Named(s.clone()),
+			TyAst::Named(s) => self.convert_named(&self.symbol_table.get(s.id).name.clone()),
 			TyAst::Fn(args, ret) => {
 				let mut t_args = Vec::new();
 				for a in args {
@@ -126,7 +120,33 @@ impl<'a> TypeCheck<'a> {
 				Ty::Array(self.new_ty(ty))
 			},
 			TyAst::SelfTy => unreachable!(),
-			e => unimplemented!("{}", e),
+			e => unimplemented!("{:?}", e),
+		}
+	}
+
+	fn convert_named(&self, name: &str) -> Ty {
+		let s = self.structs.get(name).unwrap();
+		if !s.lang_item {
+			Ty::Named(name.to_string())
+		} else {
+			match name {
+				"str" => Ty::Str,
+				"int" => Ty::Int,
+				"num" => Ty::Num,
+				"bool" => Ty::Bool,
+				e => panic!("Can not make instance of type {}", e),
+			}
+		}
+	}
+
+	fn get_struct_id(&self, ty: TyId) -> String {
+		match self.get_type(ty) {
+			Ty::Named(s) => s,
+			Ty::Bool => "bool".to_string(),
+			Ty::Str => "str".to_string(),
+			Ty::Num => "num".to_string(),
+			Ty::Int => "int".to_string(),
+			t => unimplemented!("{:?}", t),
 		}
 	}
 
@@ -441,30 +461,26 @@ impl<'a> TypeCheck<'a> {
 		(current_pair, false)
 	}
 
-	fn eval_fn_params(&mut self, params: &[NameTy], self_ty: Option<Ty>) -> Vec<TyId> {
+	fn eval_fn_params(&mut self, params: &[NameTy], self_ty: Option<TyId>) -> Vec<TyId> {
 		let mut param_ty = Vec::new();
 
 		for (i, p) in params.iter().enumerate() {
-			let id = if self.symbol_table.get(p.name.id).name == "self" {
+			let ty = if self.symbol_table.get(p.name.id).name == "self" {
 				// TODO nicer err messages
 				assert!(i == 0, "self must be first argument!");
 				assert!(p.ty.is_none());
-				// self.lookup(p.name.id).expect("Self argument could not be resolved")
-				if let Some(ref ty) = self_ty {
-					self.new_def(p.name.id, ty.clone())
-				} else {
-					panic!("Can not use `self` here")
-				}
+				self.get_type(self_ty.expect("Can not use `self` here"))
 			} else {
 				let ty = match &p.ty {
 					Some(ty) => match ty {
-						TyAst::SelfTy => self_ty.clone().expect("can't use `self` here"),
+						TyAst::SelfTy => self.get_type(self_ty.expect("Can not use `self` here")),
 						_ => self.convert_ast_ty(ty),
 					},
 					None => Ty::TyVar,
 				};
-				self.new_def(p.name.id, ty)
+				ty
 			};
+			let id = self.new_def(p.name.id, ty);
 			param_ty.push(id);
 		}
 		param_ty
@@ -518,20 +534,22 @@ impl<'a> TypeCheck<'a> {
 	}
 
 	// span should refer to the place where the function is defined
-	fn eval_lambda(&mut self, node: &mut FnBody, span: Span, self_ty: Option<Ty>) -> TyId {
-		let param_ty = self.eval_fn_params(&node.params, self_ty.clone());
-		let ty = match &node.ty {
+	fn eval_lambda(&mut self, node: &mut FnBody, span: Span, self_ty: Option<TyId>) -> TyId {
+		let param_ty = self.eval_fn_params(&node.params, self_ty);
+		let ret_id = match &node.ty {
 			Some(ty) => match ty {
 				TyAst::SelfTy => self_ty.expect("can't use `self` here"),
-				_ => self.convert_ast_ty(ty),
+				_ => {
+					let n_ty = self.convert_ast_ty(ty);
+					self.new_ty(n_ty)
+				},
 			},
-			None => Ty::TyVar,
+			None => self.new_ty(Ty::TyVar),
 		};
-		let ret_id = self.new_ty(ty);
 		let fn_ty = Ty::Fn(param_ty, ret_id);
 		let fn_id = self.new_ty(fn_ty);
 
-		let (ty, prev_span) = self.eval_fn_body(node, span); // !
+		let (ty, prev_span) = self.eval_fn_body(node, span);
 
 		if self.unify(ty, ret_id).is_err() {
 			let msg = format!(
@@ -561,7 +579,8 @@ impl<'a> TypeCheck<'a> {
 				s.push(last_suffix);
 			} else {
 				// TODO: bad idea
-				let name = self.ty_to_string(ty);
+				let name = self.get_struct_id(ty);
+				dbg!(&name);
 				// fix up the AST for method call
 				let inst_expr = std::mem::replace(
 					expr,
@@ -625,7 +644,7 @@ impl<'a> TypeCheck<'a> {
 				// TODO: instantiate does not take care of generics on struct
 
 				// FIXME
-				if self.structs[&struct_name].lang_type {
+				if self.structs[&struct_name].lang_item {
 					let msg = "builtin type does not have a constructor".to_string();
 					format_err_f(&msg, c.expr.span, self.input);
 					self.errors.push(msg);
@@ -736,24 +755,20 @@ impl<'a> TypeCheck<'a> {
 	}
 
 	fn eval_struct_def(&mut self, node: &mut StructDef) {
-		let mut lang_type = false;
-
 		let struct_name = &self.symbol_table.get(node.name.id).name;
 
-		// TODO: add a directive for this
-		if struct_name == "str" || struct_name == "int" || struct_name == "num" {
-			lang_type = true;
-		}
 		let table = Struct {
 			fields: FxHashMap::default(),
 			methods: FxHashMap::default(),
 			required_fields: Vec::new(),
 			symbol_id: node.name.id,
-			lang_type,
+			lang_item: node.lang_item,
 		};
 
 		self.structs.insert(struct_name.clone(), table);
-		self.new_def(node.name.id, Ty::TyName(struct_name.clone()));
+		let ty = Ty::TyName(struct_name.clone());
+		self.new_def(node.name.id, ty);
+		let self_ty = self.new_ty(self.convert_named(struct_name));
 		for f in &mut node.table.fields {
 			match &mut f.kind {
 				FieldKind::Empty => {
@@ -806,7 +821,7 @@ impl<'a> TypeCheck<'a> {
 						.insert(f.field.property.name.clone(), expr_ty);
 				},
 				FieldKind::Fn(func) => {
-					let ty = self.eval_lambda(func, f.field.property.span, Some(Ty::Named(struct_name.clone())));
+					let ty = self.eval_lambda(func, f.field.property.span, Some(self_ty));
 					self.structs
 						.get_mut(struct_name)
 						.unwrap()

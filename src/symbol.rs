@@ -80,7 +80,7 @@ impl SymbolTable {
 	}
 
 	pub fn get(&self, id: SymbolId) -> &Symbol {
-		assert!(id != 0);
+		assert!(id != 0, "undefined symbol");
 		&self.symbols[id]
 	}
 

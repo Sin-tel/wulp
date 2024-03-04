@@ -1,4 +1,5 @@
 use crate::ast::*;
+use crate::ty::TyAst;
 
 pub trait Visitor: Sized {
 	fn visit_file(&mut self, node: &mut File) {
@@ -58,8 +59,12 @@ pub trait Visitor: Sized {
 	fn visit_field(&mut self, node: &mut Field) {
 		node.walk(self);
 	}
+	fn visit_ty(&mut self, node: &mut TyAst) {
+		node.walk(self);
+	}
 	// leaf nodes
 	fn visit_name(&mut self, _node: &mut Name) {}
+	fn visit_ty_name(&mut self, _node: &mut TyName) {}
 	fn visit_property(&mut self, _node: &mut Property) {}
 	fn visit_literal(&mut self, _node: &mut Literal) {}
 }
@@ -216,6 +221,9 @@ impl<V: Visitor> VisitNode<V> for NameTy {
 	}
 	fn walk(&mut self, v: &mut V) {
 		v.visit_name(&mut self.name);
+		if let Some(ty) = &mut self.ty {
+			v.visit_ty(ty);
+		}
 	}
 }
 
@@ -341,12 +349,41 @@ impl<V: Visitor> VisitNode<V> for Field {
 				v.visit_fn_body(f);
 			},
 		}
+		if let Some(ty) = &mut self.field.ty {
+			v.visit_ty(ty);
+		}
+	}
+}
+
+impl<V: Visitor> VisitNode<V> for TyAst {
+	fn visit(&mut self, v: &mut V) {
+		v.visit_ty(self);
+	}
+	fn walk(&mut self, v: &mut V) {
+		match self {
+			TyAst::SelfTy => (),
+			TyAst::Named(n) => v.visit_ty_name(n),
+			TyAst::Array(ty) => v.visit_ty(ty),
+			TyAst::Maybe(ty) => v.visit_ty(ty),
+			TyAst::Fn(args, ret) => {
+				for arg in args {
+					v.visit_ty(arg);
+				}
+				v.visit_ty(ret);
+			},
+		}
 	}
 }
 
 impl<V: Visitor> VisitNode<V> for Name {
 	fn visit(&mut self, v: &mut V) {
 		v.visit_name(self);
+	}
+}
+
+impl<V: Visitor> VisitNode<V> for TyName {
+	fn visit(&mut self, v: &mut V) {
+		v.visit_ty_name(self);
 	}
 }
 

@@ -17,7 +17,6 @@
 // #![allow(clippy::too_many_lines)]
 // #![allow(clippy::doc_markdown)]
 
-// use crate::ast_print::AstPrinter;
 use crate::emit::EmitLua;
 use crate::parser::Parser;
 use crate::scope::ScopeCheck;
@@ -26,6 +25,7 @@ use anyhow::Result;
 use mlua::{prelude::LuaResult, LuaOptions, StdLib};
 use std::env;
 use std::fs;
+use std::io::Write;
 use std::path::Path;
 
 pub mod ast;
@@ -46,11 +46,7 @@ mod tests;
 
 fn main() -> Result<()> {
 	let filename = "test";
-
 	let (mut ast, files) = Parser::parse(filename)?;
-
-	// println!("----- input:");
-	// println!("{input}");
 	let symbol_table = ScopeCheck::check(&mut ast, &files)?;
 	// for s in symbol_table.symbols.iter() {
 	// 	dbg!(s);
@@ -58,26 +54,26 @@ fn main() -> Result<()> {
 
 	TypeCheck::check(&mut ast, &files, &symbol_table)?;
 
-	// // println!("----- AST:");
-	// // AstPrinter::print_ast(&mut ast, &input);
-
-	println!("----- emitted code:");
 	// symbol_table.mangle();
 	let code = EmitLua::emit(&mut ast, symbol_table);
-	println!("{code}");
+	// println!("----- emitted code:");
+	// println!("{code}");
 
 	println!("----- execute:");
 	env::set_current_dir(Path::new("./lua"))?;
-	let lua = mlua::Lua::new_with(StdLib::PACKAGE, LuaOptions::default())?;
+	let lua = mlua::Lua::new_with(
+		StdLib::PACKAGE | StdLib::STRING | StdLib::MATH | StdLib::IO,
+		LuaOptions::default(),
+	)?;
 	let mut chunk = lua.load(code.clone());
 	chunk = chunk.set_name(filename.to_string());
 	let res = chunk.exec();
 	// let res = chunk.eval::<String>();
 	display_return(res, filename);
 
-	// env::set_current_dir(Path::new(".."))?;
-	// let mut file = fs::File::create(filename.replace("wulp", "lua"))?;
-	// file.write_all(code.as_bytes())?;
+	env::set_current_dir(Path::new("../out"))?;
+	let mut file = fs::File::create(format!("{}.lua", filename))?;
+	file.write_all(code.as_bytes())?;
 
 	Ok(())
 }
