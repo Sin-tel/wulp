@@ -91,6 +91,7 @@ pub fn format_note_f(message: &str, span: Span, files: &[InputFile]) {
 	);
 }
 
+#[allow(dead_code)]
 pub fn format_warning_f(message: &str, span: Span, files: &[InputFile]) {
 	print_message(
 		message,
@@ -109,6 +110,7 @@ pub fn format_warning(message: &str, span: Span, input: &str, filename: &str) {
 	print_message(message, span, input, filename, "warning");
 }
 
+#[allow(dead_code)]
 pub fn format_note(message: &str, span: Span, input: &str, filename: &str) {
 	print_message(message, span, input, filename, "note");
 }

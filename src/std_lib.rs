@@ -18,14 +18,14 @@ lazy_static! {
 			name: "print",
 			is_fn_def: true,
 			param_ty: vec![Ty::Any],
-			ret_ty: Ty::Nil,
+			ret_ty: Ty::Unit,
 			id: 1
 		},
 		Item {
 			name: "assert",
 			is_fn_def: true,
 			param_ty: vec![Ty::Bool],
-			ret_ty: Ty::Nil,
+			ret_ty: Ty::Unit,
 			id: 2
 		},
 		Item {

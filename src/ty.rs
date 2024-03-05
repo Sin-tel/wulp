@@ -13,7 +13,7 @@ pub enum TyNode {
 pub enum Ty {
 	Any,
 	Bottom,
-	Nil,
+	Unit,
 	Bool,
 	Str,
 	Num,

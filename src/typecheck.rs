@@ -82,7 +82,7 @@ impl<'a> TypeCheck<'a> {
 		match self.get_type(id) {
 			Ty::Any => "Any".to_string(),
 			Ty::Bottom => "Bottom".to_string(),
-			Ty::Nil => "nil".to_string(),
+			Ty::Unit => "()".to_string(),
 			Ty::Bool => "bool".to_string(),
 			Ty::Str => "str".to_string(),
 			Ty::Num => "num".to_string(),
@@ -120,7 +120,10 @@ impl<'a> TypeCheck<'a> {
 				Ty::Array(self.new_ty(ty))
 			},
 			TyAst::SelfTy => unreachable!(),
-			e => unimplemented!("{:?}", e),
+			TyAst::Maybe(a) => {
+				let ty = self.convert_ast_ty(a);
+				Ty::Maybe(self.new_ty(ty))
+			},
 		}
 	}
 
@@ -197,7 +200,7 @@ impl<'a> TypeCheck<'a> {
 		match self.get_type(id) {
 			Ty::Any
 			| Ty::Bottom
-			| Ty::Nil
+			| Ty::Unit
 			| Ty::Bool
 			| Ty::Str
 			| Ty::Num
@@ -229,7 +232,7 @@ impl<'a> TypeCheck<'a> {
 		match ty {
 			Ty::Any
 			| Ty::Bottom
-			| Ty::Nil
+			| Ty::Unit
 			| Ty::Bool
 			| Ty::Str
 			| Ty::Num
@@ -264,7 +267,7 @@ impl<'a> TypeCheck<'a> {
 		match ty {
 			Ty::Any
 			| Ty::Bottom
-			| Ty::Nil
+			| Ty::Unit
 			| Ty::Bool
 			| Ty::Str
 			| Ty::Num
@@ -321,6 +324,8 @@ impl<'a> TypeCheck<'a> {
 				(a, b) if a == b => Ok(()),
 				(Ty::Array(a), Ty::Array(b)) | (Ty::Maybe(a), Ty::Maybe(b)) => self.unify(a, b),
 
+				// TODO: only when coercion ok
+				// (_, Ty::Maybe(b)) => self.unify(a_id, b),
 				(Ty::Fn(a_args, a_ret), Ty::Fn(b_args, b_ret)) => {
 					if a_args.len() != b_args.len() {
 						return Err(());
@@ -389,7 +394,7 @@ impl<'a> TypeCheck<'a> {
 				},
 				Stat::Return(ret) => {
 					let new_pair = if ret.exprs.is_empty() {
-						Some((self.new_ty(Ty::Nil), ret.span))
+						Some((self.new_ty(Ty::Unit), ret.span))
 					} else {
 						// TODO: multiple return
 						assert!(ret.exprs.len() == 1);
@@ -489,9 +494,9 @@ impl<'a> TypeCheck<'a> {
 
 	fn eval_fn_body(&mut self, node: &mut FnBody, span: Span) -> (TyId, Span) {
 		let (mut ret_pair, ret_all) = self.eval_block(&mut node.body);
-		// There is an implied 'return nil' at the end of every body
+		// There is an implied 'return ()' at the end of every body
 		if !ret_all {
-			let nil = self.new_ty(Ty::Nil);
+			let nil = self.new_ty(Ty::Unit);
 			ret_pair = self.unify_return(ret_pair, Some((nil, span)));
 		};
 		ret_pair.unwrap()
@@ -644,7 +649,6 @@ impl<'a> TypeCheck<'a> {
 			Ty::TyName(struct_name) => {
 				// TODO: instantiate does not take care of generics on struct
 
-				// FIXME
 				if self.structs[&struct_name].lang_item {
 					let msg = "builtin type does not have a constructor".to_string();
 					format_err_f(&msg, c.expr.span, self.input);
@@ -770,9 +774,6 @@ impl<'a> TypeCheck<'a> {
 		let ty = Ty::TyName(id);
 		self.new_def(node.name.id, ty);
 		let self_ty = self.new_ty(self.convert_named(id));
-		// if node.lang_item {
-		// 	self.new_def(node.name.id, self.convert_named(id));
-		// }
 		for f in &mut node.table.fields {
 			match &mut f.kind {
 				FieldKind::Empty => {
@@ -1052,7 +1053,10 @@ impl<'a> TypeCheck<'a> {
 
 	fn eval_literal(&mut self, l: &Literal) -> TyId {
 		match l {
-			Literal::Nil => self.new_ty(Ty::Nil),
+			Literal::Nil => {
+				let ty = self.new_ty(Ty::TyVar);
+				self.new_ty(Ty::Maybe(ty))
+			},
 			Literal::Bool(_) => self.new_ty(Ty::Bool),
 			Literal::Num(_) => self.new_ty(Ty::Num),
 			Literal::Int(_) => self.new_ty(Ty::Int),

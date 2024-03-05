@@ -1,5 +1,4 @@
 use crate::ast::*;
-use crate::symbol::SymbolKind;
 use crate::symbol::SymbolTable;
 use crate::visitor::*;
 use std::mem;

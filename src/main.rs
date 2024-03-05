@@ -28,18 +28,18 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 
-pub mod ast;
-pub mod emit;
-pub mod lexer;
-pub mod parser;
-pub mod scope;
-pub mod span;
-pub mod std_lib;
-pub mod symbol;
-pub mod token;
-pub mod ty;
-pub mod typecheck;
-pub mod visitor;
+mod ast;
+mod emit;
+mod lexer;
+mod parser;
+mod scope;
+mod span;
+mod std_lib;
+mod symbol;
+mod token;
+mod ty;
+mod typecheck;
+mod visitor;
 
 #[cfg(test)]
 mod tests;

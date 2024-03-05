@@ -50,6 +50,7 @@ pub struct SymbolTable {
 	pub symbols: Vec<Symbol>,
 	pub globals: Vec<SymbolId>,
 	temp_counter: usize,
+	// TODO: somehow make these const
 	pub t_num: SymbolId,
 	pub t_int: SymbolId,
 	pub t_str: SymbolId,
@@ -92,6 +93,7 @@ impl SymbolTable {
 		&self.symbols[id]
 	}
 
+	#[allow(dead_code)]
 	pub fn mangle(&mut self) {
 		for s in &mut self.symbols {
 			if !s.is_const && s.kind != SymbolKind::FnDef {

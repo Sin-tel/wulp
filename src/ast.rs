@@ -14,11 +14,6 @@ pub struct Block {
 }
 
 #[derive(Debug)]
-pub enum Directive {
-	LangItem(StructDef),
-}
-
-#[derive(Debug)]
 pub enum Stat {
 	Assignment(Assignment),
 	AssignOp(AssignOp),
