@@ -19,7 +19,6 @@ struct Struct {
 	fields: FxHashMap<String, TyId>,
 	methods: FxHashMap<String, TyId>,
 	required_fields: Vec<String>,
-	symbol_id: SymbolId,
 	lang_item: bool,
 }
 
@@ -48,8 +47,8 @@ impl<'a> TypeCheck<'a> {
 			symbol_table,
 		};
 
-		this.types.push(TyNode::Ty(Ty::Bottom));
-		assert!(this.get_type(ERR_TY) == Ty::Bottom);
+		this.types.push(TyNode::Ty(Ty::Err));
+		assert!(this.get_type(ERR_TY) == Ty::Err);
 
 		this.new_struct(INT_SYM, true);
 		this.new_struct(NUM_SYM, true);
@@ -93,7 +92,6 @@ impl<'a> TypeCheck<'a> {
 				fields: FxHashMap::default(),
 				methods: FxHashMap::default(),
 				required_fields: Vec::new(),
-				symbol_id: id,
 				lang_item,
 			},
 		);
@@ -102,17 +100,13 @@ impl<'a> TypeCheck<'a> {
 	fn ty_to_string(&self, id: TyId) -> String {
 		let id = self.get_parent(id);
 		match self.get_type(id) {
-			Ty::Any => "Any".to_string(),
-			Ty::Bottom => "Bottom".to_string(),
+			Ty::Any => "any".to_string(),
+			Ty::Err => "error".to_string(),
 			Ty::Unit => "()".to_string(),
-			Ty::Bool => "bool".to_string(),
-			Ty::Str => "str".to_string(),
-			Ty::Num => "num".to_string(),
-			Ty::Int => "int".to_string(),
 			Ty::TyVar => format!("T{id}?"),
 			Ty::Free => format!("T{id}"),
-			Ty::TyName(s) => format!("Type({s})"),
-			Ty::Named(s) => format!("Instance {s}"),
+			Ty::TyName(id) => format!("Type({})", &self.symbol_table.get(id).name),
+			Ty::Named(id) => self.symbol_table.get(id).name.clone(),
 			Ty::Array(ty) => format!("[{}]", self.ty_to_string(ty)),
 			Ty::Maybe(ty) => format!("maybe({})", self.ty_to_string(ty)),
 			Ty::Fn(args, ret) => {
@@ -127,7 +121,7 @@ impl<'a> TypeCheck<'a> {
 	}
 	fn convert_ast_ty(&mut self, ty_ast: &TyAst) -> Ty {
 		match ty_ast {
-			TyAst::Named(s) => self.convert_named(s.id),
+			TyAst::Named(s) => Ty::Named(s.id),
 			TyAst::Fn(args, ret) => {
 				let mut t_args = Vec::new();
 				for a in args {
@@ -146,33 +140,6 @@ impl<'a> TypeCheck<'a> {
 				let ty = self.convert_ast_ty(a);
 				Ty::Maybe(self.new_ty(ty))
 			},
-		}
-	}
-
-	fn convert_named(&self, id: SymbolId) -> Ty {
-		let s = self.structs.get(&id).unwrap();
-		if !s.lang_item {
-			Ty::Named(id)
-		} else {
-			let name = self.symbol_table.get(id).name.as_ref();
-			match name {
-				"str" => Ty::Str,
-				"int" => Ty::Int,
-				"num" => Ty::Num,
-				"bool" => Ty::Bool,
-				e => panic!("Can not make instance of type {}", e),
-			}
-		}
-	}
-
-	fn get_struct_id(&self, ty: TyId) -> SymbolId {
-		match self.get_type(ty) {
-			Ty::Named(s) => s,
-			Ty::Num => NUM_SYM,
-			Ty::Int => INT_SYM,
-			Ty::Str => STR_SYM,
-			Ty::Bool => BOOL_SYM,
-			t => unimplemented!("{:?}", t),
 		}
 	}
 
@@ -220,16 +187,7 @@ impl<'a> TypeCheck<'a> {
 	fn promote_free(&mut self, id: TyId) {
 		let id = self.get_parent(id);
 		match self.get_type(id) {
-			Ty::Any
-			| Ty::Bottom
-			| Ty::Unit
-			| Ty::Bool
-			| Ty::Str
-			| Ty::Num
-			| Ty::Int
-			| Ty::Free
-			| Ty::Named(_)
-			| Ty::TyName(_) => (),
+			Ty::Any | Ty::Err | Ty::Unit | Ty::Free | Ty::Named(_) | Ty::TyName(_) => (),
 			Ty::TyVar => {
 				let parent_id = self.get_parent(id);
 				self.types[parent_id] = TyNode::Ty(Ty::Free);
@@ -252,16 +210,7 @@ impl<'a> TypeCheck<'a> {
 		let ty = self.get_type(id);
 		let parent_id = self.get_parent(id);
 		match ty {
-			Ty::Any
-			| Ty::Bottom
-			| Ty::Unit
-			| Ty::Bool
-			| Ty::Str
-			| Ty::Num
-			| Ty::Int
-			| Ty::TyVar
-			| Ty::Named(_)
-			| Ty::TyName(_) => parent_id,
+			Ty::Any | Ty::Err | Ty::Unit | Ty::TyVar | Ty::Named(_) | Ty::TyName(_) => parent_id,
 			Ty::Free => {
 				// keep track of which variables were already instantiated
 				for &(old, new) in subs.iter() {
@@ -287,17 +236,7 @@ impl<'a> TypeCheck<'a> {
 
 	fn occurs(&mut self, ty: Ty, id: TyId) -> Result<(), ()> {
 		match ty {
-			Ty::Any
-			| Ty::Bottom
-			| Ty::Unit
-			| Ty::Bool
-			| Ty::Str
-			| Ty::Num
-			| Ty::Int
-			| Ty::TyVar
-			| Ty::TyName(_)
-			| Ty::Named(_)
-			| Ty::Free => Ok(()),
+			Ty::Any | Ty::Err | Ty::Unit | Ty::TyVar | Ty::TyName(_) | Ty::Named(_) | Ty::Free => Ok(()),
 			Ty::Array(t_id) | Ty::Maybe(t_id) => {
 				if t_id == id {
 					return Err(());
@@ -332,7 +271,7 @@ impl<'a> TypeCheck<'a> {
 		} else {
 			match (self.get_type(a_id), self.get_type(b_id)) {
 				(_, Ty::Free) | (Ty::Free, _) => Err(()),
-				(_, Ty::Bottom) | (Ty::Bottom, _) | (_, Ty::Any) | (Ty::Any, _) => Ok(()), // bail
+				(_, Ty::Err) | (Ty::Err, _) | (_, Ty::Any) | (Ty::Any, _) => Ok(()), // bail
 				(ty, Ty::TyVar) => {
 					self.occurs(ty, b_id)?;
 					self.types[b_id] = TyNode::Node(a_id);
@@ -480,7 +419,7 @@ impl<'a> TypeCheck<'a> {
 				Stat::FnDef(s) => {
 					if let Some(p) = &mut s.property {
 						let struct_id = s.name.id;
-						let self_ty = self.new_ty(self.convert_named(struct_id));
+						let self_ty = self.new_ty(Ty::Named(struct_id));
 						let ty = self.eval_lambda(&mut s.body, p.span, Some(self_ty));
 						self.structs
 							.get_mut(&struct_id)
@@ -619,18 +558,19 @@ impl<'a> TypeCheck<'a> {
 			if let Ty::TyName(_) = self.get_type(ty) {
 				s.push(last_suffix);
 			} else {
-				dbg!(&ty);
-				let name = self.get_struct_id(ty);
-				dbg!(&name);
+				// let name = self.get_struct_id(ty);
+				let id = if let Ty::Named(id) = self.get_type(ty) {
+					id
+				} else {
+					unimplemented!();
+				};
+
 				// fix up the AST for method call
 				let inst_expr = std::mem::replace(
 					expr,
 					Box::new(Expr {
 						span: expr.span,
-						kind: ExprKind::Name(Name {
-							span: expr.span,
-							id: self.structs[&name].symbol_id,
-						}),
+						kind: ExprKind::Name(Name { span: expr.span, id }),
 					}),
 				);
 				let inst_s = std::mem::replace(s, vec![last_suffix]);
@@ -733,7 +673,7 @@ impl<'a> TypeCheck<'a> {
 				}
 				self.new_ty(Ty::Named(struct_name))
 			},
-			Ty::Bottom => ERR_TY,
+			Ty::Err => ERR_TY,
 			_ => {
 				let msg = format!("Type `{}` is not callable.", self.ty_to_string(fn_ty));
 				format_err_f(&msg, c.expr.span, self.input);
@@ -799,7 +739,7 @@ impl<'a> TypeCheck<'a> {
 
 		self.new_struct(id, false);
 
-		let self_ty = self.new_ty(self.convert_named(id));
+		let self_ty = self.new_ty(Ty::Named(id));
 		for f in &mut node.table.fields {
 			match &mut f.kind {
 				FieldKind::Empty => {
@@ -898,7 +838,7 @@ impl<'a> TypeCheck<'a> {
 			Suffix::Property(p) => match self.get_type(expr_ty) {
 				Ty::Named(name) => self.get_field(name, p),
 				Ty::TyName(name) => self.get_method(name, p),
-				Ty::Bottom => ERR_TY,
+				Ty::Err => ERR_TY,
 				_ => {
 					let msg = format!("Type `{}` does not allow indexing with `.`", self.ty_to_string(expr_ty));
 					format_err_f(&msg, expr_span, self.input);
@@ -909,7 +849,7 @@ impl<'a> TypeCheck<'a> {
 			Suffix::Index(e) => {
 				let ty = match self.get_type(expr_ty) {
 					Ty::Array(inner_ty) => inner_ty,
-					Ty::Bottom => ERR_TY,
+					Ty::Err => ERR_TY,
 					_ => {
 						let msg = format!("Can not index type `{}`.", self.ty_to_string(expr_ty));
 						format_err_f(&msg, expr_span, self.input);
@@ -918,7 +858,7 @@ impl<'a> TypeCheck<'a> {
 					},
 				};
 				let index_ty = self.eval_expr(e);
-				let ty_int = self.new_ty(Ty::Int);
+				let ty_int = self.new_ty(Ty::Named(INT_SYM));
 				if self.unify(index_ty, ty_int).is_err() {
 					let msg = format!("Index must be type `int` but found `{}`.", self.ty_to_string(index_ty));
 					format_err_f(&msg, e.span, self.input);
@@ -1009,15 +949,15 @@ impl<'a> TypeCheck<'a> {
 		let ty = self.get_type(id);
 		match op {
 			UnOp::Minus => {
-				if ty == Ty::Int {
+				if ty == Ty::Named(INT_SYM) {
 					return id;
 				}
-				if ty == Ty::Num {
+				if ty == Ty::Named(NUM_SYM) {
 					return id;
 				}
 			},
 			UnOp::Not => {
-				if ty == Ty::Bool {
+				if ty == Ty::Named(BOOL_SYM) {
 					return id;
 				}
 			},
@@ -1042,32 +982,32 @@ impl<'a> TypeCheck<'a> {
 		let ty = self.get_type(lhs);
 		match op {
 			BinOp::Plus | BinOp::Minus | BinOp::Mul | BinOp::Mod => {
-				if ty == Ty::Int || ty == Ty::Num {
+				if ty == Ty::Named(INT_SYM) || ty == Ty::Named(NUM_SYM) {
 					return lhs;
 				}
 			},
 			BinOp::Pow | BinOp::Div => {
-				if ty == Ty::Int || ty == Ty::Num {
-					return self.new_ty(Ty::Num);
+				if ty == Ty::Named(INT_SYM) || ty == Ty::Named(NUM_SYM) {
+					return self.new_ty(Ty::Named(NUM_SYM));
 				}
 			},
 			BinOp::Gt | BinOp::Lt | BinOp::Gte | BinOp::Lte => {
-				if ty == Ty::Int || ty == Ty::Num || ty == Ty::Str {
-					return self.new_ty(Ty::Bool);
+				if ty == Ty::Named(INT_SYM) || ty == Ty::Named(NUM_SYM) || ty == Ty::Named(STR_SYM) {
+					return self.new_ty(Ty::Named(BOOL_SYM));
 				}
 			},
 			BinOp::Concat => {
-				if ty == Ty::Str {
+				if ty == Ty::Named(STR_SYM) {
 					return lhs;
 				}
 			},
 			BinOp::And | BinOp::Or => {
-				if ty == Ty::Bool {
+				if ty == Ty::Named(BOOL_SYM) {
 					return lhs;
 				}
 			},
 			BinOp::Eq | BinOp::Neq => {
-				return self.new_ty(Ty::Bool);
+				return self.new_ty(Ty::Named(BOOL_SYM));
 			},
 		}
 
@@ -1083,10 +1023,10 @@ impl<'a> TypeCheck<'a> {
 				let ty = self.new_ty(Ty::TyVar);
 				self.new_ty(Ty::Maybe(ty))
 			},
-			Literal::Bool(_) => self.new_ty(Ty::Bool),
-			Literal::Num(_) => self.new_ty(Ty::Num),
-			Literal::Int(_) => self.new_ty(Ty::Int),
-			Literal::Str(_) => self.new_ty(Ty::Str),
+			Literal::Num(_) => self.new_ty(Ty::Named(NUM_SYM)),
+			Literal::Int(_) => self.new_ty(Ty::Named(INT_SYM)),
+			Literal::Str(_) => self.new_ty(Ty::Named(STR_SYM)),
+			Literal::Bool(_) => self.new_ty(Ty::Named(BOOL_SYM)),
 		}
 	}
 }

@@ -12,14 +12,10 @@ pub enum TyNode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Ty {
 	Any,
-	Bottom,
+	Err,
 	Unit,
-	Bool,
-	Str,
-	Num,
-	Int,
 	TyVar,            // type variable
-	Free,             // free type varaible
+	Free,             // free type variable
 	TyName(SymbolId), // The type of the name of a type
 	Named(SymbolId),
 	Array(TyId),

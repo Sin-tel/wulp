@@ -21,19 +21,19 @@ lazy_static! {
 			ret_ty: Ty::Unit,
 			id: 5
 		},
-		Item {
-			name: "assert",
-			is_fn_def: true,
-			param_ty: vec![Ty::Bool],
-			ret_ty: Ty::Unit,
-			id: 6
-		},
-		Item {
-			name: "error",
-			is_fn_def: true,
-			param_ty: vec![Ty::Str],
-			ret_ty: Ty::Bottom,
-			id: 7
-		},
+		// Item {
+		// 	name: "assert",
+		// 	is_fn_def: true,
+		// 	param_ty: vec![Ty::Bool],
+		// 	ret_ty: Ty::Unit,
+		// 	id: 6
+		// },
+		// Item {
+		// 	name: "error",
+		// 	is_fn_def: true,
+		// 	param_ty: vec![Ty::Str],
+		// 	ret_ty: Ty::Err,
+		// 	id: 7
+		// },
 	];
 }
