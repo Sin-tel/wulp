@@ -1,10 +1,7 @@
 use crate::ast::*;
 use crate::fs;
 use crate::lexer::Lexer;
-use crate::span::FileId;
-use crate::span::InputFile;
-use crate::span::Span;
-use crate::span::{format_err, format_warning};
+use crate::span::{format_err, format_warning, FileId, InputFile, Span};
 use crate::token::{Token, TokenKind};
 use crate::ty::TyAst;
 use anyhow::Result;
@@ -127,7 +124,8 @@ impl<'a> Parser<'a> {
 
 		let name_str = span.as_string(self.input);
 		match name_str.as_ref() {
-			"lang_item" => Stat::StructDef(self.parse_struct_def(true)),
+			// "lang_item" => Stat::StructDef(self.parse_struct_def(true)),
+			"lang_item" => todo!(),
 			s => self.error(format!("Unknown directive `{s}`"), span),
 		}
 	}
@@ -191,7 +189,7 @@ impl<'a> Parser<'a> {
 			TokenKind::Hash => self.parse_directive(),
 			TokenKind::Return => Stat::Return(self.parse_return()),
 			TokenKind::Let => Stat::Let(self.parse_let()),
-			TokenKind::Struct => Stat::StructDef(self.parse_struct_def(false)),
+			TokenKind::Struct => Stat::StructDef(self.parse_struct_def()),
 			TokenKind::LCurly => Stat::Block(self.parse_block()),
 			TokenKind::While => Stat::WhileBlock(self.parse_while_block()),
 			TokenKind::If => Stat::IfBlock(self.parse_if_block()),
@@ -286,7 +284,7 @@ impl<'a> Parser<'a> {
 		Let { names, exprs, span }
 	}
 
-	fn parse_struct_def(&mut self, lang_item: bool) -> StructDef {
+	fn parse_struct_def(&mut self) -> StructDef {
 		self.assert_next(TokenKind::Struct);
 		let name = self.parse_name();
 
@@ -295,16 +293,23 @@ impl<'a> Parser<'a> {
 		self.assert_next(TokenKind::RCurly);
 		let table = Table { fields };
 
-		StructDef { name, table, lang_item }
+		StructDef { name, table }
 	}
 
 	fn parse_fn_def(&mut self) -> FnDef {
 		self.assert_next(TokenKind::Fn);
 
 		let name = self.parse_name();
+		let mut property = None;
+
+		if self.tokens.peek().kind == TokenKind::Period {
+			self.tokens.next();
+			property = Some(self.parse_property());
+		}
+
 		let body = self.parse_fn_body();
 
-		FnDef { name, body }
+		FnDef { name, property, body }
 	}
 
 	fn parse_fn_body(&mut self) -> FnBody {

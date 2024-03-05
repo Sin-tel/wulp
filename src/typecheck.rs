@@ -1,4 +1,8 @@
 use crate::ast::*;
+use crate::scope::BOOL_SYM;
+use crate::scope::INT_SYM;
+use crate::scope::NUM_SYM;
+use crate::scope::STR_SYM;
 use crate::span::Span;
 use crate::span::{format_err_f, format_note_f, InputFile};
 use crate::std_lib::GLOBALS;
@@ -47,6 +51,11 @@ impl<'a> TypeCheck<'a> {
 		this.types.push(TyNode::Ty(Ty::Bottom));
 		assert!(this.get_type(ERR_TY) == Ty::Bottom);
 
+		this.new_struct(INT_SYM, true);
+		this.new_struct(NUM_SYM, true);
+		this.new_struct(STR_SYM, true);
+		this.new_struct(BOOL_SYM, true);
+
 		for item in GLOBALS.iter() {
 			let mut param_ty = Vec::new();
 			for p in &item.param_ty {
@@ -76,6 +85,19 @@ impl<'a> TypeCheck<'a> {
 			Some(err) => Err(anyhow!("{}", err)),
 			None => Ok(()),
 		}
+	}
+	fn new_struct(&mut self, id: SymbolId, lang_item: bool) {
+		self.structs.insert(
+			id,
+			Struct {
+				fields: FxHashMap::default(),
+				methods: FxHashMap::default(),
+				required_fields: Vec::new(),
+				symbol_id: id,
+				lang_item,
+			},
+		);
+		self.new_def(id, Ty::TyName(id));
 	}
 	fn ty_to_string(&self, id: TyId) -> String {
 		let id = self.get_parent(id);
@@ -146,10 +168,10 @@ impl<'a> TypeCheck<'a> {
 	fn get_struct_id(&self, ty: TyId) -> SymbolId {
 		match self.get_type(ty) {
 			Ty::Named(s) => s,
-			Ty::Num => self.symbol_table.t_num,
-			Ty::Int => self.symbol_table.t_int,
-			Ty::Str => self.symbol_table.t_str,
-			Ty::Bool => self.symbol_table.t_bool,
+			Ty::Num => NUM_SYM,
+			Ty::Int => INT_SYM,
+			Ty::Str => STR_SYM,
+			Ty::Bool => BOOL_SYM,
 			t => unimplemented!("{:?}", t),
 		}
 	}
@@ -455,12 +477,23 @@ impl<'a> TypeCheck<'a> {
 				Stat::Assignment(s) => self.eval_assignment(s),
 				Stat::AssignOp(s) => self.eval_assign_op(s),
 				Stat::Let(s) => self.eval_let(s),
-				Stat::FnDef(s) => self.eval_fn_def(s),
+				Stat::FnDef(s) => {
+					if let Some(p) = &mut s.property {
+						let struct_id = s.name.id;
+						let self_ty = self.new_ty(self.convert_named(struct_id));
+						let ty = self.eval_lambda(&mut s.body, p.span, Some(self_ty));
+						self.structs
+							.get_mut(&struct_id)
+							.unwrap()
+							.methods
+							.insert(p.name.clone(), ty);
+					} else {
+						self.eval_fn_def(s)
+					}
+				},
 				Stat::StructDef(_) => (),
 				Stat::Import(_s) => {
 					todo!();
-					// let table = self.eval_table(&mut s.module);
-					// self.new_def(s.alias.id, self.get_type(table));
 				},
 			};
 		}
@@ -503,14 +536,16 @@ impl<'a> TypeCheck<'a> {
 	}
 
 	fn hoist_fn_def(&mut self, node: &FnDef) {
-		let param_ty = self.eval_fn_params(&node.body.params, None);
-		let ty = match &node.body.ty {
-			Some(ty) => self.convert_ast_ty(ty),
-			None => Ty::TyVar,
-		};
-		let ret_id = self.new_ty(ty);
-		let fn_ty = Ty::Fn(param_ty, ret_id);
-		self.new_def(node.name.id, fn_ty);
+		if node.property.is_none() {
+			let param_ty = self.eval_fn_params(&node.body.params, None);
+			let ty = match &node.body.ty {
+				Some(ty) => self.convert_ast_ty(ty),
+				None => Ty::TyVar,
+			};
+			let ret_id = self.new_ty(ty);
+			let fn_ty = Ty::Fn(param_ty, ret_id);
+			self.new_def(node.name.id, fn_ty);
+		}
 	}
 
 	fn eval_fn_def(&mut self, node: &mut FnDef) {
@@ -762,17 +797,8 @@ impl<'a> TypeCheck<'a> {
 	fn eval_struct_def(&mut self, node: &mut StructDef) {
 		let id = node.name.id;
 
-		let table = Struct {
-			fields: FxHashMap::default(),
-			methods: FxHashMap::default(),
-			required_fields: Vec::new(),
-			symbol_id: node.name.id,
-			lang_item: node.lang_item,
-		};
+		self.new_struct(id, false);
 
-		self.structs.insert(id, table);
-		let ty = Ty::TyName(id);
-		self.new_def(node.name.id, ty);
 		let self_ty = self.new_ty(self.convert_named(id));
 		for f in &mut node.table.fields {
 			match &mut f.kind {

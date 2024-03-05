@@ -139,6 +139,7 @@ pub struct NamedArg {
 #[derive(Debug)]
 pub struct FnDef {
 	pub name: Name,
+	pub property: Option<Property>,
 	pub body: FnBody,
 }
 
@@ -146,7 +147,6 @@ pub struct FnDef {
 pub struct StructDef {
 	pub name: Name,
 	pub table: Table,
-	pub lang_item: bool,
 }
 
 #[derive(Debug)]

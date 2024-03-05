@@ -16,6 +16,11 @@ pub struct ScopeCheck<'a> {
 	hoist_fn_def: bool,
 }
 
+pub const INT_SYM: SymbolId = 1;
+pub const NUM_SYM: SymbolId = 2;
+pub const STR_SYM: SymbolId = 3;
+pub const BOOL_SYM: SymbolId = 4;
+
 impl<'a> ScopeCheck<'a> {
 	pub fn check(ast: &mut File, input: &'a [InputFile]) -> Result<SymbolTable> {
 		let mut this = Self {
@@ -27,6 +32,15 @@ impl<'a> ScopeCheck<'a> {
 		};
 
 		this.scope_stack.push(FxHashMap::default());
+
+		this.new_identifier("int", Symbol::new("int").make_const());
+		assert_eq!(this.lookup("int"), Some(INT_SYM));
+		this.new_identifier("num", Symbol::new("num").make_const());
+		assert_eq!(this.lookup("num"), Some(NUM_SYM));
+		this.new_identifier("str", Symbol::new("str").make_const());
+		assert_eq!(this.lookup("str"), Some(STR_SYM));
+		this.new_identifier("bool", Symbol::new("bool").make_const());
+		assert_eq!(this.lookup("bool"), Some(BOOL_SYM));
 
 		for item in GLOBALS.iter() {
 			let mut sym = Symbol::new(item.name).make_const();
@@ -154,17 +168,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 			format_err_f(&msg, node.name.span, self.input);
 			self.errors.push(msg);
 		} else {
-			let id = self.new_identifier(name, Symbol::new(name).ty_def());
-			dbg!(id);
-			if node.lang_item {
-				match name {
-					"num" => self.symbol_table.t_num = id,
-					"int" => self.symbol_table.t_int = id,
-					"str" => self.symbol_table.t_str = id,
-					"bool" => self.symbol_table.t_bool = id,
-					e => panic!("{}", e),
-				}
-			}
+			self.new_identifier(name, Symbol::new(name).ty_def());
 			node.name.visit(self);
 			node.table.visit(self);
 		}
@@ -173,15 +177,18 @@ impl<'a> Visitor for ScopeCheck<'a> {
 	fn visit_fn_def(&mut self, node: &mut FnDef) {
 		if self.hoist_fn_def {
 			let name = node.name.span.as_str_f(self.input);
-			let lookup = self.lookup(name);
-			// plain fn def
-			if lookup.is_some() {
-				let msg = format!("Function `{name}` already defined.");
-				format_err_f(&msg, node.name.span, self.input);
-				self.errors.push(msg);
-			} else {
-				// function defs are always const
-				self.new_identifier(name, Symbol::new(name).fn_def());
+
+			if node.property.is_none() {
+				let lookup = self.lookup(name);
+				// plain fn def
+				if lookup.is_some() {
+					let msg = format!("Function `{name}` already defined.");
+					format_err_f(&msg, node.name.span, self.input);
+					self.errors.push(msg);
+				} else {
+					// function defs are always const
+					self.new_identifier(name, Symbol::new(name).fn_def());
+				}
 			}
 		} else {
 			node.walk(self);

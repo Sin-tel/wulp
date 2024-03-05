@@ -232,6 +232,9 @@ impl<V: Visitor> VisitNode<V> for FnDef {
 		v.visit_fn_def(self);
 	}
 	fn walk(&mut self, v: &mut V) {
+		if let Some(p) = &mut self.property {
+			v.visit_property(p);
+		}
 		v.visit_name(&mut self.name);
 		v.visit_fn_body(&mut self.body);
 	}
@@ -242,7 +245,7 @@ impl<V: Visitor> VisitNode<V> for StructDef {
 		v.visit_struct_def(self);
 	}
 	fn walk(&mut self, v: &mut V) {
-		// v.visit_name(&mut self.name);
+		v.visit_name(&mut self.name);
 		v.visit_table(&mut self.table);
 	}
 }

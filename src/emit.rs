@@ -95,6 +95,10 @@ impl EmitLua {
 	fn emit_fn_def(&mut self, node: &mut FnDef) {
 		self.statement.push_str("function ");
 		self.visit_name(&mut node.name);
+		if let Some(p) = &mut node.property {
+			self.statement.push('.');
+			self.visit_property(p);
+		}
 		self.visit_fn_body(&mut node.body);
 	}
 }
@@ -105,9 +109,11 @@ impl Visitor for EmitLua {
 		self.hoist_defs = true;
 		for b in &mut node.stats {
 			if let Stat::FnDef(f) = b {
-				self.indent();
-				self.emit_fn_local(f);
-				self.put_statement();
+				if f.property.is_none() {
+					self.indent();
+					self.emit_fn_local(f);
+					self.put_statement();
+				}
 			}
 			if let Stat::StructDef(s) = b {
 				self.indent();
@@ -117,9 +123,11 @@ impl Visitor for EmitLua {
 		}
 		for b in &mut node.stats {
 			if let Stat::FnDef(f) = b {
-				self.indent();
-				self.emit_fn_def(f);
-				self.put_statement();
+				if f.property.is_none() {
+					self.indent();
+					self.emit_fn_def(f);
+					self.put_statement();
+				}
 			}
 		}
 		self.hoist_defs = false;
@@ -189,8 +197,12 @@ impl Visitor for EmitLua {
 			self.push_list(&mut node.exprs, ", ");
 		}
 	}
-	fn visit_fn_def(&mut self, _node: &mut FnDef) {
-		// nop
+	fn visit_fn_def(&mut self, node: &mut FnDef) {
+		if node.property.is_some() {
+			self.indent();
+			self.emit_fn_def(node);
+			self.put_statement();
+		}
 	}
 	fn visit_fn_call(&mut self, node: &mut Call) {
 		self.visit_expr(&mut node.expr);
@@ -271,47 +283,45 @@ impl Visitor for EmitLua {
 				self.statement.push('}');
 
 				// constructor
-				if !t.lang_item {
-					self.put_statement();
-					// TODO: try to get rid of the `args = args or {}`
-					self.statement.push_str(&format!(
-						"setmetatable({0}, {{\n\
+				self.put_statement();
+				// TODO: try to get rid of the `args = args or {}`
+				self.statement.push_str(&format!(
+					"setmetatable({0}, {{\n\
 					\t__call = function(_, args)\n\
 					\t\targs = args or {{}};\n\
 					\t\tlocal new = {{",
-						&name_str
-					));
-					for f in &mut t.table.fields {
-						match &mut f.kind {
-							FieldKind::Empty => {
-								self.visit_property(&mut f.field.property);
-								self.statement.push_str(" = args.");
-								self.visit_property(&mut f.field.property);
-								self.statement.push_str(", ");
-							},
-							FieldKind::Assign(e) => {
-								self.visit_property(&mut f.field.property);
-								self.statement.push_str(" = default(args.");
-								self.visit_property(&mut f.field.property);
-								self.statement.push_str(", ");
-								self.visit_expr(e);
-								self.statement.push_str("), ");
-							},
-							FieldKind::Fn(_) => (),
-						}
+					&name_str
+				));
+				for f in &mut t.table.fields {
+					match &mut f.kind {
+						FieldKind::Empty => {
+							self.visit_property(&mut f.field.property);
+							self.statement.push_str(" = args.");
+							self.visit_property(&mut f.field.property);
+							self.statement.push_str(", ");
+						},
+						FieldKind::Assign(e) => {
+							self.visit_property(&mut f.field.property);
+							self.statement.push_str(" = default(args.");
+							self.visit_property(&mut f.field.property);
+							self.statement.push_str(", ");
+							self.visit_expr(e);
+							self.statement.push_str("), ");
+						},
+						FieldKind::Fn(_) => (),
 					}
-					self.statement.push_str("}\n\t\treturn new\n\tend\n})");
 				}
+				self.statement.push_str("}\n\t\treturn new\n\tend\n})");
 			},
 			Stat::WhileBlock(_)
 			| Stat::IfBlock(_)
 			| Stat::ForBlock(_)
 			| Stat::Assignment(_)
 			| Stat::Let(_)
+			| Stat::FnDef(_)
 			| Stat::Call(_) => {
 				node.walk(self);
 			},
-			Stat::FnDef(_) => (), // already done
 		};
 
 		self.put_statement();
