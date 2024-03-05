@@ -1,7 +1,6 @@
 use crate::ast::*;
 use crate::span::format_err_f;
 use crate::span::InputFile;
-use crate::std_lib::GLOBALS;
 use crate::symbol::SymbolKind;
 use crate::symbol::{Symbol, SymbolId, SymbolTable};
 use crate::visitor::{VisitNode, Visitor};
@@ -41,15 +40,6 @@ impl<'a> ScopeCheck<'a> {
 		assert_eq!(this.lookup("str"), Some(STR_SYM));
 		this.new_identifier("bool", Symbol::new("bool").make_const());
 		assert_eq!(this.lookup("bool"), Some(BOOL_SYM));
-
-		for item in GLOBALS.iter() {
-			let mut sym = Symbol::new(item.name).make_const();
-			if item.is_fn_def {
-				sym = sym.fn_def();
-			}
-			this.new_identifier(item.name, sym);
-			assert_eq!(this.lookup(item.name), Some(item.id));
-		}
 
 		this.visit_file(ast);
 		this.scope_stack.pop();
@@ -144,6 +134,13 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		self.hoist_fn_def = false;
 		node.walk(self);
 		self.scope_stack.pop();
+	}
+
+	fn visit_intrinsic(&mut self, node: &mut Intrinsic) {
+		let name = node.name.span.as_str_f(self.input);
+		self.new_identifier(name, Symbol::new(name).make_const());
+		node.name.visit(self);
+		node.ty.visit(self);
 	}
 
 	fn visit_for_block(&mut self, node: &mut ForBlock) {

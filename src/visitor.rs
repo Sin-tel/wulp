@@ -14,6 +14,9 @@ pub trait Visitor: Sized {
 	fn visit_stat(&mut self, node: &mut Stat) {
 		node.walk(self);
 	}
+	fn visit_intrinsic(&mut self, node: &mut Intrinsic) {
+		node.walk(self);
+	}
 	fn visit_assignment(&mut self, node: &mut Assignment) {
 		node.walk(self);
 	}
@@ -126,12 +129,23 @@ impl<V: Visitor> VisitNode<V> for Stat {
 			Stat::WhileBlock(s) => v.visit_while_block(s),
 			Stat::Break => (),
 			Stat::Import(s) => v.visit_import(s),
+			Stat::Intrinsic(s) => v.visit_intrinsic(s),
 			Stat::Return(ret) => {
 				for e in &mut ret.exprs {
 					v.visit_expr(e);
 				}
 			},
 		}
+	}
+}
+
+impl<V: Visitor> VisitNode<V> for Intrinsic {
+	fn visit(&mut self, v: &mut V) {
+		v.visit_intrinsic(self);
+	}
+	fn walk(&mut self, v: &mut V) {
+		v.visit_name(&mut self.name);
+		v.visit_ty(&mut self.ty);
 	}
 }
 
@@ -374,6 +388,7 @@ impl<V: Visitor> VisitNode<V> for TyAst {
 				}
 				v.visit_ty(ret);
 			},
+			_ => (),
 		}
 	}
 }

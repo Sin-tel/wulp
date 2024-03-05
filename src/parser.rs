@@ -81,8 +81,13 @@ impl<'a> Parser<'a> {
 
 		let name_str = span.as_string(self.input);
 		match name_str.as_ref() {
-			// "lang_item" => Stat::StructDef(self.parse_struct_def(true)),
-			"lang_item" => todo!(),
+			"intrinsic" => {
+				// self.tokens.next()
+				let name = self.parse_name();
+				self.assert_next(TokenKind::Colon);
+				let ty = self.parse_type();
+				Stat::Intrinsic(Intrinsic { name, ty })
+			},
 			s => self.error(format!("Unknown directive `{s}`"), span),
 		}
 	}
@@ -828,19 +833,22 @@ impl<'a> Parser<'a> {
 				let name_str = name.span.as_string(self.input);
 				match name_str.as_ref() {
 					"self" => TyAst::SelfTy,
+					"any" => TyAst::Any,
 					_ => TyAst::Named(name),
 				}
 			},
 			TokenKind::LBracket => {
+				// Array `[ty]`
+
 				self.tokens.next();
-				// Array type
 				let ty = TyAst::Array(Box::new(self.parse_type()));
 				self.assert_next(TokenKind::RBracket);
 				ty
 			},
 			TokenKind::Fn => {
+				// Function `fn(arg, arg) -> ret`
+
 				self.tokens.next();
-				// Function type
 				let mut arg_ty = Vec::new();
 				self.assert_next(TokenKind::LParen);
 				loop {
@@ -860,11 +868,22 @@ impl<'a> Parser<'a> {
 				TyAst::Fn(arg_ty, Box::new(ret_ty))
 			},
 			TokenKind::Maybe => {
+				// maybe `maybe(ty)`
+
 				self.tokens.next();
 				self.assert_next(TokenKind::LParen);
 				let inner = self.parse_type();
 				self.assert_next(TokenKind::RParen);
 				TyAst::Maybe(Box::new(inner))
+			},
+			TokenKind::LParen => {
+				self.tokens.next();
+				self.assert_next(TokenKind::RParen);
+				TyAst::Unit
+			},
+			TokenKind::Bang => {
+				self.tokens.next();
+				TyAst::Never
 			},
 
 			_ => {

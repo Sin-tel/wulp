@@ -34,7 +34,6 @@ mod lexer;
 mod parser;
 mod scope;
 mod span;
-mod std_lib;
 mod symbol;
 mod token;
 mod ty;

@@ -227,6 +227,7 @@ impl Visitor for EmitLua {
 	fn visit_stat(&mut self, node: &mut Stat) {
 		self.indent();
 		match node {
+			Stat::Intrinsic(_) => (),
 			Stat::Return(ret) => {
 				self.statement.push_str("return ");
 				self.push_list(&mut ret.exprs, ", ");

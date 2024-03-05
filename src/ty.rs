@@ -25,6 +25,9 @@ pub enum Ty {
 
 #[derive(Debug)]
 pub enum TyAst {
+	Any,
+	Unit,
+	Never,
 	SelfTy,
 	Named(ast::TyName),
 	Array(Box<TyAst>),

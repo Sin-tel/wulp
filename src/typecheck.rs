@@ -5,7 +5,6 @@ use crate::scope::NUM_SYM;
 use crate::scope::STR_SYM;
 use crate::span::Span;
 use crate::span::{format_err_f, format_note_f, InputFile};
-use crate::std_lib::GLOBALS;
 use crate::symbol::SymbolId;
 use crate::symbol::SymbolTable;
 use crate::ty::*;
@@ -19,7 +18,7 @@ struct Struct {
 	fields: FxHashMap<String, TyId>,
 	methods: FxHashMap<String, TyId>,
 	required_fields: Vec<String>,
-	lang_item: bool,
+	primitive: bool,
 }
 
 const ERR_TY: TyId = 0;
@@ -55,15 +54,6 @@ impl<'a> TypeCheck<'a> {
 		this.new_struct(STR_SYM, true);
 		this.new_struct(BOOL_SYM, true);
 
-		for item in GLOBALS.iter() {
-			let mut param_ty = Vec::new();
-			for p in &item.param_ty {
-				param_ty.push(this.new_ty(p.clone()));
-			}
-			let ret_ty = this.new_ty(item.ret_ty.clone());
-			this.new_def(item.id, Ty::Fn(param_ty, ret_ty));
-		}
-
 		let (ret, _) = this.eval_block(&mut file.block);
 
 		if let Some((ret_ty, _)) = ret {
@@ -85,14 +75,14 @@ impl<'a> TypeCheck<'a> {
 			None => Ok(()),
 		}
 	}
-	fn new_struct(&mut self, id: SymbolId, lang_item: bool) {
+	fn new_struct(&mut self, id: SymbolId, primitive: bool) {
 		self.structs.insert(
 			id,
 			Struct {
 				fields: FxHashMap::default(),
 				methods: FxHashMap::default(),
 				required_fields: Vec::new(),
-				lang_item,
+				primitive,
 			},
 		);
 		self.new_def(id, Ty::TyName(id));
@@ -101,8 +91,8 @@ impl<'a> TypeCheck<'a> {
 		let id = self.get_parent(id);
 		match self.get_type(id) {
 			Ty::Any => "any".to_string(),
-			Ty::Err => "error".to_string(),
 			Ty::Unit => "()".to_string(),
+			Ty::Err => "error".to_string(),
 			Ty::TyVar => format!("T{id}?"),
 			Ty::Free => format!("T{id}"),
 			Ty::TyName(id) => format!("Type({})", &self.symbol_table.get(id).name),
@@ -140,6 +130,9 @@ impl<'a> TypeCheck<'a> {
 				let ty = self.convert_ast_ty(a);
 				Ty::Maybe(self.new_ty(ty))
 			},
+			TyAst::Unit => Ty::Unit,
+			TyAst::Any => Ty::Any,
+			TyAst::Never => Ty::Err,
 		}
 	}
 
@@ -345,6 +338,10 @@ impl<'a> TypeCheck<'a> {
 		let mut current_pair: RetPair = None;
 		for stat in &mut block.stats {
 			match stat {
+				Stat::Intrinsic(s) => {
+					let new_ty = self.convert_ast_ty(&s.ty);
+					self.new_def(s.name.id, new_ty);
+				},
 				Stat::Break => return (current_pair, false),
 				Stat::Block(block) => {
 					let (new_pair, ret) = self.eval_block(block);
@@ -411,7 +408,13 @@ impl<'a> TypeCheck<'a> {
 					current_pair = self.unify_return(current_pair, pair);
 				},
 				Stat::Call(s) => {
-					self.eval_fn_call(s);
+					let ret = self.eval_fn_call(s);
+					// bail if we got an error from a function call
+					if self.get_type(ret) == Ty::Err {
+						let new_pair = Some((ret, s.expr.span));
+						current_pair = self.unify_return(current_pair, new_pair);
+						return (current_pair, true);
+					}
 				},
 				Stat::Assignment(s) => self.eval_assignment(s),
 				Stat::AssignOp(s) => self.eval_assign_op(s),
@@ -624,8 +627,8 @@ impl<'a> TypeCheck<'a> {
 			Ty::TyName(struct_name) => {
 				// TODO: instantiate does not take care of generics on struct
 
-				if self.structs[&struct_name].lang_item {
-					let msg = "builtin type does not have a constructor".to_string();
+				if self.structs[&struct_name].primitive {
+					let msg = "primitive type does not have a constructor".to_string();
 					format_err_f(&msg, c.expr.span, self.input);
 					self.errors.push(msg);
 					return ERR_TY;

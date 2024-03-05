@@ -15,6 +15,7 @@ pub struct Block {
 
 #[derive(Debug)]
 pub enum Stat {
+	Intrinsic(Intrinsic),
 	Assignment(Assignment),
 	AssignOp(AssignOp),
 	Let(Let),
@@ -28,6 +29,12 @@ pub enum Stat {
 	Break,
 	Return(Return),
 	Import(Import),
+}
+
+#[derive(Debug)]
+pub struct Intrinsic {
+	pub name: Name,
+	pub ty: TyAst,
 }
 
 #[derive(Debug)]

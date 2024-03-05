@@ -460,6 +460,11 @@ impl Iterator for LexIter<'_> {
 					let end = self.cursor;
 					Some(self.newtoken(Neq, start, end))
 				},
+				'!' => {
+					self.eat_char();
+					let end = self.cursor;
+					Some(self.newtoken(Bang, start, end))
+				},
 				tk => {
 					let msg = format!("Unexpected token: `{tk}`");
 					format_err(&msg, Span::at(self.cursor, self.id), self.input, &self.filename);
