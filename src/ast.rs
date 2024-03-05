@@ -34,7 +34,6 @@ pub enum Stat {
 pub struct Import {
 	pub filename: String,
 	pub alias: Name,
-	pub module: Table,
 }
 
 #[derive(Debug)]

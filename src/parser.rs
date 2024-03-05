@@ -10,7 +10,6 @@ use anyhow::Result;
 pub struct Parser<'a> {
 	input: &'a str,
 	file_id: FileId,
-	next_id: FileId,
 	tokens: Lexer<'a>,
 	filename: String,
 	files: Vec<InputFile>,
@@ -22,11 +21,9 @@ impl<'a> Parser<'a> {
 		let input = fs::read_to_string(filename.clone())?;
 		let mut files = Vec::new();
 		let file_id = 0;
-		let next_id = 1;
 		let mut this = Parser {
 			input: &input,
 			file_id,
-			next_id,
 			tokens: Lexer::new(&input, file_id, filename.clone()),
 			filename: filename.clone(),
 			files: Vec::new(),
@@ -53,40 +50,6 @@ impl<'a> Parser<'a> {
 		Ok((ast, files))
 	}
 
-	fn parse_module(&mut self, filename: &str) -> Table {
-		let filename = format!("wulp/{filename}.wulp");
-		// TODO: return result
-		let input = fs::read_to_string(filename.clone()).unwrap();
-		let file_id = self.next_id;
-		let next_id = self.next_id + 1;
-		let mut parser = Parser {
-			input: &input,
-			file_id,
-			next_id,
-			tokens: Lexer::new(&input, file_id, filename.clone()),
-			filename: filename.clone(),
-			files: Vec::new(),
-		};
-		let fields = parser.parse_fields();
-
-		// make sure we are done
-		let tk = parser.tokens.next();
-		if tk.kind != TokenKind::Eof {
-			parser.error(format!("Expected end of file but found: {tk}."), tk.span);
-		}
-
-		self.next_id = parser.next_id;
-		self.files.append(&mut parser.files);
-		self.files.push({
-			InputFile {
-				contents: input,
-				filename,
-				id: file_id,
-			}
-		});
-		Table { fields }
-	}
-
 	fn error(&mut self, msg: String, span: Span) -> ! {
 		format_err(&msg, span, self.input, &self.filename);
 		panic!("{msg}");
@@ -105,13 +68,7 @@ impl<'a> Parser<'a> {
 					Name { id: 0, span }
 				};
 
-				let module = self.parse_module(&filename);
-
-				Import {
-					filename,
-					alias,
-					module,
-				}
+				Import { filename, alias }
 			},
 			TokenKind::From => todo!(),
 			_ => unreachable!(),

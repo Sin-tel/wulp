@@ -120,16 +120,17 @@ impl<'a> ScopeCheck<'a> {
 }
 
 impl<'a> Visitor for ScopeCheck<'a> {
-	fn visit_import(&mut self, node: &mut Import) {
+	fn visit_import(&mut self, _node: &mut Import) {
 		// TODO: each file should have its own scope!
-		self.scope_stack.push(FxHashMap::default());
-		for field in &mut node.module.fields {
-			field.visit(self);
-		}
-		self.scope_stack.pop();
-		let name_str = node.alias.span.as_str_f(self.input);
-		self.new_identifier(name_str, Symbol::new(name_str).make_const());
-		node.alias.visit(self);
+		todo!()
+		// self.scope_stack.push(FxHashMap::default());
+		// for field in &mut node.module.fields {
+		// 	field.visit(self);
+		// }
+		// self.scope_stack.pop();
+		// let name_str = node.alias.span.as_str_f(self.input);
+		// self.new_identifier(name_str, Symbol::new(name_str).make_const());
+		// node.alias.visit(self);
 	}
 
 	fn visit_block(&mut self, node: &mut Block) {

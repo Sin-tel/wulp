@@ -93,7 +93,7 @@ impl<V: Visitor> VisitNode<V> for Import {
 	}
 	fn walk(&mut self, v: &mut V) {
 		v.visit_name(&mut self.alias);
-		v.visit_table(&mut self.module);
+		// v.visit_table(&mut self.module);
 	}
 }
 

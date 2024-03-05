@@ -240,15 +240,16 @@ impl Visitor for EmitLua {
 				self.indent();
 				self.statement.push_str("end");
 			},
-			Stat::Import(s) => {
+			Stat::Import(_s) => {
 				// TODO: emit this as a block instead of a table
 				// struct and fn defs should be in export table
-				self.statement.push_str("local ");
-				s.alias.visit(self);
-				self.statement.push_str(" = ");
-				self.statement.push('{');
-				self.push_list(&mut s.module.fields, ", ");
-				self.statement.push('}');
+				todo!()
+				// self.statement.push_str("local ");
+				// s.alias.visit(self);
+				// self.statement.push_str(" = ");
+				// self.statement.push('{');
+				// self.push_list(&mut s.module.fields, ", ");
+				// self.statement.push('}');
 			},
 			Stat::AssignOp(s) => {
 				// Copy any evaluations to a temp var
