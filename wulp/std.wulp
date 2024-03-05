@@ -1,0 +1,12 @@
+#intrinsic
+assert: fn(bool) -> ()
+
+#intrinsic
+print: fn(any) -> ()
+
+#intrinsic
+error: fn(str) -> !
+
+#include std.str
+#include std.num
+

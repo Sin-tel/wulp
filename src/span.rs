@@ -6,7 +6,6 @@ pub type FileId = usize;
 pub struct InputFile {
 	pub contents: String,
 	pub filename: String,
-	pub id: FileId,
 }
 
 #[derive(PartialEq, Debug, Copy, Clone)]

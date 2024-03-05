@@ -137,8 +137,10 @@ impl<'a> Visitor for ScopeCheck<'a> {
 	}
 
 	fn visit_intrinsic(&mut self, node: &mut Intrinsic) {
-		let name = node.name.span.as_str_f(self.input);
-		self.new_identifier(name, Symbol::new(name).make_const());
+		if node.property.is_none() {
+			let name = node.name.span.as_str_f(self.input);
+			self.new_identifier(name, Symbol::new(name).make_const());
+		}
 		node.name.visit(self);
 		node.ty.visit(self);
 	}

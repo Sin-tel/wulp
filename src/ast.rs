@@ -34,6 +34,7 @@ pub enum Stat {
 #[derive(Debug)]
 pub struct Intrinsic {
 	pub name: Name,
+	pub property: Option<Property>,
 	pub ty: TyAst,
 }
 

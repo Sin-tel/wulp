@@ -12,42 +12,65 @@ pub struct Parser<'a> {
 	file_id: FileId,
 	tokens: Lexer<'a>,
 	filename: String,
-	files: Vec<InputFile>,
+	includes: Vec<String>,
 }
 
 impl<'a> Parser<'a> {
 	pub fn parse(filename: &str) -> Result<(File, Vec<InputFile>)> {
-		let filename = format!("wulp/{filename}.wulp");
-		let input = fs::read_to_string(filename.clone())?;
 		let mut files = Vec::new();
-		let file_id = 0;
+		let stats = Self::parse_file_rec(filename, &mut files, true)?;
+
+		Ok((File { block: Block { stats } }, files))
+	}
+
+	pub fn parse_file_rec(filename: &str, files: &mut Vec<InputFile>, include_std: bool) -> Result<Vec<Stat>> {
+		let (mut stats_last, includes) = Self::parse_file(filename, files, include_std)?;
+		let mut stats = Vec::new();
+		for f in &includes {
+			let mut r_stats = Self::parse_file_rec(f, files, false)?;
+			stats.append(&mut r_stats);
+		}
+		stats.append(&mut stats_last);
+
+		Ok(stats)
+	}
+
+	pub fn parse_file(
+		filename: &str,
+		files: &mut Vec<InputFile>,
+		include_std: bool,
+	) -> Result<(Vec<Stat>, Vec<String>)> {
+		let filename = format!("{filename}.wulp");
+		let input = fs::read_to_string(filename.clone())?;
+		let file_id = files.len();
+		let mut includes = Vec::new();
+		if include_std {
+			includes.push("std".to_string());
+		}
 		let mut this = Parser {
 			input: &input,
 			file_id,
 			tokens: Lexer::new(&input, file_id, filename.clone()),
 			filename: filename.clone(),
-			files: Vec::new(),
+			includes,
 		};
-		let ast = this.parse_file();
+
+		let stats = this.parse_stat_list();
 
 		// make sure we are done
 		let tk = this.tokens.next();
 		if tk.kind != TokenKind::Eof {
 			this.error(format!("Expected end of file but found: {tk}."), tk.span);
 		}
-		files.append(&mut this.files);
+
+		let includes = this.includes;
 		files.push({
 			InputFile {
 				contents: input,
 				filename,
-				id: file_id,
 			}
 		});
-		files.sort_by_key(|f| f.id);
-		for (i, v) in files.iter().enumerate() {
-			assert_eq!(i, v.id);
-		}
-		Ok((ast, files))
+		Ok((stats, includes))
 	}
 
 	fn error(&mut self, msg: String, span: Span) -> ! {
@@ -75,29 +98,39 @@ impl<'a> Parser<'a> {
 		}
 	}
 
-	fn parse_directive(&mut self) -> Stat {
+	fn parse_directive(&mut self) -> Option<Stat> {
 		self.assert_next(TokenKind::Hash);
 		let span = self.assert_next(TokenKind::Name).span;
 
 		let name_str = span.as_string(self.input);
 		match name_str.as_ref() {
 			"intrinsic" => {
-				// self.tokens.next()
 				let name = self.parse_name();
+				let mut property = None;
+				if self.tokens.peek().kind == TokenKind::Period {
+					self.tokens.next();
+					property = Some(self.parse_property());
+				}
 				self.assert_next(TokenKind::Colon);
 				let ty = self.parse_type();
-				Stat::Intrinsic(Intrinsic { name, ty })
+				Some(Stat::Intrinsic(Intrinsic { name, property, ty }))
 			},
-			s => self.error(format!("Unknown directive `{s}`"), span),
+			"include" => {
+				let mut filename = self.tokens.next().span.as_string(self.input);
+				while self.tokens.peek().kind == TokenKind::Period {
+					self.tokens.next();
+					filename.push(std::path::MAIN_SEPARATOR);
+					filename.push_str(self.tokens.next().span.as_str(self.input));
+				}
+				self.includes.push(filename);
+
+				None
+			},
+			s => self.error(format!("Unknown directive `#{s}`"), span),
 		}
 	}
 
 	// Block and statement rules
-
-	fn parse_file(&mut self) -> File {
-		let stats = self.parse_stat_list();
-		File { block: Block { stats } }
-	}
 
 	/// `{` block `}` | statement
 	fn parse_block(&mut self) -> Block {
@@ -117,6 +150,12 @@ impl<'a> Parser<'a> {
 	fn parse_stat_list(&mut self) -> Vec<Stat> {
 		let mut stats = Vec::new();
 		loop {
+			while self.tokens.peek().kind == TokenKind::Hash {
+				let s = self.parse_directive();
+				if let Some(s) = s {
+					stats.push(s);
+				}
+			}
 			match self.tokens.peek().kind {
 				TokenKind::RCurly | TokenKind::Eof => break,
 				TokenKind::Return | TokenKind::Break => {
@@ -148,7 +187,6 @@ impl<'a> Parser<'a> {
 				Stat::Break
 			},
 			TokenKind::Import | TokenKind::From => Stat::Import(self.parse_import()),
-			TokenKind::Hash => self.parse_directive(),
 			TokenKind::Return => Stat::Return(self.parse_return()),
 			TokenKind::Let => Stat::Let(self.parse_let()),
 			TokenKind::Struct => Stat::StructDef(self.parse_struct_def()),
@@ -157,6 +195,7 @@ impl<'a> Parser<'a> {
 			TokenKind::If => Stat::IfBlock(self.parse_if_block()),
 			TokenKind::For => Stat::ForBlock(self.parse_for_block()),
 			TokenKind::Fn => Stat::FnDef(self.parse_fn_def()),
+			TokenKind::Hash => unreachable!(),
 			_ => {
 				// Parse a suffix expression, then check if a `=`, `,` or `:` follows to parse (multiple) assignment.
 				// If not, it should be a function call.

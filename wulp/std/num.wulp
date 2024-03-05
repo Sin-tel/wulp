@@ -1,0 +1,61 @@
+// Does not include, ldexp, fmod, deg, rad, modf
+
+// constants
+#intrinsic
+num.NAN: num
+#intrinsic
+num.INF: num
+#intrinsic
+num.PI: num
+#intrinsic
+num.TWO_PI: num
+
+// math
+#intrinsic
+num.abs:   fn(self) -> self
+#intrinsic
+num.acos:  fn(self) -> self
+#intrinsic
+num.asin:  fn(self) -> self
+#intrinsic
+num.atan:  fn(self) -> self
+#intrinsic
+num.atan2: fn(self, self) -> self
+#intrinsic
+num.ceil:  fn(self) -> self
+#intrinsic
+num.cos:   fn(self) -> self
+#intrinsic
+num.cosh:  fn(self) -> self
+#intrinsic
+num.exp:   fn(self) -> self
+#intrinsic
+num.floor: fn(self) -> self
+#intrinsic
+num.ln:    fn(self) -> self
+#intrinsic
+num.log10: fn(self) -> self
+#intrinsic
+num.max:   fn(self, self) -> self
+#intrinsic
+num.min:   fn(self, self) -> self
+#intrinsic
+num.sin:   fn(self) -> self
+#intrinsic
+num.sinh:  fn(self) -> self
+#intrinsic
+num.sqrt:  fn(self) -> self
+#intrinsic
+num.tan:   fn(self) -> self
+#intrinsic
+num.tanh:  fn(self) -> self
+
+// random
+#intrinsic
+num.random: fn(self) -> self
+#intrinsic
+num.random_seed: fn(self) -> self
+
+fn num.log2(self) {
+	return self.ln() / num.ln(2.0)
+}

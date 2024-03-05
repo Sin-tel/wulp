@@ -1,7 +1,7 @@
 require("strict")
 local int = {}
-local num = {}
-local str = {}
+local num = require("num")
+local str = require("str")
 local bool = {}
 local function default(x, y)
   if x == nil then

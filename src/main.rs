@@ -44,6 +44,7 @@ mod visitor;
 mod tests;
 
 fn main() -> Result<()> {
+	env::set_current_dir(Path::new("./wulp"))?;
 	let filename = "test";
 	let (mut ast, files) = Parser::parse(filename)?;
 	let symbol_table = ScopeCheck::check(&mut ast, &files)?;
@@ -59,7 +60,7 @@ fn main() -> Result<()> {
 	// println!("{code}");
 
 	println!("----- execute:");
-	env::set_current_dir(Path::new("./lua"))?;
+	env::set_current_dir(Path::new("../lua"))?;
 	let lua = mlua::Lua::new_with(
 		StdLib::PACKAGE | StdLib::STRING | StdLib::MATH | StdLib::IO,
 		LuaOptions::default(),
@@ -71,7 +72,7 @@ fn main() -> Result<()> {
 	display_return(res, filename);
 
 	env::set_current_dir(Path::new("../out"))?;
-	let mut file = fs::File::create(format!("{}.lua", filename))?;
+	let mut file = fs::File::create(format!("{filename}.lua"))?;
 	file.write_all(code.as_bytes())?;
 
 	Ok(())

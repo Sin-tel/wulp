@@ -1,0 +1,13 @@
+#intrinsic
+str.upper: fn(self) -> self
+#intrinsic
+str.lower: fn(self) -> self
+#intrinsic
+str.reverse: fn(self) -> self
+#intrinsic
+str.len: fn(self) -> int
+#intrinsic
+str.len: fn(self) -> int
+#intrinsic
+str.rep: fn(self, int) -> self
+

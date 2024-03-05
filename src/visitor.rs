@@ -378,10 +378,8 @@ impl<V: Visitor> VisitNode<V> for TyAst {
 	}
 	fn walk(&mut self, v: &mut V) {
 		match self {
-			TyAst::SelfTy => (),
 			TyAst::Named(n) => v.visit_ty_name(n),
-			TyAst::Array(ty) => v.visit_ty(ty),
-			TyAst::Maybe(ty) => v.visit_ty(ty),
+			TyAst::Array(ty) | TyAst::Maybe(ty) => v.visit_ty(ty),
 			TyAst::Fn(args, ret) => {
 				for arg in args {
 					v.visit_ty(arg);
