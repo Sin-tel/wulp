@@ -12,6 +12,17 @@ int.max:   fn(self, self) -> self
 int.min:   fn(self, self) -> self
 #lua #"int.min = math.min"#
 
+#intrinsic
+int.idiv:   fn(self, self) -> self
+#lua #"
+int.idiv = function(self, denom)
+	assert(denum ~= 0, "division by zero")
+	return math.floor(self / denom)
+end
+"#
+
+
+
 // bitwise ops
 #intrinsic
 int.bit_shl:   fn(self, self) -> self
@@ -50,15 +61,11 @@ int.bit_ror:   fn(self, self) -> self
 #lua #"int.bit_ror = bit.ror"#
 
 #intrinsic
-int.bit_swap:   fn(self, self) -> self
+int.bit_swap:   fn(self) -> self
 #lua #"int.bit_swap = bit.bswap"#
 
+// TODO: optional length argument
 #intrinsic
-int.idiv:   fn(self, self) -> self
-#lua #"
-int.idiv = function(self, denom)
-	assert(denum ~= 0, "division by zero")
-	return math.floor(self / denom)
-end
-"#
+int.to_hex: fn(self) -> str
+#lua #"int.to_hex = function(self) return "0x" .. bit.tohex(self) end"#
 

@@ -98,7 +98,7 @@ impl<'a> LexIter<'a> {
 		c.map(|b| *b as char)
 	}
 
-	fn peek_is_number(&mut self) -> bool {
+	fn peek_is_digit(&mut self) -> bool {
 		if let Some(c) = self.peek_char() {
 			return c.is_ascii_digit();
 		}
@@ -243,32 +243,77 @@ impl<'a> LexIter<'a> {
 
 		while let Some(n) = self.cur_char() {
 			match n {
-				'0'..='9' => {
-					if let Some(c) = self.eat_char() {
-						s.push(c);
-					} else {
-						unreachable!()
-					}
+				'0'..='9' | '_' => {
+					let c = self.eat_char().unwrap();
+					s.push(c);
 				},
 				'.' => {
+					if let Some(c) = self.peek_char() {
+						if c.is_ascii_alphabetic() {
+							break;
+						}
+					}
 					if dot {
 						break;
 					}
-					if let Some(c) = self.eat_char() {
-						s.push(c);
-						dot = true;
-					} else {
-						unreachable!()
-					}
+					let c = self.eat_char().unwrap();
+					s.push(c);
+					dot = true;
 				},
 				_ => break,
 			}
 		}
-
 		let span = Span::new(start, self.cursor, self.id);
-
 		Token {
 			kind: TokenKind::Number,
+			span,
+			line: self.line,
+		}
+	}
+
+	fn hex_number(&mut self) -> Token {
+		let start = self.cursor;
+		let mut s = String::new();
+
+		assert_eq!(self.eat_char(), Some('0'));
+		assert_eq!(self.eat_char(), Some('x'));
+
+		while let Some(n) = self.cur_char() {
+			match n {
+				'0'..='9' | 'a'..='f' | 'A'..='F' | '_' => {
+					let c = self.eat_char().unwrap();
+					s.push(c);
+				},
+				_ => break,
+			}
+		}
+		let span = Span::new(start, self.cursor, self.id);
+		Token {
+			kind: TokenKind::HexNumber,
+			span,
+			line: self.line,
+		}
+	}
+
+	fn bin_number(&mut self) -> Token {
+		let start = self.cursor;
+		let mut s = String::new();
+
+		assert_eq!(self.eat_char(), Some('0'));
+		assert_eq!(self.eat_char(), Some('b'));
+
+		while let Some(n) = self.cur_char() {
+			match n {
+				'0'..='9' | 'a'..='f' | 'A'..='F' | '_' => {
+					let c = self.eat_char().unwrap();
+					s.push(c);
+				},
+				_ => break,
+			}
+		}
+		let span = Span::new(start, self.cursor, self.id);
+		Token {
+			kind: TokenKind::BinNumber,
 			span,
 			line: self.line,
 		}
@@ -321,7 +366,9 @@ impl Iterator for LexIter<'_> {
 					self.eat_char();
 					self.next()
 				},
-				'.' if self.peek_is_number() => Some(self.number()),
+				'.' if self.peek_is_digit() => Some(self.number()),
+				'0' if next == Some('x') => Some(self.hex_number()),
+				'0' if next == Some('b') => Some(self.bin_number()),
 				'0'..='9' => Some(self.number()),
 				'/' if next == Some('/') => Some(self.single_line_comment()),
 				'-' if next == Some('>') => {

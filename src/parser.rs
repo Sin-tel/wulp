@@ -567,7 +567,7 @@ impl<'a> Parser<'a> {
 				}
 			},
 			TokenKind::Str => self.parse_string(),
-			TokenKind::Number => self.parse_number(),
+			TokenKind::Number | TokenKind::HexNumber | TokenKind::BinNumber => self.parse_number(),
 			TokenKind::LBracket => self.parse_array_constructor(),
 			TokenKind::Name => {
 				let name = self.parse_name();
@@ -812,21 +812,50 @@ impl<'a> Parser<'a> {
 	}
 
 	fn parse_number(&mut self) -> Expr {
-		let span = self.tokens.next().span;
+		let tk = self.tokens.next();
+		let span = tk.span;
 		let s = span.as_string(self.input);
-		if let Ok(num) = s.parse() {
-			Expr {
-				span,
-				kind: ExprKind::Literal(Literal::Int(num)),
-			}
-		} else if let Ok(num) = s.parse() {
-			Expr {
-				span,
-				kind: ExprKind::Literal(Literal::Num(num)),
-			}
-		} else {
-			self.error(format!("Malformed number: `{s}`."), span);
+		match tk.kind {
+			TokenKind::Number => {
+				let s = str::replace(&s, "_", "");
+				if let Ok(num) = s.parse::<u32>() {
+					return Expr {
+						span,
+						kind: ExprKind::Literal(Literal::Int(num as i32)),
+					};
+				} else if let Ok(num) = s.parse::<f64>() {
+					return Expr {
+						span,
+						kind: ExprKind::Literal(Literal::Num(num)),
+					};
+				}
+			},
+			TokenKind::HexNumber => {
+				let s = str::replace(&s, "_", "");
+				if let Some(s) = s.strip_prefix("0x") {
+					if let Ok(num) = u32::from_str_radix(&s, 16) {
+						return Expr {
+							span,
+							kind: ExprKind::Literal(Literal::Int(num as i32)),
+						};
+					}
+				}
+			},
+			TokenKind::BinNumber => {
+				if let Some(s) = s.strip_prefix("0b") {
+					let s = &str::replace(s, "_", "");
+					if let Ok(num) = u32::from_str_radix(&s, 2) {
+						return Expr {
+							span,
+							kind: ExprKind::Literal(Literal::Int(num as i32)),
+						};
+					}
+				}
+			},
+			_ => unreachable!(),
 		}
+		// TODO: better error message when literal doesn't fit in i32
+		self.error(format!("Malformed number: `{s}`."), span);
 	}
 
 	fn parse_name(&mut self) -> Name {
