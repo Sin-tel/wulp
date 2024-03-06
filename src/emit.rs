@@ -276,23 +276,9 @@ impl Visitor for EmitLua {
 			Stat::StructDef(t) => {
 				let name_str = self.symbol_table.get(t.name.id).name.clone();
 				self.statement.push_str(&name_str);
-				self.statement.push_str(" = {\n");
-				self.indent_level += 1;
-				for f in &mut t.table.fields {
-					match f.kind {
-						FieldKind::Empty | FieldKind::Assign(_) => (),
-						FieldKind::Fn(_) => {
-							self.indent();
-							self.visit_field(f);
-							self.put_statement();
-						},
-					}
-				}
-				self.indent_level -= 1;
-				self.statement.push('}');
-
-				// constructor
+				self.statement.push_str(" = {}");
 				self.put_statement();
+				// constructor
 				// TODO: try to get rid of the `args = args or {}`
 				self.statement.push_str(&format!(
 					"setmetatable({0}, {{\n\
@@ -317,7 +303,6 @@ impl Visitor for EmitLua {
 							self.visit_expr(e);
 							self.statement.push_str("), ");
 						},
-						FieldKind::Fn(_) => (),
 					}
 				}
 				self.statement.push_str("}\n\t\treturn new\n\tend\n})");
@@ -429,10 +414,6 @@ impl Visitor for EmitLua {
 			FieldKind::Assign(e) => {
 				self.statement.push_str(" = ");
 				self.visit_expr(e);
-			},
-			FieldKind::Fn(f) => {
-				self.statement.push_str(" = function");
-				self.visit_fn_body(f);
 			},
 		}
 	}

@@ -174,7 +174,6 @@ pub struct Field {
 pub enum FieldKind {
 	Empty,
 	Assign(Expr),
-	Fn(FnBody),
 }
 
 #[derive(Debug)]

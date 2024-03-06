@@ -362,10 +362,6 @@ impl<V: Visitor> VisitNode<V> for Field {
 				v.visit_expr(e);
 				v.visit_property(&mut self.field.property);
 			},
-			FieldKind::Fn(f) => {
-				v.visit_property(&mut self.field.property);
-				v.visit_fn_body(f);
-			},
 		}
 		if let Some(ty) = &mut self.field.ty {
 			v.visit_ty(ty);

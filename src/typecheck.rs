@@ -334,16 +334,13 @@ impl<'a> TypeCheck<'a> {
 	// Bool indicates if the block always returns
 	fn eval_block(&mut self, block: &mut Block) -> (RetPair, bool) {
 		for stat in &mut block.stats {
-			if let Stat::FnDef(s) = stat {
-				self.hoist_fn_def(s);
-			}
-			if let Stat::StructDef(s) = stat {
-				self.eval_struct_def(s);
-			}
-		}
-		let mut current_pair: RetPair = None;
-		for stat in &mut block.stats {
 			match stat {
+				Stat::FnDef(s) => {
+					self.hoist_fn_def(s);
+				},
+				Stat::StructDef(s) => {
+					self.eval_struct_def(s);
+				},
 				Stat::Intrinsic(s) => {
 					if let Some(p) = &mut s.property {
 						let struct_id = s.name.id;
@@ -360,6 +357,12 @@ impl<'a> TypeCheck<'a> {
 						self.new_def(s.name.id, new_ty);
 					}
 				},
+				_ => (),
+			};
+		}
+		let mut current_pair: RetPair = None;
+		for stat in &mut block.stats {
+			match stat {
 				Stat::Break => return (current_pair, false),
 				Stat::Block(block) => {
 					let (new_pair, ret) = self.eval_block(block);
@@ -451,8 +454,7 @@ impl<'a> TypeCheck<'a> {
 						self.eval_fn_def(s);
 					}
 				},
-				Stat::InlineLua(_) => (),
-				Stat::StructDef(_) => (),
+				Stat::InlineLua(_) | Stat::Intrinsic(_) | Stat::StructDef(_) => (),
 				Stat::Import(_s) => {
 					todo!();
 				},
@@ -567,47 +569,48 @@ impl<'a> TypeCheck<'a> {
 		fn_id
 	}
 
-	fn eval_fn_call(&mut self, c: &mut Call) -> TyId {
+	// tranpose something that looks like instance.call(...) to Class.call(instance, ...)
+	// TODO: this is a bit messy!
+	// TODO: somehow check if the first parameter is actually "self" before doing this
+	fn transpose_call(&mut self, c: &mut Call) {
 		if let ExprKind::SuffixExpr(expr, s) = &mut c.expr.kind {
 			let mut ty = self.eval_expr(expr);
 			let last_suffix = s.pop().expect("should have at least one suffix");
 			for suffix in s.iter_mut() {
 				ty = self.eval_suffix(ty, expr.span, suffix);
 			}
-
-			// TODO: this is a bit messy!
-			// TODO: do not call this when evaluating lambda field
-			if let Ty::TyName(_) = self.get_type(ty) {
-				s.push(last_suffix);
-			} else {
-				let id = if let Ty::Named(id) = self.get_type(ty) {
-					id
-				} else {
-					unimplemented!();
-				};
-
-				// fix up the AST for method call
-				let inst_expr = std::mem::replace(
-					expr,
-					Box::new(Expr {
-						span: expr.span,
-						kind: ExprKind::Name(Name { span: expr.span, id }),
-					}),
-				);
-				let inst_s = std::mem::replace(s, vec![last_suffix]);
-				c.args.insert(
-					0,
-					if inst_s.is_empty() {
-						*inst_expr
-					} else {
-						Expr {
-							span: expr.span,
-							kind: ExprKind::SuffixExpr(inst_expr, inst_s),
-						}
-					},
-				);
+			if let Ty::Named(id) = self.get_type(ty) {
+				if let Suffix::Property(p) = &last_suffix {
+					if self.structs[&id].fields.get(&p.name).is_none() {
+						let inst_expr = std::mem::replace(
+							expr,
+							Box::new(Expr {
+								span: expr.span,
+								kind: ExprKind::Name(Name { span: expr.span, id }),
+							}),
+						);
+						let inst_s = std::mem::replace(s, vec![last_suffix]);
+						c.args.insert(
+							0,
+							if inst_s.is_empty() {
+								*inst_expr
+							} else {
+								Expr {
+									span: expr.span,
+									kind: ExprKind::SuffixExpr(inst_expr, inst_s),
+								}
+							},
+						);
+						return;
+					}
+				}
 			}
+			s.push(last_suffix);
 		}
+	}
+
+	fn eval_fn_call(&mut self, c: &mut Call) -> TyId {
+		self.transpose_call(c);
 
 		let fn_ty_id = self.eval_expr(&mut c.expr);
 		// println!("fn_ty_id {}", self.ty_to_string(fn_ty_id));
@@ -762,7 +765,7 @@ impl<'a> TypeCheck<'a> {
 
 		let self_ty = self.new_ty(Ty::Named(id));
 		for f in &mut node.table.fields {
-			match &mut f.kind {
+			let (k, v) = match &mut f.kind {
 				FieldKind::Empty => {
 					self.structs
 						.get_mut(&id)
@@ -773,11 +776,7 @@ impl<'a> TypeCheck<'a> {
 					if let Some(ty) = &f.field.ty {
 						let new_ty = self.convert_ast_ty(ty, None);
 						let ty = self.new_ty(new_ty);
-						self.structs
-							.get_mut(&id)
-							.unwrap()
-							.fields
-							.insert(f.field.property.name.clone(), ty);
+						(f.field.property.name.clone(), ty)
 					} else {
 						let msg = "Need type annotation here";
 						format_err_f(msg, f.field.property.span, self.input);
@@ -806,21 +805,10 @@ impl<'a> TypeCheck<'a> {
 						}
 						expr_ty = ty_id;
 					}
-					self.structs
-						.get_mut(&id)
-						.unwrap()
-						.fields
-						.insert(f.field.property.name.clone(), expr_ty);
-				},
-				FieldKind::Fn(func) => {
-					let ty = self.eval_lambda(func, f.field.property.span, Some(self_ty));
-					self.structs
-						.get_mut(&id)
-						.unwrap()
-						.static_fields
-						.insert(f.field.property.name.clone(), ty);
+					(f.field.property.name.clone(), expr_ty)
 				},
 			};
+			self.structs.get_mut(&id).unwrap().fields.insert(k, v);
 		}
 	}
 

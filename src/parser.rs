@@ -677,16 +677,6 @@ impl<'a> Parser<'a> {
 					}
 				}
 			},
-			TokenKind::Fn => {
-				self.tokens.next();
-
-				let property = self.parse_property();
-				let body = self.parse_fn_body();
-				Field {
-					field: PropertyTy { property, ty: None },
-					kind: FieldKind::Fn(body),
-				}
-			},
 			_ => {
 				let tk = self.tokens.next();
 				self.error(format!("Expected field but found: `{tk}`."), tk.span);
