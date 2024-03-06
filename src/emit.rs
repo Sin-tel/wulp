@@ -108,17 +108,24 @@ impl Visitor for EmitLua {
 		self.indent_level += 1;
 		self.hoist_defs = true;
 		for b in &mut node.stats {
-			if let Stat::FnDef(f) = b {
-				if f.property.is_none() {
+			match b {
+				Stat::FnDef(f) => {
+					if f.property.is_none() {
+						self.indent();
+						self.emit_fn_local(f);
+						self.put_statement();
+					}
+				},
+				Stat::StructDef(s) => {
 					self.indent();
-					self.emit_fn_local(f);
+					self.emit_struct_local(s);
 					self.put_statement();
-				}
-			}
-			if let Stat::StructDef(s) = b {
-				self.indent();
-				self.emit_struct_local(s);
-				self.put_statement();
+				},
+				Stat::InlineLua(s) => {
+					self.statement.push_str(s);
+					self.put_statement();
+				},
+				_ => (),
 			}
 		}
 		for b in &mut node.stats {
@@ -227,7 +234,7 @@ impl Visitor for EmitLua {
 	fn visit_stat(&mut self, node: &mut Stat) {
 		self.indent();
 		match node {
-			Stat::Intrinsic(_) => (),
+			Stat::Intrinsic(_) | Stat::InlineLua(_) => (),
 			Stat::Return(ret) => {
 				self.statement.push_str("return ");
 				self.push_list(&mut ret.exprs, ", ");

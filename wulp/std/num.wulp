@@ -1,6 +1,12 @@
-// Does not include, ldexp, fmod, deg, rad, modf
+// Does not include, ldexp, fmod, modf, deg, rad
 
 // constants
+#lua #"
+num.INF = math.huge
+num.NAN = 0 / 0
+num.PI = math.pi
+num.TWO_PI = 6.283185307179586
+"#
 #intrinsic
 num.NAN: num
 #intrinsic
@@ -11,6 +17,27 @@ num.PI: num
 num.TWO_PI: num
 
 // math
+#lua #"
+num.abs = math.abs
+num.acos = math.acos
+num.asin = math.asin
+num.atan = math.atan
+num.atan2 = math.atan2
+num.ceil = math.ceil
+num.cos = math.cos
+num.cosh = math.cosh
+num.exp = math.exp
+num.floor = math.floor
+num.ln = math.log
+num.log10 = math.log10
+num.max = math.max
+num.min = math.min
+num.sin = math.sin
+num.sinh = math.sinh
+num.sqrt = math.sqrt
+num.tan = math.tan
+num.tanh = math.tanh
+"#
 #intrinsic
 num.abs:   fn(self) -> self
 #intrinsic
@@ -49,12 +76,6 @@ num.sqrt:  fn(self) -> self
 num.tan:   fn(self) -> self
 #intrinsic
 num.tanh:  fn(self) -> self
-
-// random
-#intrinsic
-num.random: fn(self) -> self
-#intrinsic
-num.random_seed: fn(self) -> self
 
 fn num.log2(self) {
 	return self.ln() / num.ln(2.0)

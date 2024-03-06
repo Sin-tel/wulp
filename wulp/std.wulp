@@ -1,12 +1,14 @@
 #intrinsic
 assert: fn(bool) -> ()
-
 #intrinsic
 print: fn(any) -> ()
-
 #intrinsic
 error: fn(str) -> !
 
-#include std.str
 #include std.num
+#include std.int
+#include std.str
+
+#include std.random
+// import std.random as random
 

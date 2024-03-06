@@ -23,8 +23,10 @@ impl<'a> Parser<'a> {
 		Ok((File { block: Block { stats } }, files))
 	}
 
-	pub fn parse_file_rec(filename: &str, files: &mut Vec<InputFile>, include_std: bool) -> Result<Vec<Stat>> {
-		let (mut stats_last, includes) = Self::parse_file(filename, files, include_std)?;
+	pub fn parse_file_rec(filename: &str, files: &mut Vec<InputFile>, is_main: bool) -> Result<Vec<Stat>> {
+		// recursively parse includes and concatenate all the statements in post-order
+
+		let (mut stats_last, includes) = Self::parse_file(filename, files, is_main)?;
 		let mut stats = Vec::new();
 		for f in &includes {
 			let mut r_stats = Self::parse_file_rec(f, files, false)?;
@@ -35,17 +37,15 @@ impl<'a> Parser<'a> {
 		Ok(stats)
 	}
 
-	pub fn parse_file(
-		filename: &str,
-		files: &mut Vec<InputFile>,
-		include_std: bool,
-	) -> Result<(Vec<Stat>, Vec<String>)> {
+	pub fn parse_file(filename: &str, files: &mut Vec<InputFile>, is_main: bool) -> Result<(Vec<Stat>, Vec<String>)> {
 		let filename = format!("{filename}.wulp");
-		let input = fs::read_to_string(filename.clone())?;
+		let mut input = fs::read_to_string(filename.clone())?;
 		let file_id = files.len();
 		let mut includes = Vec::new();
-		if include_std {
+		if is_main {
 			includes.push("std".to_string());
+			// TODO: hacky
+			input.push_str("\nmain()");
 		}
 		let mut this = Parser {
 			input: &input,
@@ -125,6 +125,11 @@ impl<'a> Parser<'a> {
 				self.includes.push(filename);
 
 				None
+			},
+			"lua" => {
+				let span = self.assert_next(TokenKind::Str).span;
+				let puts = self.parse_string_literal(span);
+				Some(Stat::InlineLua(puts))
 			},
 			s => self.error(format!("Unknown directive `#{s}`"), span),
 		}
@@ -792,18 +797,26 @@ impl<'a> Parser<'a> {
 
 	// TODO: multi line string currently broken
 	fn parse_string(&mut self) -> Expr {
-		let span = self.tokens.next().span;
+		let span = self.assert_next(TokenKind::Str).span;
+		let lit = self.parse_string_literal(span);
+		Expr {
+			span,
+			kind: ExprKind::Literal(Literal::Str(lit)),
+		}
+	}
+
+	fn parse_string_literal(&mut self, span: Span) -> String {
 		let mut chars = span.as_str(self.input).chars();
 		let lit = match chars.next() {
 			Some('\'' | '\"') => {
 				chars.next_back();
-				Literal::Str(chars.as_str().to_string())
+				chars.as_str().to_string()
 			},
 			Some('#') => {
 				chars.next();
 				chars.next_back();
 				chars.next_back();
-				Literal::Str(chars.as_str().to_string())
+				chars.as_str().to_string()
 			},
 			// TODO: if lexer is working properly, this should be unreachable
 			_ => {
@@ -811,10 +824,7 @@ impl<'a> Parser<'a> {
 			},
 		};
 
-		Expr {
-			span,
-			kind: ExprKind::Literal(lit),
-		}
+		lit
 	}
 
 	fn parse_number(&mut self) -> Expr {

@@ -16,7 +16,7 @@ use std::iter::zip;
 #[derive(Debug)]
 struct Struct {
 	fields: FxHashMap<String, TyId>,
-	methods: FxHashMap<String, TyId>,
+	static_fields: FxHashMap<String, TyId>,
 	required_fields: Vec<String>,
 	primitive: bool,
 }
@@ -80,7 +80,7 @@ impl<'a> TypeCheck<'a> {
 			id,
 			Struct {
 				fields: FxHashMap::default(),
-				methods: FxHashMap::default(),
+				static_fields: FxHashMap::default(),
 				required_fields: Vec::new(),
 				primitive,
 			},
@@ -353,7 +353,7 @@ impl<'a> TypeCheck<'a> {
 						self.structs
 							.get_mut(&struct_id)
 							.unwrap()
-							.methods
+							.static_fields
 							.insert(p.name.clone(), new_ty);
 					} else {
 						let new_ty = self.convert_ast_ty(&s.ty, None);
@@ -445,12 +445,13 @@ impl<'a> TypeCheck<'a> {
 						self.structs
 							.get_mut(&struct_id)
 							.unwrap()
-							.methods
+							.static_fields
 							.insert(p.name.clone(), ty);
 					} else {
 						self.eval_fn_def(s);
 					}
 				},
+				Stat::InlineLua(_) => (),
 				Stat::StructDef(_) => (),
 				Stat::Import(_s) => {
 					todo!();
@@ -579,7 +580,6 @@ impl<'a> TypeCheck<'a> {
 			if let Ty::TyName(_) = self.get_type(ty) {
 				s.push(last_suffix);
 			} else {
-				// let name = self.get_struct_id(ty);
 				let id = if let Ty::Named(id) = self.get_type(ty) {
 					id
 				} else {
@@ -817,7 +817,7 @@ impl<'a> TypeCheck<'a> {
 					self.structs
 						.get_mut(&id)
 						.unwrap()
-						.methods
+						.static_fields
 						.insert(f.field.property.name.clone(), ty);
 				},
 			};
@@ -835,11 +835,11 @@ impl<'a> TypeCheck<'a> {
 		}
 	}
 
-	fn get_method(&mut self, struct_id: SymbolId, p: &mut Property) -> TyId {
-		if let Some(p_id) = self.structs[&struct_id].methods.get(&p.name) {
+	fn get_static(&mut self, struct_id: SymbolId, p: &mut Property) -> TyId {
+		if let Some(p_id) = self.structs[&struct_id].static_fields.get(&p.name) {
 			*p_id
 		} else {
-			let msg = format!("No method `{}`.", p.name);
+			let msg = format!("No static field `{}`.", p.name);
 			format_err_f(&msg, p.span, self.input);
 			self.errors.push(msg);
 			ERR_TY
@@ -858,7 +858,7 @@ impl<'a> TypeCheck<'a> {
 		match suffix {
 			Suffix::Property(p) => match self.get_type(expr_ty) {
 				Ty::Named(name) => self.get_field(name, p),
-				Ty::TyName(name) => self.get_method(name, p),
+				Ty::TyName(name) => self.get_static(name, p),
 				Ty::Err => ERR_TY,
 				_ => {
 					let msg = format!("Type `{}` does not allow indexing with `.`", self.ty_to_string(expr_ty));

@@ -62,7 +62,7 @@ fn main() -> Result<()> {
 	println!("----- execute:");
 	env::set_current_dir(Path::new("../lua"))?;
 	let lua = mlua::Lua::new_with(
-		StdLib::PACKAGE | StdLib::STRING | StdLib::MATH | StdLib::IO,
+		StdLib::PACKAGE | StdLib::STRING | StdLib::MATH | StdLib::IO | StdLib::OS,
 		LuaOptions::default(),
 	)?;
 	let mut chunk = lua.load(code.clone());

@@ -16,6 +16,7 @@ pub struct Block {
 #[derive(Debug)]
 pub enum Stat {
 	Intrinsic(Intrinsic),
+	InlineLua(String),
 	Assignment(Assignment),
 	AssignOp(AssignOp),
 	Let(Let),

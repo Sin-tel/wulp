@@ -1,0 +1,21 @@
+#intrinsic
+int.abs:   fn(self) -> self
+#lua #"int.abs = math.abs"#
+
+#intrinsic
+int.max:   fn(self, self) -> self
+#lua #"int.max = math.max"#
+
+#intrinsic
+int.min:   fn(self, self) -> self
+#lua #"int.min = math.min"#
+
+#intrinsic
+int.idiv:   fn(self, self) -> self
+#lua #"
+int.idiv = function(self, denom)
+	assert(denum ~= 0, "division by zero")
+	return math.floor(self / denom)
+end
+"#
+

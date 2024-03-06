@@ -1,17 +1,5 @@
 local iter = {}
 
-local function range_next(self)
-	if self.counter >= self.stop then
-		return nil
-	end
-	self.counter = self.counter + 1
-	return self.counter
-end
-
-function iter.range(stop)
-	return { stop = stop, counter = 0, ["next"] = range_next }
-end
-
 local function array_next(self)
 	local item = self.a[self.counter]
 	if self.counter >= self.a.n then
@@ -29,6 +17,5 @@ end
 function iter.wrap(iter)
 	return iter.next, iter
 end
-
 
 return iter
