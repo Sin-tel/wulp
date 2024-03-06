@@ -760,10 +760,8 @@ impl<'a> TypeCheck<'a> {
 
 	fn eval_struct_def(&mut self, node: &mut StructDef) {
 		let id = node.name.id;
-
 		self.new_struct(id, false);
 
-		let self_ty = self.new_ty(Ty::Named(id));
 		for f in &mut node.table.fields {
 			let (k, v) = match &mut f.kind {
 				FieldKind::Empty => {

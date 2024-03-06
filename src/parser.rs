@@ -420,7 +420,7 @@ impl<'a> Parser<'a> {
 	fn parse_sub_expr(&mut self, min_priority: i32) -> Expr {
 		let mut expression = match self.parse_unexp() {
 			Some(expr) => expr,
-			None => self.parse_simple_expr(),
+			None => self.parse_suffix_expr(),
 		};
 
 		while let Some(op) = self.tokens.peek().as_bin_op() {
@@ -444,44 +444,6 @@ impl<'a> Parser<'a> {
 		}
 
 		expression
-	}
-
-	fn parse_simple_expr(&mut self) -> Expr {
-		match self.tokens.peek().kind {
-			TokenKind::Nil => {
-				let span = self.tokens.next().span;
-				Expr {
-					span,
-					kind: ExprKind::Literal(Literal::Nil),
-				}
-			},
-			TokenKind::True => {
-				let span = self.tokens.next().span;
-				Expr {
-					span,
-					kind: ExprKind::Literal(Literal::Bool(true)),
-				}
-			},
-			TokenKind::False => {
-				let span = self.tokens.next().span;
-				Expr {
-					span,
-					kind: ExprKind::Literal(Literal::Bool(false)),
-				}
-			},
-			TokenKind::Fn => {
-				// TODO: we now use `fn` for the span of the lambda, which is kind of lame
-				let span = self.tokens.next().span;
-				Expr {
-					span,
-					kind: ExprKind::Lambda(self.parse_fn_body()),
-				}
-			},
-			TokenKind::Str => self.parse_string(),
-			TokenKind::Number => self.parse_number(),
-			TokenKind::LBracket => self.parse_array_constructor(),
-			_ => self.parse_suffix_expr(),
-		}
 	}
 
 	fn parse_unexp(&mut self) -> Option<Expr> {
@@ -575,6 +537,38 @@ impl<'a> Parser<'a> {
 
 	fn parse_primary_expr(&mut self) -> Expr {
 		match self.tokens.peek().kind {
+			TokenKind::Nil => {
+				let span = self.tokens.next().span;
+				Expr {
+					span,
+					kind: ExprKind::Literal(Literal::Nil),
+				}
+			},
+			TokenKind::True => {
+				let span = self.tokens.next().span;
+				Expr {
+					span,
+					kind: ExprKind::Literal(Literal::Bool(true)),
+				}
+			},
+			TokenKind::False => {
+				let span = self.tokens.next().span;
+				Expr {
+					span,
+					kind: ExprKind::Literal(Literal::Bool(false)),
+				}
+			},
+			TokenKind::Fn => {
+				// TODO: we now use `fn` for the span of the lambda, which is kind of lame
+				let span = self.tokens.next().span;
+				Expr {
+					span,
+					kind: ExprKind::Lambda(self.parse_fn_body()),
+				}
+			},
+			TokenKind::Str => self.parse_string(),
+			TokenKind::Number => self.parse_number(),
+			TokenKind::LBracket => self.parse_array_constructor(),
 			TokenKind::Name => {
 				let name = self.parse_name();
 				Expr {
