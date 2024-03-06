@@ -1,3 +1,5 @@
+
+// math
 #intrinsic
 int.abs:   fn(self) -> self
 #lua #"int.abs = math.abs"#
@@ -9,6 +11,47 @@ int.max:   fn(self, self) -> self
 #intrinsic
 int.min:   fn(self, self) -> self
 #lua #"int.min = math.min"#
+
+// bitwise ops
+#intrinsic
+int.bit_shl:   fn(self, self) -> self
+#lua #"int.bit_shl = bit.lshift"#
+
+#intrinsic
+int.bit_shr:   fn(self, self) -> self
+#lua #"int.bit_shr = bit.rshift"#
+
+#intrinsic
+int.bit_sar:   fn(self, self) -> self
+#lua #"int.bit_sar = bit.arshift"#
+
+#intrinsic
+int.bit_or:   fn(self, self) -> self
+#lua #"int.bit_or = bit.bor"#
+
+#intrinsic
+int.bit_and:   fn(self, self) -> self
+#lua #"int.bit_and = bit.band"#
+
+#intrinsic
+int.bit_xor:   fn(self, self) -> self
+#lua #"int.bit_xor = bit.bxor"#
+
+#intrinsic
+int.bit_not:   fn(self) -> self
+#lua #"int.bit_not = bit.bnot"#
+
+#intrinsic
+int.bit_rol:   fn(self, self) -> self
+#lua #"int.bit_rol = bit.rol"#
+
+#intrinsic
+int.bit_ror:   fn(self, self) -> self
+#lua #"int.bit_ror = bit.ror"#
+
+#intrinsic
+int.bit_swap:   fn(self, self) -> self
+#lua #"int.bit_swap = bit.bswap"#
 
 #intrinsic
 int.idiv:   fn(self, self) -> self

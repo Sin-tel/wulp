@@ -1,5 +1,6 @@
 require("strict")
 math.randomseed(os.time())
+local bit = require("bit")
 local int = {}
 local num = {}
 local str = {}
