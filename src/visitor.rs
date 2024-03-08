@@ -2,13 +2,16 @@ use crate::ast::*;
 use crate::ty::TyAst;
 
 pub trait Visitor: Sized {
-	fn visit_file(&mut self, node: &mut File) {
+	fn visit_module(&mut self, node: &mut Module) {
 		node.walk(self);
 	}
-	fn visit_block(&mut self, node: &mut Block) {
+	fn visit_item(&mut self, node: &mut Item) {
 		node.walk(self);
 	}
 	fn visit_import(&mut self, node: &mut Import) {
+		node.walk(self);
+	}
+	fn visit_block(&mut self, node: &mut Block) {
 		node.walk(self);
 	}
 	fn visit_stat(&mut self, node: &mut Stat) {
@@ -81,12 +84,29 @@ pub trait VisitNode<V: Visitor> {
 	}
 }
 
-impl<V: Visitor> VisitNode<V> for File {
+impl<V: Visitor> VisitNode<V> for Module {
 	fn visit(&mut self, v: &mut V) {
-		v.visit_file(self);
+		v.visit_module(self);
 	}
 	fn walk(&mut self, v: &mut V) {
-		v.visit_block(&mut self.block);
+		for i in &mut self.items {
+			v.visit_item(i);
+		}
+	}
+}
+
+impl<V: Visitor> VisitNode<V> for Item {
+	fn visit(&mut self, v: &mut V) {
+		v.visit_item(self);
+	}
+	fn walk(&mut self, v: &mut V) {
+		match self {
+			Item::FnDef(s) => v.visit_fn_def(s),
+			Item::StructDef(s) => v.visit_struct_def(s),
+			Item::Import(s) => v.visit_import(s),
+			Item::Intrinsic(s) => v.visit_intrinsic(s),
+			Item::InlineLua(_) => (),
+		}
 	}
 }
 
@@ -120,16 +140,12 @@ impl<V: Visitor> VisitNode<V> for Stat {
 			Stat::Assignment(s) => v.visit_assignment(s),
 			Stat::AssignOp(s) => v.visit_assign_op(s),
 			Stat::Let(s) => v.visit_let(s),
-			Stat::FnDef(s) => v.visit_fn_def(s),
-			Stat::StructDef(s) => v.visit_struct_def(s),
 			Stat::Call(s) => v.visit_fn_call(s),
 			Stat::IfBlock(s) => v.visit_if_block(s),
 			Stat::ForBlock(s) => v.visit_for_block(s),
 			Stat::Block(s) => v.visit_block(s),
 			Stat::WhileBlock(s) => v.visit_while_block(s),
-			Stat::Import(s) => v.visit_import(s),
-			Stat::Intrinsic(s) => v.visit_intrinsic(s),
-			Stat::InlineLua(_) | Stat::Break => (),
+			Stat::Break => (),
 			Stat::Return(ret) => {
 				for e in &mut ret.exprs {
 					v.visit_expr(e);

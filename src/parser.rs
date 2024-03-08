@@ -16,36 +16,34 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-	pub fn parse(filename: &str) -> Result<(File, Vec<InputFile>)> {
+	pub fn parse(filename: &str) -> Result<(Module, Vec<InputFile>)> {
 		let mut files = Vec::new();
-		let stats = Self::parse_file_rec(filename, &mut files, true)?;
+		let items = Self::parse_file(filename, &mut files, true)?;
 
-		Ok((File { block: Block { stats } }, files))
+		Ok((Module { items }, files))
 	}
 
-	pub fn parse_file_rec(filename: &str, files: &mut Vec<InputFile>, is_main: bool) -> Result<Vec<Stat>> {
+	pub fn parse_file(filename: &str, files: &mut Vec<InputFile>, is_main: bool) -> Result<Vec<Item>> {
 		// recursively parse includes and concatenate all the statements in post-order
 
-		let (mut stats_last, includes) = Self::parse_file(filename, files, is_main)?;
-		let mut stats = Vec::new();
+		let (mut items_last, includes) = Self::parse_module(filename, files, is_main)?;
+		let mut items = Vec::new();
 		for f in &includes {
-			let mut r_stats = Self::parse_file_rec(f, files, false)?;
-			stats.append(&mut r_stats);
+			let mut r_stats = Self::parse_file(f, files, false)?;
+			items.append(&mut r_stats);
 		}
-		stats.append(&mut stats_last);
+		items.append(&mut items_last);
 
-		Ok(stats)
+		Ok(items)
 	}
 
-	pub fn parse_file(filename: &str, files: &mut Vec<InputFile>, is_main: bool) -> Result<(Vec<Stat>, Vec<String>)> {
+	pub fn parse_module(filename: &str, files: &mut Vec<InputFile>, is_main: bool) -> Result<(Vec<Item>, Vec<String>)> {
 		let filename = format!("{filename}.wulp");
-		let mut input = fs::read_to_string(filename.clone())?;
+		let input = fs::read_to_string(filename.clone())?;
 		let file_id = files.len();
 		let mut includes = Vec::new();
 		if is_main {
 			includes.push("std".to_string());
-			// TODO: hacky
-			input.push_str("\nmain()");
 		}
 		let mut this = Parser {
 			input: &input,
@@ -55,7 +53,7 @@ impl<'a> Parser<'a> {
 			includes,
 		};
 
-		let stats = this.parse_stat_list();
+		let items = this.parse_item_list();
 
 		// make sure we are done
 		let tk = this.tokens.next();
@@ -65,7 +63,7 @@ impl<'a> Parser<'a> {
 
 		let includes = this.includes;
 		files.push(InputFile { contents: input, filename });
-		Ok((stats, includes))
+		Ok((items, includes))
 	}
 
 	fn error(&mut self, msg: String, span: Span) -> ! {
@@ -93,7 +91,7 @@ impl<'a> Parser<'a> {
 		}
 	}
 
-	fn parse_directive(&mut self) -> Option<Stat> {
+	fn parse_directive(&mut self) -> Option<Item> {
 		self.assert_next(TokenKind::Hash);
 		let span = self.assert_next(TokenKind::Name).span;
 
@@ -108,7 +106,7 @@ impl<'a> Parser<'a> {
 				}
 				self.assert_next(TokenKind::Colon);
 				let ty = self.parse_type();
-				Some(Stat::Intrinsic(Intrinsic { name, property, ty }))
+				Some(Item::Intrinsic(Intrinsic { name, property, ty }))
 			},
 			"include" => {
 				let mut filename = self.tokens.next().span.as_string(self.input);
@@ -124,7 +122,7 @@ impl<'a> Parser<'a> {
 			"lua" => {
 				let span = self.assert_next(TokenKind::Str).span;
 				let puts = self.parse_string_literal(span);
-				Some(Stat::InlineLua(puts))
+				Some(Item::InlineLua(puts))
 			},
 			s => self.error(format!("Unknown directive `#{s}`"), span),
 		}
@@ -145,17 +143,48 @@ impl<'a> Parser<'a> {
 		}
 	}
 
+	fn parse_item_list(&mut self) -> Vec<Item> {
+		let mut items = Vec::new();
+		loop {
+			match self.tokens.peek().kind {
+				TokenKind::Hash => {
+					let s = self.parse_directive();
+					if let Some(s) = s {
+						items.push(s);
+					}
+				},
+				TokenKind::Eof => break,
+				_ => items.push(self.parse_item()),
+			}
+		}
+		items
+	}
+
+	fn parse_item(&mut self) -> Item {
+		let stat = self.parse_item_inner();
+		// take care of optional semicolon
+		if self.tokens.peek().kind == TokenKind::SemiColon {
+			self.tokens.next();
+		}
+		stat
+	}
+
+	fn parse_item_inner(&mut self) -> Item {
+		let tk = self.tokens.peek();
+		match tk.kind {
+			TokenKind::Import | TokenKind::From => Item::Import(self.parse_import()),
+			TokenKind::Struct => Item::StructDef(self.parse_struct_def()),
+			TokenKind::Fn => Item::FnDef(self.parse_fn_def()),
+			TokenKind::Hash => unreachable!(),
+			_ => self.error(format!("Expected item but found: `{tk}`."), tk.span),
+		}
+	}
+
 	fn parse_stat_list(&mut self) -> Vec<Stat> {
 		let mut stats = Vec::new();
 		loop {
-			while self.tokens.peek().kind == TokenKind::Hash {
-				let s = self.parse_directive();
-				if let Some(s) = s {
-					stats.push(s);
-				}
-			}
 			match self.tokens.peek().kind {
-				TokenKind::RCurly | TokenKind::Eof => break,
+				TokenKind::RCurly => break,
 				TokenKind::Return | TokenKind::Break => {
 					// These have to be the last statements in a block
 					// TODO: peek here to check it is the last statement, and produce error
@@ -184,16 +213,12 @@ impl<'a> Parser<'a> {
 				self.tokens.next();
 				Stat::Break
 			},
-			TokenKind::Import | TokenKind::From => Stat::Import(self.parse_import()),
 			TokenKind::Return => Stat::Return(self.parse_return()),
 			TokenKind::Let => Stat::Let(self.parse_let()),
-			TokenKind::Struct => Stat::StructDef(self.parse_struct_def()),
 			TokenKind::LCurly => Stat::Block(self.parse_block()),
 			TokenKind::While => Stat::WhileBlock(self.parse_while_block()),
 			TokenKind::If => Stat::IfBlock(self.parse_if_block()),
 			TokenKind::For => Stat::ForBlock(self.parse_for_block()),
-			TokenKind::Fn => Stat::FnDef(self.parse_fn_def()),
-			TokenKind::Hash => unreachable!(),
 			_ => {
 				// Parse a suffix expression, then check if a `=`, `,` or `:` follows to parse (multiple) assignment.
 				// If not, it should be a function call.

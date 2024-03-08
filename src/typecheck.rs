@@ -36,7 +36,7 @@ pub struct TypeCheck<'a> {
 }
 
 impl<'a> TypeCheck<'a> {
-	pub fn check(file: &mut File, input: &'a [InputFile], symbol_table: &'a SymbolTable) -> Result<()> {
+	pub fn check(module: &mut Module, input: &'a [InputFile], symbol_table: &'a SymbolTable) -> Result<()> {
 		let mut this = Self {
 			input,
 			errors: Vec::new(),
@@ -54,21 +54,18 @@ impl<'a> TypeCheck<'a> {
 		this.new_struct(STR_SYM, true);
 		this.new_struct(BOOL_SYM, true);
 
-		let (ret, _) = this.eval_block(&mut file.block);
+		this.eval_module(module);
 
-		if let Some((ret_ty, _)) = ret {
-			println!("Main return: {}", this.ty_to_string(ret_ty));
-		}
 		// println!("----- types ");
 		// for (i, v) in this.types.iter().enumerate() {
 		// 	println!("{i}: {:?} {} {}", v, this.get_parent(i), this.ty_to_string(i));
 		// }
-		// println!("----- env ");
-		// for (i, s) in symbol_table.symbols.iter().enumerate().skip(1) {
-		// 	if let Some(id) = this.lookup(i) {
-		// 		println!("`{}`: {}", s.name, this.ty_to_string(id));
-		// 	}
-		// }
+		println!("----- env ");
+		for (i, s) in symbol_table.symbols.iter().enumerate().skip(1) {
+			if let Some(id) = this.lookup(i) {
+				println!("`{}`: {}", s.name, this.ty_to_string(id));
+			}
+		}
 
 		match this.errors.last() {
 			Some(err) => Err(anyhow!("{}", err)),
@@ -221,7 +218,14 @@ impl<'a> TypeCheck<'a> {
 				subs.push((parent_id, t));
 				t
 			},
-			Ty::Array(t) | Ty::Maybe(t) => self.instantiate_inner(t, subs),
+			Ty::Array(t) => {
+				let new = self.instantiate_inner(t, subs);
+				self.new_ty(Ty::Array(new))
+			},
+			Ty::Maybe(t) => {
+				let new = self.instantiate_inner(t, subs);
+				self.new_ty(Ty::Maybe(new))
+			},
 			Ty::Fn(args, ret) => {
 				let mut new_args = Vec::new();
 				for a in args {
@@ -258,13 +262,7 @@ impl<'a> TypeCheck<'a> {
 	}
 
 	fn unify(&mut self, a_id: TyId, b_id: TyId) -> Result<(), ()> {
-		// println!(
-		// 	"unify {}, {} ({}, {})",
-		// 	a_id,
-		// 	b_id,
-		// 	self.ty_to_string(a_id),
-		// 	self.ty_to_string(b_id)
-		// );
+		// println!("unify {}, {} ({}, {})", a_id, b_id, self.ty_to_string(a_id), self.ty_to_string(b_id));
 		if a_id == b_id {
 			Ok(())
 		} else {
@@ -329,19 +327,16 @@ impl<'a> TypeCheck<'a> {
 		}
 	}
 
-	// Returns the type and span of any return statements
-	// Otherwise return None
-	// Bool indicates if the block always returns
-	fn eval_block(&mut self, block: &mut Block) -> (RetPair, bool) {
-		for stat in &mut block.stats {
-			match stat {
-				Stat::FnDef(s) => {
+	fn eval_module(&mut self, node: &mut Module) {
+		for item in &mut node.items {
+			match item {
+				Item::FnDef(s) => {
 					self.hoist_fn_def(s);
 				},
-				Stat::StructDef(s) => {
+				Item::StructDef(s) => {
 					self.eval_struct_def(s);
 				},
-				Stat::Intrinsic(s) => {
+				Item::Intrinsic(s) => {
 					if let Some(p) = &mut s.property {
 						let struct_id = s.name.id;
 						let self_ty = self.new_ty(Ty::Named(struct_id));
@@ -357,9 +352,38 @@ impl<'a> TypeCheck<'a> {
 						self.new_def(s.name.id, new_ty);
 					}
 				},
+				Item::Import(_s) => {
+					todo!();
+				},
 				_ => (),
 			};
 		}
+
+		for item in &mut node.items {
+			match item {
+				Item::FnDef(s) => {
+					if let Some(p) = &mut s.property {
+						let struct_id = s.name.id;
+						let self_ty = self.new_ty(Ty::Named(struct_id));
+						let ty = self.eval_lambda(&mut s.body, p.span, Some(self_ty));
+						self.structs
+							.get_mut(&struct_id)
+							.unwrap()
+							.static_fields
+							.insert(p.name.clone(), ty);
+					} else {
+						self.eval_fn_def(s);
+					}
+				},
+				Item::InlineLua(_) | Item::Intrinsic(_) | Item::StructDef(_) | Item::Import(_) => (),
+			}
+		}
+	}
+
+	// Returns the type and span of any return statements
+	// Otherwise return None
+	// Bool indicates if the block always returns
+	fn eval_block(&mut self, block: &mut Block) -> (RetPair, bool) {
 		let mut current_pair: RetPair = None;
 		for stat in &mut block.stats {
 			match stat {
@@ -440,24 +464,6 @@ impl<'a> TypeCheck<'a> {
 				Stat::Assignment(s) => self.eval_assignment(s),
 				Stat::AssignOp(s) => self.eval_assign_op(s),
 				Stat::Let(s) => self.eval_let(s),
-				Stat::FnDef(s) => {
-					if let Some(p) = &mut s.property {
-						let struct_id = s.name.id;
-						let self_ty = self.new_ty(Ty::Named(struct_id));
-						let ty = self.eval_lambda(&mut s.body, p.span, Some(self_ty));
-						self.structs
-							.get_mut(&struct_id)
-							.unwrap()
-							.static_fields
-							.insert(p.name.clone(), ty);
-					} else {
-						self.eval_fn_def(s);
-					}
-				},
-				Stat::InlineLua(_) | Stat::Intrinsic(_) | Stat::StructDef(_) => (),
-				Stat::Import(_s) => {
-					todo!();
-				},
 			};
 		}
 		(current_pair, false)

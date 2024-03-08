@@ -12,7 +12,7 @@ pub struct ScopeCheck<'a> {
 	symbol_table: SymbolTable,
 	input: &'a [InputFile],
 	errors: Vec<String>,
-	hoist_fn_def: bool,
+	hoist_defs: bool,
 }
 
 pub const INT_SYM: SymbolId = 1;
@@ -21,13 +21,13 @@ pub const STR_SYM: SymbolId = 3;
 pub const BOOL_SYM: SymbolId = 4;
 
 impl<'a> ScopeCheck<'a> {
-	pub fn check(ast: &mut File, input: &'a [InputFile]) -> Result<SymbolTable> {
+	pub fn check(ast: &mut Module, input: &'a [InputFile]) -> Result<SymbolTable> {
 		let mut this = Self {
 			scope_stack: Vec::new(),
 			symbol_table: SymbolTable::new(),
 			input,
 			errors: Vec::new(),
-			hoist_fn_def: false,
+			hoist_defs: false,
 		};
 
 		this.scope_stack.push(FxHashMap::default());
@@ -41,7 +41,17 @@ impl<'a> ScopeCheck<'a> {
 		this.new_identifier("bool", Symbol::new("bool").make_const());
 		assert_eq!(this.lookup("bool"), Some(BOOL_SYM));
 
-		this.visit_file(ast);
+		this.visit_module(ast);
+
+		if let Some(f) = this.lookup("main") {
+			if this.symbol_table.get(f).kind != SymbolKind::FnDef {
+				let msg = format!("`main` should be a function.");
+				this.errors.push(msg);
+			}
+		} else {
+			let msg = format!("No `main` function found.");
+			this.errors.push(msg);
+		};
 		this.scope_stack.pop();
 		assert!(this.scope_stack.is_empty());
 
@@ -110,6 +120,19 @@ impl<'a> ScopeCheck<'a> {
 }
 
 impl<'a> Visitor for ScopeCheck<'a> {
+	fn visit_module(&mut self, node: &mut Module) {
+		self.hoist_defs = true;
+		// node.walk(self);
+		for b in &mut node.items {
+			if let Item::FnDef(f) = b {
+				f.visit(self);
+			}
+		}
+		self.hoist_defs = false;
+
+		node.walk(self);
+	}
+
 	fn visit_import(&mut self, _node: &mut Import) {
 		// TODO: each file should have its own scope!
 		todo!()
@@ -125,13 +148,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 
 	fn visit_block(&mut self, node: &mut Block) {
 		self.scope_stack.push(FxHashMap::default());
-		self.hoist_fn_def = true;
-		for b in &mut node.stats {
-			if let Stat::FnDef(f) = b {
-				f.visit(self);
-			}
-		}
-		self.hoist_fn_def = false;
+
 		node.walk(self);
 		self.scope_stack.pop();
 	}
@@ -175,7 +192,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 	}
 
 	fn visit_fn_def(&mut self, node: &mut FnDef) {
-		if self.hoist_fn_def {
+		if self.hoist_defs {
 			let name = node.name.span.as_str_f(self.input);
 
 			if node.property.is_none() {

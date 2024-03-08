@@ -4,8 +4,17 @@ use crate::ty::TyAst;
 use std::fmt;
 
 #[derive(Debug)]
-pub struct File {
-	pub block: Block,
+pub struct Module {
+	pub items: Vec<Item>,
+}
+
+#[derive(Debug)]
+pub enum Item {
+	Intrinsic(Intrinsic),
+	InlineLua(String),
+	Import(Import),
+	FnDef(FnDef),
+	StructDef(StructDef),
 }
 
 #[derive(Debug)]
@@ -15,8 +24,6 @@ pub struct Block {
 
 #[derive(Debug)]
 pub enum Stat {
-	Intrinsic(Intrinsic),
-	InlineLua(String),
 	Assignment(Assignment),
 	AssignOp(AssignOp),
 	Let(Let),
@@ -25,11 +32,8 @@ pub enum Stat {
 	WhileBlock(WhileBlock),
 	IfBlock(IfBlock),
 	ForBlock(ForBlock),
-	FnDef(FnDef),
-	StructDef(StructDef),
-	Break,
 	Return(Return),
-	Import(Import),
+	Break,
 }
 
 #[derive(Debug)]

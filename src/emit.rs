@@ -13,7 +13,7 @@ pub struct EmitLua {
 }
 
 impl EmitLua {
-	pub fn emit(ast: &mut File, symbol_table: SymbolTable) -> String {
+	pub fn emit(ast: &mut Module, symbol_table: SymbolTable) -> String {
 		let mut this = Self {
 			statement: String::new(),
 			code: String::new(),
@@ -23,7 +23,8 @@ impl EmitLua {
 			hoist_defs: false,
 		};
 		this.code.push_str(include_str!("../lua/std_preamble.lua"));
-		ast.block.visit(&mut this);
+		this.visit_module(ast);
+		this.code.push_str("\nmain();");
 
 		// this.code = this.code.replace("\n", " ");
 		// this.code = this.code.replace(";", "");
@@ -101,40 +102,93 @@ impl EmitLua {
 }
 
 impl Visitor for EmitLua {
-	fn visit_block(&mut self, node: &mut Block) {
+	fn visit_module(&mut self, node: &mut Module) {
 		self.indent_level += 1;
 		self.hoist_defs = true;
-		for b in &mut node.stats {
+		for b in &mut node.items {
 			match b {
-				Stat::FnDef(f) => {
+				Item::FnDef(f) => {
 					if f.property.is_none() {
 						self.indent();
 						self.emit_fn_local(f);
 						self.put_statement();
 					}
 				},
-				Stat::StructDef(s) => {
+				Item::StructDef(s) => {
 					self.indent();
 					self.emit_struct_local(s);
 					self.put_statement();
 				},
-				Stat::InlineLua(s) => {
+				Item::InlineLua(s) => {
 					self.statement.push_str(s);
 					self.put_statement();
 				},
 				_ => (),
 			}
 		}
-		for b in &mut node.stats {
-			if let Stat::FnDef(f) = b {
-				if f.property.is_none() {
-					self.indent();
-					self.emit_fn_def(f);
-					self.put_statement();
-				}
-			}
-		}
 		self.hoist_defs = false;
+		node.walk(self);
+		self.indent_level -= 1;
+	}
+	fn visit_item(&mut self, node: &mut Item) {
+		match node {
+			Item::FnDef(_) => node.walk(self),
+			Item::Intrinsic(_) | Item::InlineLua(_) => (),
+			Item::Import(_s) => {
+				// TODO: emit this as a block instead of a table
+				// struct and fn defs should be in export table
+				todo!()
+				// self.statement.push_str("local ");
+				// s.alias.visit(self);
+				// self.statement.push_str(" = ");
+				// self.statement.push('{');
+				// self.push_list(&mut s.module.fields, ", ");
+				// self.statement.push('}');
+			},
+			Item::StructDef(t) => {
+				let name_str = self.symbol_table.get(t.name.id).name.clone();
+				self.statement.push_str(&name_str);
+				self.statement.push_str(" = {}");
+				self.put_statement();
+				// constructor
+				// TODO: try to get rid of the `args = args or {}`
+				self.statement.push_str(&format!(
+					"setmetatable({0}, {{\n\
+					\t__call = function(_, args)\n\
+					\t\targs = args or {{}};\n\
+					\t\tlocal new = {{",
+					&name_str
+				));
+				for f in &mut t.table.fields {
+					match &mut f.kind {
+						FieldKind::Empty => {
+							self.visit_property(&mut f.field.property);
+							self.statement.push_str(" = args.");
+							self.visit_property(&mut f.field.property);
+							self.statement.push_str(", ");
+						},
+						FieldKind::Assign(e) => {
+							self.visit_property(&mut f.field.property);
+							self.statement.push_str(" = default(args.");
+							self.visit_property(&mut f.field.property);
+							self.statement.push_str(", ");
+							self.visit_expr(e);
+							self.statement.push_str("), ");
+						},
+					}
+				}
+				self.statement.push_str("}\n\t\treturn new\n\tend\n})");
+			},
+		}
+	}
+	fn visit_fn_def(&mut self, node: &mut FnDef) {
+		self.indent();
+		self.emit_fn_def(node);
+		self.put_statement();
+	}
+
+	fn visit_block(&mut self, node: &mut Block) {
+		self.indent_level += 1;
 		node.walk(self);
 		self.indent_level -= 1;
 	}
@@ -201,13 +255,6 @@ impl Visitor for EmitLua {
 			self.push_list(&mut node.exprs, ", ");
 		}
 	}
-	fn visit_fn_def(&mut self, node: &mut FnDef) {
-		if node.property.is_some() {
-			self.indent();
-			self.emit_fn_def(node);
-			self.put_statement();
-		}
-	}
 	fn visit_fn_call(&mut self, node: &mut Call) {
 		self.visit_expr(&mut node.expr);
 		self.statement.push('(');
@@ -228,10 +275,10 @@ impl Visitor for EmitLua {
 
 		self.statement.push(')');
 	}
+
 	fn visit_stat(&mut self, node: &mut Stat) {
 		self.indent();
 		match node {
-			Stat::Intrinsic(_) | Stat::InlineLua(_) => (),
 			Stat::Return(ret) => {
 				self.statement.push_str("return ");
 				self.push_list(&mut ret.exprs, ", ");
@@ -244,17 +291,6 @@ impl Visitor for EmitLua {
 				b.visit(self);
 				self.indent();
 				self.statement.push_str("end");
-			},
-			Stat::Import(_s) => {
-				// TODO: emit this as a block instead of a table
-				// struct and fn defs should be in export table
-				todo!()
-				// self.statement.push_str("local ");
-				// s.alias.visit(self);
-				// self.statement.push_str(" = ");
-				// self.statement.push('{');
-				// self.push_list(&mut s.module.fields, ", ");
-				// self.statement.push('}');
 			},
 			Stat::AssignOp(s) => {
 				// Copy any evaluations to a temp var
@@ -270,46 +306,12 @@ impl Visitor for EmitLua {
 				self.statement.push(' ');
 				self.visit_expr(&mut s.expr);
 			},
-			Stat::StructDef(t) => {
-				let name_str = self.symbol_table.get(t.name.id).name.clone();
-				self.statement.push_str(&name_str);
-				self.statement.push_str(" = {}");
-				self.put_statement();
-				// constructor
-				// TODO: try to get rid of the `args = args or {}`
-				self.statement.push_str(&format!(
-					"setmetatable({0}, {{\n\
-					\t__call = function(_, args)\n\
-					\t\targs = args or {{}};\n\
-					\t\tlocal new = {{",
-					&name_str
-				));
-				for f in &mut t.table.fields {
-					match &mut f.kind {
-						FieldKind::Empty => {
-							self.visit_property(&mut f.field.property);
-							self.statement.push_str(" = args.");
-							self.visit_property(&mut f.field.property);
-							self.statement.push_str(", ");
-						},
-						FieldKind::Assign(e) => {
-							self.visit_property(&mut f.field.property);
-							self.statement.push_str(" = default(args.");
-							self.visit_property(&mut f.field.property);
-							self.statement.push_str(", ");
-							self.visit_expr(e);
-							self.statement.push_str("), ");
-						},
-					}
-				}
-				self.statement.push_str("}\n\t\treturn new\n\tend\n})");
-			},
+
 			Stat::WhileBlock(_)
 			| Stat::IfBlock(_)
 			| Stat::ForBlock(_)
 			| Stat::Assignment(_)
 			| Stat::Let(_)
-			| Stat::FnDef(_)
 			| Stat::Call(_) => {
 				node.walk(self);
 			},
