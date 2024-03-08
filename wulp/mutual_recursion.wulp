@@ -1,4 +1,6 @@
-odd(5)
+fn main() {
+	odd(5)
+}
 
 fn even(n) {
 	print("even")

@@ -1,27 +1,25 @@
-let a: num = 5.0
+fn main() {
+	let a: num = 5.0
 
-a += 1.0
-assert(a == 6.0)
-a -= 4.0
-assert(a == 2.0)
-a *= 3.0
-assert(a == 6.0)
-a /= 2.0
-assert(a == 3.0)
-a ^= 2.0
-assert(a == 9.0)
-a %= 5.0
-assert(a == 4.0)
+	a += 1.0
+	assert(a == 6.0)
+	a -= 4.0
+	assert(a == 2.0)
+	a *= 3.0
+	assert(a == 6.0)
+	a /= 2.0
+	assert(a == 3.0)
+	a ^= 2.0
+	assert(a == 9.0)
+	a %= 5.0
+	assert(a == 4.0)
 
-let b = "world"
-let a = "hello"
-a ..= " "
-a ..= b
+	let b = "world"
+	let a = "hello"
+	a ..= " "
+	a ..= b
 
-assert(a == "hello world")
+	assert(a == "hello world")
 
-
-
-
-
-print("ok")
+	print("ok")
+}

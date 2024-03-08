@@ -1,26 +1,25 @@
-let x, y, z = 1, [ 2, 3 4 ], 5
-
-struct S1 {
-	fn k(self) print("ok")
-	fn t(self) return fn(a,b) print("ok",a,b)
-}
+struct S1 {}
+fn S1.k(self) print("ok")
+fn S1.t(self) return fn(a,b) print("ok",a,b)
 
 struct S2 {
 	j: [S1]
 }
 
-let i = S2(j = [S1(), S1()])
+fn main() {
+	let x, y, z = 1, [ 2, 3 4 ], 5
 
-i.j[1].k()
+	let i = S2(j = [S1(), S1()])
 
-let x = i.j[0].t()
-x(2,3)
+	i.j[1].k()
 
+	let x = i.j[0].t()
+	x(2,3)
 
-// fn f(a, c, d){
-// 	let u, v, w = 1, 2, 3
-// 	return u, v, w
-// }
+	// fn f(a, c, d){
+	// 	let u, v, w = 1, 2, 3
+	// 	return u, v, w
+	// }
 
-// f(x, y, z)
-
+	// f(x, y, z)
+}

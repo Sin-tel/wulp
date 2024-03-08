@@ -1,8 +1,10 @@
-// ok
-let _ = true
-let _ = 5
+fn main() {
+	// ok
+	let _ = true
+	let _ = 5
 
-// not ok
-_ = 3
-let x = 3*_
-print(x)
+	// not ok, but currently allowed
+	_ = 3
+	let x = 3*_
+	print(x)
+}

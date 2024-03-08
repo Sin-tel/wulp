@@ -1,11 +1,10 @@
-// occurs check
-let x = []
-x = [[x]]
-x = [x] // infinite loop!
+fn main() {
+	let x = []
+	// x = [[x]]
+	x = [x]
 
-
-// let x = []
-// if x == [x] {
-// 	print(x)
-// }
-
+	let y = []
+	if y == [y] {
+		print(y)
+	}
+}

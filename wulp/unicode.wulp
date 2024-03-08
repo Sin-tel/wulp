@@ -1,29 +1,15 @@
-let x = 1
-let y = 2
-let c = fn() {}
-let one = fn() {return fn() {return fn() {}}}
-let two = fn() {return fn() {return fn() {}}}
-let three = fn() {return fn() {return fn() {}}}
-let b = 1
-let z = {}
-let a = fn() {return fn() {}}
+fn main() {
+	let c = fn(a: str) {}
 
-x = 1, nil, true, "test", (x * 5 * x + 3 - 1 + 5 + y - -3)
+	c("y無限   ' ' 	aa\"  a\n	tab \t	a")
 
-y = { foo = "foo", bar = false, bizz = 1 }
+	let zz = #"
+	『』　☆彡  「 \　\' ' \ta\\
+	\"  a\\n\ttab \\t\ta"
+			 		　	　	  whitespace
+	"#
 
-c("y無限   ' ' 	aa\"  a\n	tab \t	a")
+	// 背flkfsヶfml背kmfls毛mflksm
 
-let zz = #"
-『』　☆彡  「 \　\' ' \ta\\
-\"  a\\n\ttab \\t\ta"
-		 		　	　	  whitespace
-"#
-
-// 背flkfsヶfml背kmfls毛mflksm
-
-z.y = a(b, c())();
-
-(one)(two)(three)
-
-return "ok"
+	return "💯"
+}

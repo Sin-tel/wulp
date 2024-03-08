@@ -1,31 +1,30 @@
-// fails
-// fn a() {}
-// fn a() {}
-
-// fails
-// fn b() {}
-// b = fn() {}
-
-// fails
-// c = fn() {}
-// fn c() {}
-
-// allowed
-let d = fn() {}
-let d = fn() {}
-
-// fails
-// print = fn() {}
-
-// fails
-// for i in {1 2 3} {
-// 	i = 2
-// }
-
 // shoud fail but currently doesn't
-let s = {
-	fn g() {}
-	fn g() {}
+struct S {}
+fn S.g() {}
+fn S.g() {}
+
+fn a() {}
+fn b() {}
+
+// fails
+// fn a() {}
+
+fn main() {
+
+	// fails
+	// b = fn() {}
+
+	// allowed
+	let d = fn() {}
+	let d = fn() {}
+
+	// fails
+	// print = fn() {}
+
+	// fails
+	// for i in [1 2 3] {
+	// 	i = 2
+	// }
+
+
 }
-// we want to allow this kind of syntax
-// fn s.g() {}

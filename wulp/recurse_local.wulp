@@ -1,18 +1,21 @@
-// undefined variable
-let fact = fn(n) {
-	if n == 0 {
-		return 1
-	} else {
-		return n * fact(n - 1)
-	}
-}
-
-// ok
 fn fact2(n) {
 	if n == 0 {
 		return 1
 	} else {
 		return n * fact2(n - 1)
+	}
+}
+
+fn main() {
+	print(fact2(2))
+
+	// undefined variable
+	let fact = fn(n) {
+		if n == 0 {
+			return 1
+		} else {
+			return n * fact(n - 1)
+		}
 	}
 }
 

@@ -1,14 +1,13 @@
-let f = fn() {}
-let x = fn() {}
-let y = fn() {}
+fn main() {
+	let f = fn() {return fn(n) {return n}}
+	let x = fn() {}
+	// ok
+	f();
+	(x)()
 
+	f()(x)()
 
-// ok
-f();
-(x or y)()
-
-f()(x or y)()
-
-// ambiguous
-// f()
-// (x or y)()
+	// ambiguous
+	// f()
+	// (x)()
+}
