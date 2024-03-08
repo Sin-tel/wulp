@@ -11,10 +11,7 @@ pub struct Lexer<'a> {
 // This is mostly copypasta from peekable in std
 impl<'a> Lexer<'a> {
 	pub fn new(input: &'a str, id: FileId, filename: String) -> Self {
-		Lexer {
-			lex_iter: LexIter::new(input, id, filename),
-			peeked: None,
-		}
+		Lexer { lex_iter: LexIter::new(input, id, filename), peeked: None }
 	}
 	// I don't want to return Option<Token>
 	#[allow(clippy::should_implement_trait)]
@@ -36,10 +33,7 @@ impl<'a> Lexer<'a> {
 	fn filter_next(&mut self) -> Token {
 		// consume token, filter out comment, add end of file
 		match self.lex_iter.next() {
-			Some(Token {
-				kind: TokenKind::Comment,
-				..
-			}) => self.filter_next(),
+			Some(Token { kind: TokenKind::Comment, .. }) => self.filter_next(),
 			Some(tk) => tk,
 			None => Token {
 				kind: TokenKind::Eof,
@@ -63,23 +57,11 @@ pub struct LexIter<'a> {
 
 impl<'a> LexIter<'a> {
 	pub fn new(input: &'a str, id: FileId, filename: String) -> Self {
-		LexIter {
-			input,
-			bytes: input.as_bytes(),
-			id,
-			filename,
-			cursor: 0,
-			line: 0,
-			handle_escape: false,
-		}
+		LexIter { input, bytes: input.as_bytes(), id, filename, cursor: 0, line: 0, handle_escape: false }
 	}
 
 	fn newtoken(&self, kind: TokenKind, start: usize, end: usize) -> Token {
-		Token {
-			kind,
-			span: Span::new(start, end, self.id),
-			line: self.line,
-		}
+		Token { kind, span: Span::new(start, end, self.id), line: self.line }
 	}
 
 	fn eat_chars(&mut self, n: usize) {
@@ -150,12 +132,7 @@ impl<'a> LexIter<'a> {
 				Some('\\') => self.handle_escape = true,
 				Some('\n') | None => {
 					let msg = "Failed to close string.";
-					format_err(
-						msg,
-						Span::new(start, self.cursor - 1, self.id),
-						self.input,
-						&self.filename,
-					);
+					format_err(msg, Span::new(start, self.cursor - 1, self.id), self.input, &self.filename);
 					panic!("{msg}");
 				},
 				_ => self.handle_escape = false,
@@ -229,11 +206,7 @@ impl<'a> LexIter<'a> {
 			_ => TokenKind::Name,
 		};
 
-		Token {
-			kind,
-			span,
-			line: self.line,
-		}
+		Token { kind, span, line: self.line }
 	}
 
 	fn number(&mut self) -> Token {
@@ -264,11 +237,7 @@ impl<'a> LexIter<'a> {
 			}
 		}
 		let span = Span::new(start, self.cursor, self.id);
-		Token {
-			kind: TokenKind::Number,
-			span,
-			line: self.line,
-		}
+		Token { kind: TokenKind::Number, span, line: self.line }
 	}
 
 	fn hex_number(&mut self) -> Token {
@@ -288,11 +257,7 @@ impl<'a> LexIter<'a> {
 			}
 		}
 		let span = Span::new(start, self.cursor, self.id);
-		Token {
-			kind: TokenKind::HexNumber,
-			span,
-			line: self.line,
-		}
+		Token { kind: TokenKind::HexNumber, span, line: self.line }
 	}
 
 	fn bin_number(&mut self) -> Token {
@@ -312,11 +277,7 @@ impl<'a> LexIter<'a> {
 			}
 		}
 		let span = Span::new(start, self.cursor, self.id);
-		Token {
-			kind: TokenKind::BinNumber,
-			span,
-			line: self.line,
-		}
+		Token { kind: TokenKind::BinNumber, span, line: self.line }
 	}
 }
 

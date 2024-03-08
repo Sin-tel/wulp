@@ -79,10 +79,7 @@ impl EmitLua {
 		self.statement = stat;
 
 		let span = expr.span;
-		*expr = Expr {
-			span,
-			kind: ExprKind::Name(Name { id, span }),
-		}
+		*expr = Expr { span, kind: ExprKind::Name(Name { id, span }) }
 	}
 	fn emit_fn_local(&mut self, node: &mut FnDef) {
 		self.statement.push_str("local ");

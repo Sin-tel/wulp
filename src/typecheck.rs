@@ -522,11 +522,8 @@ impl<'a> TypeCheck<'a> {
 		let (ty, prev_span) = self.eval_fn_body(&mut node.body, node.name.span);
 
 		if self.unify(ty, ret_id).is_err() {
-			let msg = format!(
-				"Expected return type `{}`, found `{}`.",
-				self.ty_to_string(ty),
-				self.ty_to_string(ret_id)
-			);
+			let msg =
+				format!("Expected return type `{}`, found `{}`.", self.ty_to_string(ty), self.ty_to_string(ret_id));
 			format_err_f(&msg, prev_span, self.input);
 			self.errors.push(msg);
 		};
@@ -556,11 +553,8 @@ impl<'a> TypeCheck<'a> {
 		let (ty, prev_span) = self.eval_fn_body(node, span);
 
 		if self.unify(ty, ret_id).is_err() {
-			let msg = format!(
-				"Expected return type `{}`, found `{}`.",
-				self.ty_to_string(ty),
-				self.ty_to_string(ret_id)
-			);
+			let msg =
+				format!("Expected return type `{}`, found `{}`.", self.ty_to_string(ty), self.ty_to_string(ret_id));
 			format_err_f(&msg, prev_span, self.input);
 			self.errors.push(msg);
 		}
@@ -584,10 +578,7 @@ impl<'a> TypeCheck<'a> {
 					if self.structs[&id].fields.get(&p.name).is_none() {
 						let inst_expr = std::mem::replace(
 							expr,
-							Box::new(Expr {
-								span: expr.span,
-								kind: ExprKind::Name(Name { span: expr.span, id }),
-							}),
+							Box::new(Expr { span: expr.span, kind: ExprKind::Name(Name { span: expr.span, id }) }),
 						);
 						let inst_s = std::mem::replace(s, vec![last_suffix]);
 						c.args.insert(
@@ -595,10 +586,7 @@ impl<'a> TypeCheck<'a> {
 							if inst_s.is_empty() {
 								*inst_expr
 							} else {
-								Expr {
-									span: expr.span,
-									kind: ExprKind::SuffixExpr(inst_expr, inst_s),
-								}
+								Expr { span: expr.span, kind: ExprKind::SuffixExpr(inst_expr, inst_s) }
 							},
 						);
 						return;
@@ -619,11 +607,7 @@ impl<'a> TypeCheck<'a> {
 			Ty::Fn(params, ret_ty) => {
 				// TODO: get rid of hardcoded "print" here
 				if params.len() != c.args.len() && c.expr.span.as_str_f(self.input) != "print" {
-					let msg = format!(
-						"Function takes {} argument(s), {} supplied.",
-						params.len(),
-						c.args.len()
-					);
+					let msg = format!("Function takes {} argument(s), {} supplied.", params.len(), c.args.len());
 					format_err_f(&msg, c.expr.span, self.input);
 					self.errors.push(msg);
 				} else {
@@ -742,10 +726,7 @@ impl<'a> TypeCheck<'a> {
 				if let Some(ty) = ty_opt {
 					ty
 				} else {
-					let msg = format!(
-						"(compiler error) couldn't find type for `{}`",
-						expr.span.as_str_f(self.input)
-					);
+					let msg = format!("(compiler error) couldn't find type for `{}`", expr.span.as_str_f(self.input));
 					format_err_f(&msg, e.span, self.input);
 					panic!("{}", &msg);
 				}
@@ -923,11 +904,8 @@ impl<'a> TypeCheck<'a> {
 		for (var, rhs_ty) in zip(&mut node.vars, rhs) {
 			let ty = self.eval_lvalue(var);
 			if self.unify(rhs_ty, ty).is_err() {
-				let msg = format!(
-					"Type error, assigning `{}` to `{}`.",
-					self.ty_to_string(rhs_ty),
-					self.ty_to_string(ty)
-				);
+				let msg =
+					format!("Type error, assigning `{}` to `{}`.", self.ty_to_string(rhs_ty), self.ty_to_string(ty));
 				format_err_f(&msg, node.span, self.input);
 				self.errors.push(msg);
 			};
@@ -942,11 +920,7 @@ impl<'a> TypeCheck<'a> {
 		let new_lhs = self.eval_bin_op(&node.op, lhs, rhs, node.span);
 
 		if self.unify(new_lhs, lhs).is_err() {
-			let msg = format!(
-				"Cannot assign `{}` to `{}`.",
-				self.ty_to_string(new_lhs),
-				self.ty_to_string(lhs)
-			);
+			let msg = format!("Cannot assign `{}` to `{}`.", self.ty_to_string(new_lhs), self.ty_to_string(lhs));
 			format_err_f(&msg, node.span, self.input);
 			self.errors.push(msg);
 		}

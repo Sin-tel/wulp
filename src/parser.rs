@@ -64,12 +64,7 @@ impl<'a> Parser<'a> {
 		}
 
 		let includes = this.includes;
-		files.push({
-			InputFile {
-				contents: input,
-				filename,
-			}
-		});
+		files.push({ InputFile { contents: input, filename } });
 		Ok((stats, includes))
 	}
 
@@ -146,9 +141,7 @@ impl<'a> Parser<'a> {
 				self.assert_next(TokenKind::RCurly);
 				Block { stats }
 			},
-			_ => Block {
-				stats: vec![self.parse_statement()],
-			},
+			_ => Block { stats: vec![self.parse_statement()] },
 		}
 	}
 
@@ -361,12 +354,7 @@ impl<'a> Parser<'a> {
 
 		let else_block = self.parse_else_block();
 
-		IfBlock {
-			expr,
-			block,
-			elseif,
-			else_block,
-		}
+		IfBlock { expr, block, elseif, else_block }
 	}
 
 	fn parse_elseif(&mut self) -> ElseIf {
@@ -435,11 +423,7 @@ impl<'a> Parser<'a> {
 
 			expression = Expr {
 				span: Span::join(lhs.span, rhs.span),
-				kind: ExprKind::BinExpr(BinExpr {
-					op,
-					lhs: Box::new(lhs),
-					rhs: Box::new(rhs),
-				}),
+				kind: ExprKind::BinExpr(BinExpr { op, lhs: Box::new(lhs), rhs: Box::new(rhs) }),
 			};
 		}
 
@@ -454,10 +438,7 @@ impl<'a> Parser<'a> {
 				let expr = self.parse_sub_expr(op.priority());
 				Some(Expr {
 					span: Span::join(tk.span, expr.span),
-					kind: ExprKind::UnExpr(UnExpr {
-						op,
-						expr: Box::new(expr),
-					}),
+					kind: ExprKind::UnExpr(UnExpr { op, expr: Box::new(expr) }),
 				})
 			},
 			None => None,
@@ -504,11 +485,7 @@ impl<'a> Parser<'a> {
 
 					primary = Expr {
 						span: Span::join(expr.span, end),
-						kind: ExprKind::Call(Call {
-							expr: Box::new(expr),
-							args,
-							named_args,
-						}),
+						kind: ExprKind::Call(Call { expr: Box::new(expr), args, named_args }),
 					};
 				},
 				_ => break,
@@ -539,51 +516,33 @@ impl<'a> Parser<'a> {
 		match self.tokens.peek().kind {
 			TokenKind::Nil => {
 				let span = self.tokens.next().span;
-				Expr {
-					span,
-					kind: ExprKind::Literal(Literal::Nil),
-				}
+				Expr { span, kind: ExprKind::Literal(Literal::Nil) }
 			},
 			TokenKind::True => {
 				let span = self.tokens.next().span;
-				Expr {
-					span,
-					kind: ExprKind::Literal(Literal::Bool(true)),
-				}
+				Expr { span, kind: ExprKind::Literal(Literal::Bool(true)) }
 			},
 			TokenKind::False => {
 				let span = self.tokens.next().span;
-				Expr {
-					span,
-					kind: ExprKind::Literal(Literal::Bool(false)),
-				}
+				Expr { span, kind: ExprKind::Literal(Literal::Bool(false)) }
 			},
 			TokenKind::Fn => {
 				// TODO: we now use `fn` for the span of the lambda, which is kind of lame
 				let span = self.tokens.next().span;
-				Expr {
-					span,
-					kind: ExprKind::Lambda(self.parse_fn_body()),
-				}
+				Expr { span, kind: ExprKind::Lambda(self.parse_fn_body()) }
 			},
 			TokenKind::Str => self.parse_string(),
 			TokenKind::Number | TokenKind::HexNumber | TokenKind::BinNumber => self.parse_number(),
 			TokenKind::LBracket => self.parse_array_constructor(),
 			TokenKind::Name => {
 				let name = self.parse_name();
-				Expr {
-					span: name.span,
-					kind: ExprKind::Name(name),
-				}
+				Expr { span: name.span, kind: ExprKind::Name(name) }
 			},
 			TokenKind::LParen => {
 				let start = self.assert_next(TokenKind::LParen).span;
 				let inner = self.parse_expr();
 				let end = self.assert_next(TokenKind::RParen).span;
-				Expr {
-					span: Span::join(start, end),
-					kind: ExprKind::Expr(Box::new(inner)),
-				}
+				Expr { span: Span::join(start, end), kind: ExprKind::Expr(Box::new(inner)) }
 			},
 			_ => {
 				let tk = self.tokens.next();
@@ -598,10 +557,7 @@ impl<'a> Parser<'a> {
 		let start = self.assert_next(TokenKind::LBracket).span;
 		let exprs = self.parse_array_fields();
 		let end = self.assert_next(TokenKind::RBracket).span;
-		Expr {
-			span: Span::join(start, end),
-			kind: ExprKind::Array(exprs),
-		}
+		Expr { span: Span::join(start, end), kind: ExprKind::Array(exprs) }
 	}
 
 	fn parse_fields(&mut self) -> Vec<Field> {
@@ -660,15 +616,9 @@ impl<'a> Parser<'a> {
 				if self.tokens.peek().kind == TokenKind::Assign {
 					self.tokens.next();
 					let expr = self.parse_expr();
-					Field {
-						field: PropertyTy { property, ty },
-						kind: FieldKind::Assign(expr),
-					}
+					Field { field: PropertyTy { property, ty }, kind: FieldKind::Assign(expr) }
 				} else {
-					Field {
-						field: PropertyTy { property, ty },
-						kind: FieldKind::Empty,
-					}
+					Field { field: PropertyTy { property, ty }, kind: FieldKind::Empty }
 				}
 			},
 			_ => {
@@ -783,10 +733,7 @@ impl<'a> Parser<'a> {
 	fn parse_string(&mut self) -> Expr {
 		let span = self.assert_next(TokenKind::Str).span;
 		let lit = self.parse_string_literal(span);
-		Expr {
-			span,
-			kind: ExprKind::Literal(Literal::Str(lit)),
-		}
+		Expr { span, kind: ExprKind::Literal(Literal::Str(lit)) }
 	}
 
 	fn parse_string_literal(&mut self, span: Span) -> String {
@@ -819,25 +766,16 @@ impl<'a> Parser<'a> {
 			TokenKind::Number => {
 				let s = str::replace(&s, "_", "");
 				if let Ok(num) = s.parse::<u32>() {
-					return Expr {
-						span,
-						kind: ExprKind::Literal(Literal::Int(num as i32)),
-					};
+					return Expr { span, kind: ExprKind::Literal(Literal::Int(num as i32)) };
 				} else if let Ok(num) = s.parse::<f64>() {
-					return Expr {
-						span,
-						kind: ExprKind::Literal(Literal::Num(num)),
-					};
+					return Expr { span, kind: ExprKind::Literal(Literal::Num(num)) };
 				}
 			},
 			TokenKind::HexNumber => {
 				let s = str::replace(&s, "_", "");
 				if let Some(s) = s.strip_prefix("0x") {
 					if let Ok(num) = u32::from_str_radix(&s, 16) {
-						return Expr {
-							span,
-							kind: ExprKind::Literal(Literal::Int(num as i32)),
-						};
+						return Expr { span, kind: ExprKind::Literal(Literal::Int(num as i32)) };
 					}
 				}
 			},
@@ -845,10 +783,7 @@ impl<'a> Parser<'a> {
 				if let Some(s) = s.strip_prefix("0b") {
 					let s = &str::replace(s, "_", "");
 					if let Ok(num) = u32::from_str_radix(&s, 2) {
-						return Expr {
-							span,
-							kind: ExprKind::Literal(Literal::Int(num as i32)),
-						};
+						return Expr { span, kind: ExprKind::Literal(Literal::Int(num as i32)) };
 					}
 				}
 			},

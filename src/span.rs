@@ -20,19 +20,11 @@ impl Span {
 		Self { start, end, file_id }
 	}
 	pub fn at(c: usize, file_id: FileId) -> Self {
-		Self {
-			start: c,
-			end: c + 1,
-			file_id,
-		}
+		Self { start: c, end: c + 1, file_id }
 	}
 	pub fn join(s1: Self, s2: Self) -> Self {
 		assert!(s1.file_id == s2.file_id);
-		Self {
-			start: cmp::min(s1.start, s2.start),
-			end: cmp::max(s1.end, s2.end),
-			file_id: s1.file_id,
-		}
+		Self { start: cmp::min(s1.start, s2.start), end: cmp::max(s1.end, s2.end), file_id: s1.file_id }
 	}
 
 	pub fn line_col(&self, input: &str) -> (usize, usize, usize, usize) {
@@ -71,34 +63,16 @@ fn line_col(input: &str, pos: usize) -> (usize, usize) {
 }
 
 pub fn format_err_f(message: &str, span: Span, files: &[InputFile]) {
-	print_message(
-		message,
-		span,
-		&files[span.file_id].contents,
-		&files[span.file_id].filename,
-		"error",
-	);
+	print_message(message, span, &files[span.file_id].contents, &files[span.file_id].filename, "error");
 }
 
 pub fn format_note_f(message: &str, span: Span, files: &[InputFile]) {
-	print_message(
-		message,
-		span,
-		&files[span.file_id].contents,
-		&files[span.file_id].filename,
-		"note",
-	);
+	print_message(message, span, &files[span.file_id].contents, &files[span.file_id].filename, "note");
 }
 
 #[allow(dead_code)]
 pub fn format_warning_f(message: &str, span: Span, files: &[InputFile]) {
-	print_message(
-		message,
-		span,
-		&files[span.file_id].contents,
-		&files[span.file_id].filename,
-		"warning",
-	);
+	print_message(message, span, &files[span.file_id].contents, &files[span.file_id].filename, "warning");
 }
 
 pub fn format_err(message: &str, span: Span, input: &str, filename: &str) {

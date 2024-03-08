@@ -17,11 +17,7 @@ pub enum SymbolKind {
 impl Symbol {
 	#[must_use]
 	pub fn new(name: &str) -> Self {
-		Self {
-			name: name.to_string(),
-			is_const: false,
-			kind: SymbolKind::Var,
-		}
+		Self { name: name.to_string(), is_const: false, kind: SymbolKind::Var }
 	}
 
 	#[must_use]
@@ -54,11 +50,7 @@ pub struct SymbolTable {
 
 impl SymbolTable {
 	pub fn new() -> Self {
-		let mut new = SymbolTable {
-			symbols: Vec::new(),
-			globals: Vec::new(),
-			temp_counter: 0,
-		};
+		let mut new = SymbolTable { symbols: Vec::new(), globals: Vec::new(), temp_counter: 0 };
 		// id = 0 always points to this
 		new.symbols.push(Symbol::new("UNKNOWN_SYMBOL").make_const());
 		new

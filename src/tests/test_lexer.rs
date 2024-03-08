@@ -25,15 +25,7 @@ fn single_line_comment() {
 
 	assert_eq!(
 		lex.next(),
-		Some(Token {
-			kind: TokenKind::Comment,
-			span: Span {
-				start: 0,
-				end: 34,
-				file_id: 0
-			},
-			line: 0
-		})
+		Some(Token { kind: TokenKind::Comment, span: Span { start: 0, end: 34, file_id: 0 }, line: 0 })
 	);
 }
 
@@ -41,51 +33,18 @@ fn single_line_comment() {
 fn single_line_string() {
 	let single_quote = r#"'example string'"#;
 	let mut lex = new_lexer(single_quote);
-	assert_eq!(
-		lex.next(),
-		Some(Token {
-			kind: TokenKind::Str,
-			span: Span {
-				start: 0,
-				end: 16,
-				file_id: 0
-			},
-			line: 0
-		})
-	);
+	assert_eq!(lex.next(), Some(Token { kind: TokenKind::Str, span: Span { start: 0, end: 16, file_id: 0 }, line: 0 }));
 
 	let double_quote = r#""example string""#;
 	let mut lex = new_lexer(double_quote);
-	assert_eq!(
-		lex.next(),
-		Some(Token {
-			kind: TokenKind::Str,
-			span: Span {
-				start: 0,
-				end: 16,
-				file_id: 0
-			},
-			line: 0
-		})
-	);
+	assert_eq!(lex.next(), Some(Token { kind: TokenKind::Str, span: Span { start: 0, end: 16, file_id: 0 }, line: 0 }));
 }
 
 #[test]
 fn multi_line_string() {
 	let multi_line = r##"#" multi-line	# "" 'raw string "#"##;
 	let mut lex = new_lexer(multi_line);
-	assert_eq!(
-		lex.next(),
-		Some(Token {
-			kind: TokenKind::Str,
-			span: Span {
-				start: 0,
-				end: 33,
-				file_id: 0
-			},
-			line: 0
-		})
-	);
+	assert_eq!(lex.next(), Some(Token { kind: TokenKind::Str, span: Span { start: 0, end: 33, file_id: 0 }, line: 0 }));
 }
 
 #[test]
