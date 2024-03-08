@@ -86,7 +86,7 @@ fn string_concat() {
 	let actual: Vec<_> = new_lexer(p).map(|tk| tk.kind).collect();
 
 	use TokenKind::*;
-	assert_eq!(actual, vec![Str, Concat, Name])
+	assert_eq!(actual, vec![Str, Concat, Name]);
 }
 
 #[test]
@@ -96,7 +96,7 @@ fn not_expressions() {
 	let actual: Vec<_> = new_lexer(p).map(|tk| tk.kind).collect();
 
 	use TokenKind::*;
-	assert_eq!(actual, vec![Not, True])
+	assert_eq!(actual, vec![Not, True]);
 }
 
 #[test]

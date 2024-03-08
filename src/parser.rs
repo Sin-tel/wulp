@@ -64,7 +64,7 @@ impl<'a> Parser<'a> {
 		}
 
 		let includes = this.includes;
-		files.push({ InputFile { contents: input, filename } });
+		files.push(InputFile { contents: input, filename });
 		Ok((stats, includes))
 	}
 
@@ -609,22 +609,19 @@ impl<'a> Parser<'a> {
 	}
 
 	fn parse_field(&mut self) -> Field {
-		match self.tokens.peek().kind {
-			TokenKind::Name => {
-				let property = self.parse_property();
-				let ty = self.parse_option_ty();
-				if self.tokens.peek().kind == TokenKind::Assign {
-					self.tokens.next();
-					let expr = self.parse_expr();
-					Field { field: PropertyTy { property, ty }, kind: FieldKind::Assign(expr) }
-				} else {
-					Field { field: PropertyTy { property, ty }, kind: FieldKind::Empty }
-				}
-			},
-			_ => {
-				let tk = self.tokens.next();
-				self.error(format!("Expected field but found: `{tk}`."), tk.span);
-			},
+		if self.tokens.peek().kind == TokenKind::Name {
+			let property = self.parse_property();
+			let ty = self.parse_option_ty();
+			if self.tokens.peek().kind == TokenKind::Assign {
+				self.tokens.next();
+				let expr = self.parse_expr();
+				Field { field: PropertyTy { property, ty }, kind: FieldKind::Assign(expr) }
+			} else {
+				Field { field: PropertyTy { property, ty }, kind: FieldKind::Empty }
+			}
+		} else {
+			let tk = self.tokens.next();
+			self.error(format!("Expected field but found: `{tk}`."), tk.span);
 		}
 	}
 
@@ -774,7 +771,7 @@ impl<'a> Parser<'a> {
 			TokenKind::HexNumber => {
 				let s = str::replace(&s, "_", "");
 				if let Some(s) = s.strip_prefix("0x") {
-					if let Ok(num) = u32::from_str_radix(&s, 16) {
+					if let Ok(num) = u32::from_str_radix(s, 16) {
 						return Expr { span, kind: ExprKind::Literal(Literal::Int(num as i32)) };
 					}
 				}
@@ -782,7 +779,7 @@ impl<'a> Parser<'a> {
 			TokenKind::BinNumber => {
 				if let Some(s) = s.strip_prefix("0b") {
 					let s = &str::replace(s, "_", "");
-					if let Ok(num) = u32::from_str_radix(&s, 2) {
+					if let Ok(num) = u32::from_str_radix(s, 2) {
 						return Expr { span, kind: ExprKind::Literal(Literal::Int(num as i32)) };
 					}
 				}

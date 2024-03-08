@@ -127,10 +127,9 @@ impl<V: Visitor> VisitNode<V> for Stat {
 			Stat::ForBlock(s) => v.visit_for_block(s),
 			Stat::Block(s) => v.visit_block(s),
 			Stat::WhileBlock(s) => v.visit_while_block(s),
-			Stat::Break => (),
 			Stat::Import(s) => v.visit_import(s),
 			Stat::Intrinsic(s) => v.visit_intrinsic(s),
-			Stat::InlineLua(_) => (),
+			Stat::InlineLua(_) | Stat::Break => (),
 			Stat::Return(ret) => {
 				for e in &mut ret.exprs {
 					v.visit_expr(e);
