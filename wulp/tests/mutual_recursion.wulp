@@ -3,13 +3,11 @@ fn main() {
 }
 
 fn even(n) {
-	print("even")
 	if n == 0 return 0
 	else return odd(n-1)
 }
 
 fn odd(n) {
-	print("odd")
 	if n == 0 return 0
 	else return even(n-1)
 }

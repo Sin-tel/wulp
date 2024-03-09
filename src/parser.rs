@@ -4,29 +4,30 @@ use crate::lexer::Lexer;
 use crate::span::{format_err, format_warning, FileId, InputFile, Span};
 use crate::token::{Token, TokenKind};
 use crate::ty::TyAst;
-use anyhow::Result;
+use anyhow::{Context, Result};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct Parser<'a> {
 	input: &'a str,
 	file_id: FileId,
 	tokens: Lexer<'a>,
-	filename: String,
-	includes: Vec<String>,
+	path: PathBuf,
+	includes: Vec<PathBuf>,
 }
 
 impl<'a> Parser<'a> {
-	pub fn parse(filename: &str) -> Result<(Module, Vec<InputFile>)> {
+	pub fn parse(path: &Path) -> Result<(Module, Vec<InputFile>)> {
 		let mut files = Vec::new();
-		let items = Self::parse_file(filename, &mut files, true)?;
+		let items = Self::parse_file(path, &mut files, true)?;
 
 		Ok((Module { items }, files))
 	}
 
-	pub fn parse_file(filename: &str, files: &mut Vec<InputFile>, is_main: bool) -> Result<Vec<Item>> {
+	pub fn parse_file(path: &Path, files: &mut Vec<InputFile>, is_main: bool) -> Result<Vec<Item>> {
 		// recursively parse includes and concatenate all the statements in post-order
 
-		let (mut items_last, includes) = Self::parse_module(filename, files, is_main)?;
+		let (mut items_last, includes) = Self::parse_module(path, files, is_main)?;
 		let mut items = Vec::new();
 		for f in &includes {
 			let mut r_stats = Self::parse_file(f, files, false)?;
@@ -37,19 +38,22 @@ impl<'a> Parser<'a> {
 		Ok(items)
 	}
 
-	pub fn parse_module(filename: &str, files: &mut Vec<InputFile>, is_main: bool) -> Result<(Vec<Item>, Vec<String>)> {
-		let filename = format!("{filename}.wulp");
-		let input = fs::read_to_string(filename.clone())?;
+	pub fn parse_module(path: &Path, files: &mut Vec<InputFile>, is_main: bool) -> Result<(Vec<Item>, Vec<PathBuf>)> {
+		let mut path = path.to_path_buf();
+		path.set_extension("wulp");
+		let input = fs::read_to_string(path.clone()).with_context(|| format!("Could not find {}", path.display()))?;
 		let file_id = files.len();
 		let mut includes = Vec::new();
 		if is_main {
-			includes.push("std".to_string());
+			// FIXME
+			let std_path: PathBuf = ["wulp", "std", "std"].iter().collect();
+			includes.push(std_path);
 		}
 		let mut this = Parser {
 			input: &input,
 			file_id,
-			tokens: Lexer::new(&input, file_id, filename.clone()),
-			filename: filename.clone(),
+			tokens: Lexer::new(&input, file_id, path.clone()),
+			path: path.clone(),
 			includes,
 		};
 
@@ -62,12 +66,12 @@ impl<'a> Parser<'a> {
 		}
 
 		let includes = this.includes;
-		files.push(InputFile { contents: input, filename });
+		files.push(InputFile { contents: input, path });
 		Ok((items, includes))
 	}
 
 	fn error(&mut self, msg: String, span: Span) -> ! {
-		format_err(&msg, span, self.input, &self.filename);
+		format_err(&msg, span, self.input, &self.path);
 		panic!("{msg}");
 	}
 
@@ -109,13 +113,16 @@ impl<'a> Parser<'a> {
 				Some(Item::Intrinsic(Intrinsic { name, property, ty }))
 			},
 			"include" => {
-				let mut filename = self.tokens.next().span.as_string(self.input);
+				// imports are relative, so get path of current file
+				let mut path = self.path.clone();
+				path.pop();
+
+				path.push(self.tokens.next().span.as_str(self.input));
 				while self.tokens.peek().kind == TokenKind::Period {
 					self.tokens.next();
-					filename.push(std::path::MAIN_SEPARATOR);
-					filename.push_str(self.tokens.next().span.as_str(self.input));
+					path.push(self.tokens.next().span.as_str(self.input));
 				}
-				self.includes.push(filename);
+				self.includes.push(path);
 
 				None
 			},
@@ -256,10 +263,10 @@ impl<'a> Parser<'a> {
 			vars.push(self.parse_suffix_expr());
 		}
 
-		// lhs vars can not be a Call, since those arent lvalues.
+		// lhs vars can't be a Call, since those arent lvalues.
 		for var in &vars {
 			if let ExprKind::Call(_) = var.kind {
-				self.error("Can not assign to a function call.".to_string(), var.span);
+				self.error("can't assign to a function call.".to_string(), var.span);
 			}
 		}
 		self.assert_next(TokenKind::Assign);
@@ -499,8 +506,8 @@ impl<'a> Parser<'a> {
 					// TODO: also for {} !
 					let tk = self.tokens.peek();
 					if tk.kind == TokenKind::LParen && tk.line != start_line {
-						let msg = "Ambiguous syntax.";
-						format_warning(msg, tk.span, self.input, &self.filename);
+						let msg = "ambiguous syntax";
+						format_warning(msg, tk.span, self.input, &self.path);
 						eprintln!("note: Add a semicolon to the previous statement if this is intentional.");
 						panic!("{msg}");
 					}

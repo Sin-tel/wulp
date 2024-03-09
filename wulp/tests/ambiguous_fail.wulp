@@ -1,13 +1,7 @@
 fn main() {
 	let f = fn() {return fn(n) {return n}}
 	let x = fn() {}
-	// ok
-	f();
-	(x)()
-
-	f()(x)()
-
 	// ambiguous
-	// f()
-	// (x)()
+	f()
+	(x)()
 }

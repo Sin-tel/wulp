@@ -12,7 +12,6 @@ pub struct ScopeCheck<'a> {
 	symbol_table: SymbolTable,
 	input: &'a [InputFile],
 	errors: Vec<String>,
-	hoist_defs: bool,
 }
 
 pub const INT_SYM: SymbolId = 1;
@@ -22,13 +21,7 @@ pub const BOOL_SYM: SymbolId = 4;
 
 impl<'a> ScopeCheck<'a> {
 	pub fn check(ast: &mut Module, input: &'a [InputFile]) -> Result<SymbolTable> {
-		let mut this = Self {
-			scope_stack: Vec::new(),
-			symbol_table: SymbolTable::new(),
-			input,
-			errors: Vec::new(),
-			hoist_defs: false,
-		};
+		let mut this = Self { scope_stack: Vec::new(), symbol_table: SymbolTable::new(), input, errors: Vec::new() };
 
 		this.scope_stack.push(FxHashMap::default());
 
@@ -45,11 +38,11 @@ impl<'a> ScopeCheck<'a> {
 
 		if let Some(f) = this.lookup("main") {
 			if this.symbol_table.get(f).kind != SymbolKind::FnDef {
-				let msg = format!("`main` should be a function.");
+				let msg = "`main` should be a function.".to_string();
 				this.errors.push(msg);
 			}
 		} else {
-			let msg = format!("No `main` function found.");
+			let msg = "No `main` function found.".to_string();
 			this.errors.push(msg);
 		};
 		this.scope_stack.pop();
@@ -88,11 +81,11 @@ impl<'a> ScopeCheck<'a> {
 
 				if let Some(id) = self.lookup(name) {
 					if self.symbol_table.get(id).kind == SymbolKind::FnDef {
-						let msg = format!("Function `{name}` already defined.");
+						let msg = format!("function `{name}` already defined.");
 						format_err_f(&msg, n.span, self.input);
 						self.errors.push(msg);
 					} else if self.symbol_table.get(id).is_const {
-						let msg = format!("Can't assign to constant `{name}`.");
+						let msg = format!("can't assign to constant `{name}`.");
 						format_err_f(&msg, n.span, self.input);
 						self.errors.push(msg);
 					}
@@ -121,15 +114,23 @@ impl<'a> ScopeCheck<'a> {
 
 impl<'a> Visitor for ScopeCheck<'a> {
 	fn visit_module(&mut self, node: &mut Module) {
-		self.hoist_defs = true;
-		// node.walk(self);
 		for b in &mut node.items {
 			if let Item::FnDef(f) = b {
-				f.visit(self);
+				let name = f.name.span.as_str_f(self.input);
+				if f.property.is_none() {
+					let lookup = self.lookup(name);
+					// plain fn def
+					if lookup.is_some() {
+						let msg = format!("function `{name}` already defined.");
+						format_err_f(&msg, f.name.span, self.input);
+						self.errors.push(msg);
+					} else {
+						// function defs are always const
+						self.new_identifier(name, Symbol::new(name).fn_def());
+					}
+				}
 			}
 		}
-		self.hoist_defs = false;
-
 		node.walk(self);
 	}
 
@@ -188,27 +189,6 @@ impl<'a> Visitor for ScopeCheck<'a> {
 			self.new_identifier(name, Symbol::new(name).ty_def());
 			node.name.visit(self);
 			node.table.visit(self);
-		}
-	}
-
-	fn visit_fn_def(&mut self, node: &mut FnDef) {
-		if self.hoist_defs {
-			let name = node.name.span.as_str_f(self.input);
-
-			if node.property.is_none() {
-				let lookup = self.lookup(name);
-				// plain fn def
-				if lookup.is_some() {
-					let msg = format!("Function `{name}` already defined.");
-					format_err_f(&msg, node.name.span, self.input);
-					self.errors.push(msg);
-				} else {
-					// function defs are always const
-					self.new_identifier(name, Symbol::new(name).fn_def());
-				}
-			}
-		} else {
-			node.walk(self);
 		}
 	}
 
@@ -271,7 +251,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		if let Some(id) = self.lookup(name) {
 			node.id = id;
 		} else {
-			let msg = format!("Can not find `{name}` in this scope.");
+			let msg = format!("can't find `{name}` in this scope");
 			format_err_f(&msg, node.span, self.input);
 			self.errors.push(msg);
 			// to suppress further errors, we add a new variable anyway
@@ -286,7 +266,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		if let Some(id) = self.lookup(name) {
 			node.id = id;
 		} else {
-			let msg = format!("Can not find `{name}` in this scope.");
+			let msg = format!("can't find `{name}` in this scope");
 			format_err_f(&msg, node.span, self.input);
 			self.errors.push(msg);
 			// to suppress further errors, we add a new variable anyway

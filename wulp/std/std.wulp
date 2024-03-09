@@ -5,10 +5,10 @@ print: fn(any) -> ()
 #intrinsic
 error: fn(str) -> !
 
-#include std.num
-#include std.int
-#include std.str
+#include num
+#include int
+#include str
 
-#include std.random
+#include random
 // import std.random as random
 

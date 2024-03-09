@@ -20,6 +20,4 @@ fn main() {
 	a ..= b
 
 	assert(a == "hello world")
-
-	print("ok")
 }

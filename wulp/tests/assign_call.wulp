@@ -1,9 +1,11 @@
 fn main() {
+	let counter = 0
+
 	let f = (
 		fn(a: int) -> fn() -> [int] {
 			let t = [a]
 			return fn () {
-				print("eval")
+				counter += 1
 				return t
 			}
 		}
@@ -12,14 +14,12 @@ fn main() {
 	let t = 1
 
 	// should evaluate three times exactly
-	print(f()[0])
-	f()[0] += 1
-	print(f()[0])
+	assert(f()[0] == 4)
+	assert(counter == 1)
 
-	//--- prints:
-	// eval
-	// 4
-	// eval
-	// eval
-	// 5
+	f()[0] += 1
+	assert(counter == 2)
+
+	assert(f()[0] == 5)
+	assert(counter == 3)
 }

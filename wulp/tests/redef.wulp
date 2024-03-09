@@ -6,25 +6,8 @@ fn S.g() {}
 fn a() {}
 fn b() {}
 
-// fails
-// fn a() {}
-
 fn main() {
-
-	// fails
-	// b = fn() {}
-
 	// allowed
 	let d = fn() {}
 	let d = fn() {}
-
-	// fails
-	// print = fn() {}
-
-	// fails
-	// for i in [1 2 3] {
-	// 	i = 2
-	// }
-
-
 }

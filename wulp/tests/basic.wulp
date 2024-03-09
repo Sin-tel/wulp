@@ -1,0 +1,44 @@
+// basic syntax examples
+
+fn main() {
+	let list = [2 3 4 5]
+
+	for i in list {
+		fact(i)
+	}
+
+	let i = 4
+	while true {
+		fact(i)
+		i -= 1
+		if i <= 0 break
+	}
+
+	let a: str = "str"
+	let b = a
+
+	if a == b {
+		assert(true)
+	} elseif a != b {
+		assert(false)
+	} else {
+		assert(false)
+	}
+	assert("ok" .. b == "okstr")
+
+	let add = fn(a: int, b: int) {return a + b}
+	add(1, 2)
+
+	assert(0xff == 255)
+	assert(0b111 == 7)
+
+	let u: maybe(int) = nil
+}
+
+fn fact(n: int) -> int {
+	assert(n >= 0)
+	if n != 0 return n * fact(n - 1)
+	else return 1
+}
+
+

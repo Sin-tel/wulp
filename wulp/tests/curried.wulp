@@ -9,16 +9,20 @@ fn main() {
 
 
 	let a = f1(1)
-	print(a) // 1
+	assert(a == 1)
+
 
 	let b = f2(1)
 	let c = b(2)
 	let d = f2(1)(2)
-	print(c,d) // 3  3
+	assert(c == 3)
+	assert(d == 3)
+
 
 	let e = f3(1)
 	let f = e(2)
 	let g = f(4)
 	let h = f3(1)(2)(4)
-	print(g,h) // 7  7
+	assert(g == 7)
+	assert(h == 7)
 }

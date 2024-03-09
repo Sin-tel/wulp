@@ -1,6 +1,6 @@
 struct S1 {}
-fn S1.k(self) print("ok")
-fn S1.t(self) return fn(a,b) print("ok",a,b)
+fn S1.k(self) {}
+fn S1.t(self) return fn(a,b) {assert(a == 2);assert(b == 3);}
 
 struct S2 {
 	j: [S1]

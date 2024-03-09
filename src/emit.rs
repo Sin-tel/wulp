@@ -9,7 +9,6 @@ pub struct EmitLua {
 	indent_level: usize,
 	symbol_table: SymbolTable,
 	patch_temp_lvalue: bool,
-	hoist_defs: bool,
 }
 
 impl EmitLua {
@@ -20,7 +19,6 @@ impl EmitLua {
 			indent_level: 0,
 			symbol_table,
 			patch_temp_lvalue: false,
-			hoist_defs: false,
 		};
 		this.code.push_str(include_str!("../lua/std_preamble.lua"));
 		this.visit_module(ast);
@@ -104,7 +102,6 @@ impl EmitLua {
 impl Visitor for EmitLua {
 	fn visit_module(&mut self, node: &mut Module) {
 		self.indent_level += 1;
-		self.hoist_defs = true;
 		for b in &mut node.items {
 			match b {
 				Item::FnDef(f) => {
@@ -126,7 +123,6 @@ impl Visitor for EmitLua {
 				_ => (),
 			}
 		}
-		self.hoist_defs = false;
 		node.walk(self);
 		self.indent_level -= 1;
 	}

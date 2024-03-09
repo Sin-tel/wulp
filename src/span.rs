@@ -1,11 +1,13 @@
 use std::cmp;
+use std::path::Path;
+use std::path::PathBuf;
 
 pub type FileId = usize;
 
 #[derive(Debug)]
 pub struct InputFile {
 	pub contents: String,
-	pub filename: String,
+	pub path: PathBuf,
 }
 
 #[derive(PartialEq, Debug, Copy, Clone)]
@@ -63,35 +65,32 @@ fn line_col(input: &str, pos: usize) -> (usize, usize) {
 }
 
 pub fn format_err_f(message: &str, span: Span, files: &[InputFile]) {
-	print_message(message, span, &files[span.file_id].contents, &files[span.file_id].filename, "error");
+	print_message(message, span, &files[span.file_id].contents, &files[span.file_id].path, "error");
 }
 
 pub fn format_note_f(message: &str, span: Span, files: &[InputFile]) {
-	print_message(message, span, &files[span.file_id].contents, &files[span.file_id].filename, "note");
+	print_message(message, span, &files[span.file_id].contents, &files[span.file_id].path, "note");
 }
 
 #[allow(dead_code)]
 pub fn format_warning_f(message: &str, span: Span, files: &[InputFile]) {
-	print_message(message, span, &files[span.file_id].contents, &files[span.file_id].filename, "warning");
+	print_message(message, span, &files[span.file_id].contents, &files[span.file_id].path, "warning");
 }
 
-pub fn format_err(message: &str, span: Span, input: &str, filename: &str) {
-	print_message(message, span, input, filename, "error");
+pub fn format_err(message: &str, span: Span, input: &str, path: &Path) {
+	print_message(message, span, input, path, "error");
 }
 
-pub fn format_warning(message: &str, span: Span, input: &str, filename: &str) {
-	print_message(message, span, input, filename, "warning");
+pub fn format_warning(message: &str, span: Span, input: &str, path: &Path) {
+	print_message(message, span, input, path, "warning");
 }
 
 #[allow(dead_code)]
-pub fn format_note(message: &str, span: Span, input: &str, filename: &str) {
-	print_message(message, span, input, filename, "note");
+pub fn format_note(message: &str, span: Span, input: &str, path: &Path) {
+	print_message(message, span, input, path, "note");
 }
 
-pub fn print_message(message: &str, span: Span, input: &str, filename: &str, level: &'static str) {
-	// let this_file = input.file_list[span.file_id];
-	// let contents = &this_file.contents;
-	// let filename = &this_file.filename;
+pub fn print_message(message: &str, span: Span, input: &str, path: &Path, level: &'static str) {
 	let contents = input;
 
 	let (startl, startc, endl, endc) = span.line_col(contents);
@@ -99,8 +98,8 @@ pub fn print_message(message: &str, span: Span, input: &str, filename: &str, lev
 	let width = (endl + 1).to_string().chars().count();
 	let spaces = " ".repeat(width);
 
-	// TODO fix the filename
-	eprintln!("{level}: {filename}:{}: {message}", startl + 1);
+	// TODO fix the path
+	eprintln!("{level}: {}:{}: {message}", path.to_string_lossy(), startl + 1);
 	eprintln!("{spaces} |");
 
 	for (lc, l) in contents.lines().skip(startl).enumerate() {

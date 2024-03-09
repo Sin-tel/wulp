@@ -1,6 +1,7 @@
 use crate::span::{format_err, FileId, Span};
 use crate::token::*;
 use std::iter::zip;
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct Lexer<'a> {
@@ -10,8 +11,8 @@ pub struct Lexer<'a> {
 
 // This is mostly copypasta from peekable in std
 impl<'a> Lexer<'a> {
-	pub fn new(input: &'a str, id: FileId, filename: String) -> Self {
-		Lexer { lex_iter: LexIter::new(input, id, filename), peeked: None }
+	pub fn new(input: &'a str, id: FileId, path: PathBuf) -> Self {
+		Lexer { lex_iter: LexIter::new(input, id, path), peeked: None }
 	}
 	// I don't want to return Option<Token>
 	#[allow(clippy::should_implement_trait)]
@@ -49,15 +50,15 @@ pub struct LexIter<'a> {
 	input: &'a str,
 	bytes: &'a [u8],
 	id: FileId,
-	filename: String,
+	path: PathBuf,
 	pub cursor: usize,
 	pub line: usize,
 	handle_escape: bool,
 }
 
 impl<'a> LexIter<'a> {
-	pub fn new(input: &'a str, id: FileId, filename: String) -> Self {
-		LexIter { input, bytes: input.as_bytes(), id, filename, cursor: 0, line: 0, handle_escape: false }
+	pub fn new(input: &'a str, id: FileId, path: PathBuf) -> Self {
+		LexIter { input, bytes: input.as_bytes(), id, path, cursor: 0, line: 0, handle_escape: false }
 	}
 
 	fn newtoken(&self, kind: TokenKind, start: usize, end: usize) -> Token {
@@ -132,7 +133,7 @@ impl<'a> LexIter<'a> {
 				Some('\\') => self.handle_escape = true,
 				Some('\n') | None => {
 					let msg = "Failed to close string.";
-					format_err(msg, Span::new(start, self.cursor - 1, self.id), self.input, &self.filename);
+					format_err(msg, Span::new(start, self.cursor - 1, self.id), self.input, &self.path);
 					panic!("{msg}");
 				},
 				_ => self.handle_escape = false,
@@ -475,7 +476,7 @@ impl Iterator for LexIter<'_> {
 				},
 				tk => {
 					let msg = format!("Unexpected token: `{tk}`");
-					format_err(&msg, Span::at(self.cursor, self.id), self.input, &self.filename);
+					format_err(&msg, Span::at(self.cursor, self.id), self.input, &self.path);
 					panic!("{msg}");
 				},
 			}

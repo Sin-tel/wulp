@@ -126,7 +126,7 @@ impl<'a> TypeCheck<'a> {
 				if let Some(ty) = self_ty {
 					self.get_type(ty)
 				} else {
-					panic!("Can not use self here!");
+					panic!("can't use self here!");
 				}
 			},
 			TyAst::Maybe(a) => {
@@ -477,11 +477,11 @@ impl<'a> TypeCheck<'a> {
 				// TODO nicer err messages
 				assert!(i == 0, "self must be first argument!");
 				assert!(p.ty.is_none());
-				self.get_type(self_ty.expect("Can not use `self` here"))
+				self.get_type(self_ty.expect("can't use `self` here"))
 			} else {
 				match &p.ty {
 					Some(ty) => match ty {
-						TyAst::SelfTy => self.get_type(self_ty.expect("Can not use `self` here")),
+						TyAst::SelfTy => self.get_type(self_ty.expect("can't use `self` here")),
 						_ => self.convert_ast_ty(ty, None),
 					},
 					None => Ty::TyVar,
@@ -845,7 +845,7 @@ impl<'a> TypeCheck<'a> {
 					Ty::Array(inner_ty) => inner_ty,
 					Ty::Err => ERR_TY,
 					_ => {
-						let msg = format!("Can not index type `{}`.", self.ty_to_string(expr_ty));
+						let msg = format!("can't index type `{}`.", self.ty_to_string(expr_ty));
 						format_err_f(&msg, expr_span, self.input);
 						self.errors.push(msg);
 						return ERR_TY;

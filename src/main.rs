@@ -23,7 +23,6 @@ use crate::scope::ScopeCheck;
 use crate::typecheck::TypeCheck;
 use anyhow::Result;
 use mlua::{prelude::LuaResult, LuaOptions, StdLib};
-use std::env;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -44,9 +43,10 @@ mod visitor;
 mod tests;
 
 fn main() -> Result<()> {
-	env::set_current_dir(Path::new("./wulp"))?;
-	let filename = "test";
-	let (mut ast, files) = Parser::parse(filename)?;
+	// let path = Path::new("wulp/tests/ambiguous");
+	let path = Path::new("wulp/test");
+
+	let (mut ast, files) = Parser::parse(path)?;
 	let symbol_table = ScopeCheck::check(&mut ast, &files)?;
 	// for s in symbol_table.symbols.iter() {
 	// 	dbg!(s);
@@ -56,23 +56,17 @@ fn main() -> Result<()> {
 
 	// symbol_table.mangle();
 	let code = EmitLua::emit(&mut ast, symbol_table);
-	// println!("----- emitted code:");
-	// println!("{code}");
 
 	println!("----- execute:");
-	env::set_current_dir(Path::new("../lua"))?;
-	let lua = mlua::Lua::new_with(
-		StdLib::PACKAGE | StdLib::STRING | StdLib::MATH | StdLib::IO | StdLib::OS | StdLib::BIT,
-		LuaOptions::default(),
-	)?;
+	let lua = load_lua()?;
 	let mut chunk = lua.load(code.clone());
-	chunk = chunk.set_name(filename.to_string());
+	let path_str = path.to_string_lossy();
+	chunk = chunk.set_name(path_str.clone());
 	let res = chunk.exec();
 	// let res = chunk.eval::<String>();
-	display_return(res, filename);
+	display_return(res, &path_str);
 
-	env::set_current_dir(Path::new("../out"))?;
-	let mut file = fs::File::create(format!("{filename}.lua"))?;
+	let mut file = fs::File::create(format!("out/{}.lua", path_str.to_string().replace("/", "_")))?;
 	file.write_all(code.as_bytes())?;
 
 	Ok(())
@@ -87,4 +81,11 @@ fn display_return<V: std::fmt::Debug>(res: LuaResult<V>, filename: &str) {
 	} else {
 		// println!("{:?}", res.unwrap());
 	}
+}
+
+fn load_lua() -> Result<mlua::Lua> {
+	Ok(mlua::Lua::new_with(
+		StdLib::PACKAGE | StdLib::STRING | StdLib::MATH | StdLib::IO | StdLib::OS | StdLib::BIT,
+		LuaOptions::default(),
+	)?)
 }

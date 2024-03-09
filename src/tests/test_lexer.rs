@@ -1,10 +1,11 @@
 use crate::lexer::*;
 use crate::span::Span;
 use crate::token::*;
+use std::path::PathBuf;
 
 #[cfg(test)]
 fn new_lexer(input: &'static str) -> LexIter {
-	LexIter::new(input, 0, "test".to_string())
+	LexIter::new(input, 0, PathBuf::new())
 }
 
 #[test]

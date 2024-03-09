@@ -1,0 +1,9 @@
+fn main() {
+	let f = fn() {return fn(n) {return n}}
+	let x = fn() {}
+
+	f();
+	(x)()
+
+	f()(x)()
+}

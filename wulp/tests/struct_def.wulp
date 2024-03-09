@@ -18,23 +18,23 @@ fn Test.new(x) -> self {
 
 fn main() {
 	let t = Test()
-	print(t.x)
+	assert(t.x == 0)
 
 	let t1 = Test(x = 1)
-	print(t1.x)
+	assert(t1.x == 1)
 
 	let t2 = Test.new(2)
-	print(t2.x)
+	assert(t2.x == 2)
 
 	Test.inc(t)
-	print(t.x)
+	assert(t.x == 1)
 	t.add(5)
-	print(t.x)
+	assert(t.x == 6)
 
 	let t2 = Test.new(10)
-	print(t2.x)
+	assert(t2.x == 10)
 
 	t.add_test(t2)
-	print(t.x)
-	print(t2.x)
+	assert(t.x == 16)
+	assert(t2.x == 10)
 }
