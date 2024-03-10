@@ -78,10 +78,11 @@ impl SymbolTable {
 
 	#[allow(dead_code)]
 	pub fn mangle(&mut self) {
-		for s in &mut self.symbols {
+		for (i, s) in self.symbols.iter_mut().enumerate() {
 			if !s.is_const && s.kind != SymbolKind::FnDef {
-				let mut name = "_Z".to_string();
-				name.push_str(&s.name);
+				let mut name = "_v".to_string();
+				// name.push_str(&s.name);
+				name.push_str(&i.to_string());
 				s.name = name;
 			}
 		}

@@ -1,17 +1,14 @@
--- Error when trying to make a global
 local mt = {}
 setmetatable(_G, mt)
 mt.__newindex = function(t, n, v)
     error("Script attempted to create global variable '" .. tostring(n) .. "'", 2)
 end
---
 math.randomseed(os.time())
 local bit = require("bit")
 local int = {}
 local num = {}
 local str = {}
 local bool = {}
-
 local iter = {}
 local function array_next(self)
 	local item = self.a[self.counter]

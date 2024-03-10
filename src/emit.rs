@@ -53,7 +53,7 @@ impl EmitLua {
 		}
 	}
 	fn indent(&mut self) {
-		self.statement.push_str(&"\t".repeat(self.indent_level - 1));
+		self.statement.push_str(&"\t".repeat(self.indent_level));
 	}
 	fn replace_with_temp(&mut self, expr: &mut Expr) {
 		// bail out if it's not necessary
@@ -101,7 +101,6 @@ impl EmitLua {
 
 impl Visitor for EmitLua {
 	fn visit_module(&mut self, node: &mut Module) {
-		self.indent_level += 1;
 		for b in &mut node.items {
 			match b {
 				Item::FnDef(f) => {
@@ -124,16 +123,19 @@ impl Visitor for EmitLua {
 			}
 		}
 		node.walk(self);
-		self.indent_level -= 1;
 	}
 	fn visit_item(&mut self, node: &mut Item) {
 		match node {
 			Item::FnDef(_) => node.walk(self),
 			Item::Intrinsic(_) | Item::InlineLua(_) => (),
-			Item::Import(_s) => {
+			Item::Import(s) => {
 				// TODO: emit this as a block instead of a table
 				// struct and fn defs should be in export table
-				todo!()
+
+				match s.kind {
+					ImportKind::Glob => self.visit_module(s.module.as_mut().unwrap()),
+					_ => todo!(),
+				}
 				// self.statement.push_str("local ");
 				// s.alias.visit(self);
 				// self.statement.push_str(" = ");

@@ -134,14 +134,20 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		node.walk(self);
 	}
 
-	fn visit_import(&mut self, _node: &mut Import) {
-		// TODO: each file should have its own scope!
-		todo!()
+	fn visit_import(&mut self, node: &mut Import) {
+		// TODO: imported module should not share global scope
+
+		match node.kind {
+			ImportKind::Glob => {
+				self.visit_module(node.module.as_mut().unwrap());
+			},
+			_ => todo!(),
+		}
+
 		// self.scope_stack.push(FxHashMap::default());
-		// for field in &mut node.module.fields {
-		// 	field.visit(self);
-		// }
+		// self.visit_module(node.module.as_mut().unwrap());
 		// self.scope_stack.pop();
+
 		// let name_str = node.alias.span.as_str_f(self.input);
 		// self.new_identifier(name_str, Symbol::new(name_str).make_const());
 		// node.alias.visit(self);

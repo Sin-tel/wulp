@@ -352,8 +352,9 @@ impl<'a> TypeCheck<'a> {
 						self.new_def(s.name.id, new_ty);
 					}
 				},
-				Item::Import(_s) => {
-					todo!();
+				Item::Import(s) => match s.kind {
+					ImportKind::Glob => self.eval_module(s.module.as_mut().unwrap()),
+					_ => todo!(),
 				},
 				_ => (),
 			};

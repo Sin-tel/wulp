@@ -115,8 +115,10 @@ impl<V: Visitor> VisitNode<V> for Import {
 		v.visit_import(self);
 	}
 	fn walk(&mut self, v: &mut V) {
-		v.visit_name(&mut self.alias);
-		// v.visit_table(&mut self.module);
+		match self.kind {
+			ImportKind::Glob => v.visit_module(self.module.as_mut().unwrap()),
+			_ => todo!(),
+		}
 	}
 }
 

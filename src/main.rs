@@ -66,7 +66,7 @@ fn main() -> Result<()> {
 	// let res = chunk.eval::<String>();
 	display_return(res, &path_str);
 
-	let mut file = fs::File::create(format!("out/{}.lua", path_str.to_string().replace("/", "_")))?;
+	let mut file = fs::File::create(format!("out/{}.lua", path_str.to_string().replace('/', "_")))?;
 	file.write_all(code.as_bytes())?;
 
 	Ok(())

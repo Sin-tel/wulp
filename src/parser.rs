@@ -13,50 +13,46 @@ pub struct Parser<'a> {
 	file_id: FileId,
 	tokens: Lexer<'a>,
 	path: PathBuf,
-	includes: Vec<PathBuf>,
 }
 
 impl<'a> Parser<'a> {
 	pub fn parse(path: &Path) -> Result<(Module, Vec<InputFile>)> {
 		let mut files = Vec::new();
-		let items = Self::parse_file(path, &mut files, true)?;
+		// load standard library first
+		let mut module = Self::parse_file(Path::new("std/std"), &mut files)?;
+		let mut module_main = Self::parse_file(path, &mut files)?;
 
-		Ok((Module { items }, files))
+		module.items.append(&mut module_main.items);
+
+		Ok((module, files))
 	}
 
-	pub fn parse_file(path: &Path, files: &mut Vec<InputFile>, is_main: bool) -> Result<Vec<Item>> {
-		// recursively parse includes and concatenate all the statements in post-order
+	pub fn parse_file(file_path: &Path, files: &mut Vec<InputFile>) -> Result<Module> {
+		// recursively parse imports
+		// TODO: check cycles
 
-		let (mut items_last, includes) = Self::parse_module(path, files, is_main)?;
-		let mut items = Vec::new();
-		for f in &includes {
-			let mut r_stats = Self::parse_file(f, files, false)?;
-			items.append(&mut r_stats);
+		let mut module = Self::parse_module(file_path, files)?;
+
+		for item in &mut module.items {
+			if let Item::Import(Import { path, module, kind }) = item {
+				match kind {
+					ImportKind::Glob => {
+						*module = Some(Self::parse_file(path, files)?);
+					},
+					_ => todo!(),
+				}
+			}
 		}
-		items.append(&mut items_last);
-
-		Ok(items)
+		Ok(module)
 	}
 
-	pub fn parse_module(path: &Path, files: &mut Vec<InputFile>, is_main: bool) -> Result<(Vec<Item>, Vec<PathBuf>)> {
+	pub fn parse_module(path: &Path, files: &mut Vec<InputFile>) -> Result<Module> {
 		let mut path = path.to_path_buf();
 		path.set_extension("wulp");
 		let input = fs::read_to_string(path.clone()).with_context(|| format!("Could not find {}", path.display()))?;
 		let file_id = files.len();
-		let mut includes = Vec::new();
-		if is_main {
-			// FIXME
-			let std_path: PathBuf = ["wulp", "std", "std"].iter().collect();
-			includes.push(std_path);
-		}
-		let mut this = Parser {
-			input: &input,
-			file_id,
-			tokens: Lexer::new(&input, file_id, path.clone()),
-			path: path.clone(),
-			includes,
-		};
-
+		let mut this =
+			Parser { input: &input, file_id, tokens: Lexer::new(&input, file_id, path.clone()), path: path.clone() };
 		let items = this.parse_item_list();
 
 		// make sure we are done
@@ -65,9 +61,8 @@ impl<'a> Parser<'a> {
 			this.error(format!("Expected end of file but found: {tk}."), tk.span);
 		}
 
-		let includes = this.includes;
 		files.push(InputFile { contents: input, path });
-		Ok((items, includes))
+		Ok(Module { items })
 	}
 
 	fn error(&mut self, msg: String, span: Span) -> ! {
@@ -78,19 +73,31 @@ impl<'a> Parser<'a> {
 	fn parse_import(&mut self) -> Import {
 		match self.tokens.next().kind {
 			TokenKind::Import => {
-				let span = self.assert_next(TokenKind::Name).span;
-				let filename = span.as_string(self.input);
-
-				let alias = if self.tokens.peek().kind == TokenKind::As {
-					self.tokens.next();
-					self.parse_name()
-				} else {
-					Name { id: 0, span }
-				};
-
-				Import { filename, alias }
+				todo!()
 			},
-			TokenKind::From => todo!(),
+			TokenKind::From => {
+				// imports are relative, so get path of current file
+				let mut path = self.path.clone();
+				path.pop();
+
+				path.push(self.tokens.next().span.as_str(self.input));
+				while self.tokens.peek().kind == TokenKind::Period {
+					self.tokens.next();
+					path.push(self.tokens.next().span.as_str(self.input));
+				}
+
+				self.assert_next(TokenKind::Import);
+				self.assert_next(TokenKind::Mul); // glob
+
+				// let alias = if self.tokens.peek().kind == TokenKind::As {
+				// 	self.tokens.next();
+				// 	self.parse_name()
+				// } else {
+				// 	Name { id: 0, span }
+				// };
+
+				Import { path, module: None, kind: ImportKind::Glob }
+			},
 			_ => unreachable!(),
 		}
 	}
@@ -111,20 +118,6 @@ impl<'a> Parser<'a> {
 				self.assert_next(TokenKind::Colon);
 				let ty = self.parse_type();
 				Some(Item::Intrinsic(Intrinsic { name, property, ty }))
-			},
-			"include" => {
-				// imports are relative, so get path of current file
-				let mut path = self.path.clone();
-				path.pop();
-
-				path.push(self.tokens.next().span.as_str(self.input));
-				while self.tokens.peek().kind == TokenKind::Period {
-					self.tokens.next();
-					path.push(self.tokens.next().span.as_str(self.input));
-				}
-				self.includes.push(path);
-
-				None
 			},
 			"lua" => {
 				let span = self.assert_next(TokenKind::Str).span;
@@ -168,12 +161,12 @@ impl<'a> Parser<'a> {
 	}
 
 	fn parse_item(&mut self) -> Item {
-		let stat = self.parse_item_inner();
+		let item = self.parse_item_inner();
 		// take care of optional semicolon
 		if self.tokens.peek().kind == TokenKind::SemiColon {
 			self.tokens.next();
 		}
-		stat
+		item
 	}
 
 	fn parse_item_inner(&mut self) -> Item {
@@ -593,6 +586,7 @@ impl<'a> Parser<'a> {
 	}
 
 	fn parse_fields(&mut self) -> Vec<Field> {
+		// TODO: don't need EoF here?
 		if (self.tokens.peek().kind == TokenKind::RCurly) | (self.tokens.peek().kind == TokenKind::Eof) {
 			return Vec::new();
 		};

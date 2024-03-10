@@ -2,6 +2,7 @@ use crate::span::Span;
 use crate::symbol::SymbolId;
 use crate::ty::TyAst;
 use std::fmt;
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct Module {
@@ -45,8 +46,16 @@ pub struct Intrinsic {
 
 #[derive(Debug)]
 pub struct Import {
-	pub filename: String,
-	pub alias: Name,
+	pub path: PathBuf,
+	pub module: Option<Module>,
+	pub kind: ImportKind,
+}
+
+#[derive(Debug)]
+pub enum ImportKind {
+	Glob,
+	Alias(Name),
+	// From(Vec<Name>),
 }
 
 #[derive(Debug)]
