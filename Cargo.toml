@@ -10,5 +10,4 @@ lazy_static = "1.4"
 rustc-hash = "1.1"
 memchr = "2.5"
 bytecount = "0.6"
-# 0.9.5 fails on luajit vendored
-mlua = { version = "0.9.4", features = ["luajit", "vendored"] }
+mlua = { version = "0.9.6", features = ["luajit", "vendored"] }
