@@ -1,15 +1,23 @@
 #intrinsic
-random_uniform: fn() -> num
-#lua #"local random_uniform = math.random"#
+l_random_uniform: fn() -> num
+#lua #"local l_random_uniform = math.random"#
 
 #intrinsic
 l_random_int: fn(int) -> int
 #lua #"local l_random_int = math.random"#
 
 #intrinsic
-random_seed: fn(int) -> ()
-#lua #"local random_seed = math.randomseed"#
+l_random_seed: fn(int) -> ()
+#lua #"local l_random_seed = math.randomseed"#
 
-fn random_int(n) {
+fn uniform() {
+	return l_random_uniform()
+}
+
+fn integer(n) {
 	return l_random_int(n) - 1
+}
+
+fn seed(n) {
+	l_random_seed(n)
 }

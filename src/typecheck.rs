@@ -1,12 +1,8 @@
+use crate::ast;
 use crate::ast::*;
-use crate::scope::BOOL_SYM;
-use crate::scope::INT_SYM;
-use crate::scope::NUM_SYM;
-use crate::scope::STR_SYM;
-use crate::span::Span;
-use crate::span::{format_err_f, format_note_f, InputFile};
-use crate::symbol::SymbolId;
-use crate::symbol::SymbolTable;
+use crate::scope::{BOOL_SYM, INT_SYM, NUM_SYM, STR_SYM};
+use crate::span::{format_err_f, format_note_f, FileId, InputFile, Span};
+use crate::symbol::{SymbolId, SymbolTable};
 use crate::ty::*;
 use anyhow::anyhow;
 use anyhow::Result;
@@ -21,6 +17,11 @@ struct Struct {
 	primitive: bool,
 }
 
+#[derive(Debug)]
+struct Module {
+	fields: FxHashMap<String, TyId>,
+}
+
 const ERR_TY: TyId = 0;
 
 type RetPair = Option<(TyId, Span)>;
@@ -32,17 +33,19 @@ pub struct TypeCheck<'a> {
 	env: FxHashMap<SymbolId, TyId>, // TODO: this can be Vec<Option>
 	types: Vec<TyNode>,
 	structs: FxHashMap<SymbolId, Struct>,
+	modules: FxHashMap<FileId, Module>,
 	symbol_table: &'a SymbolTable,
 }
 
 impl<'a> TypeCheck<'a> {
-	pub fn check(module: &mut Module, input: &'a [InputFile], symbol_table: &'a SymbolTable) -> Result<()> {
+	pub fn check(modules: &mut [ast::Module], input: &'a [InputFile], symbol_table: &'a SymbolTable) -> Result<()> {
 		let mut this = Self {
 			input,
 			errors: Vec::new(),
 			types: Vec::new(),
 			env: FxHashMap::default(),
 			structs: FxHashMap::default(),
+			modules: FxHashMap::default(),
 			symbol_table,
 		};
 
@@ -54,25 +57,29 @@ impl<'a> TypeCheck<'a> {
 		this.new_struct(STR_SYM, true);
 		this.new_struct(BOOL_SYM, true);
 
-		this.eval_module(module);
-
-		// println!("----- types ");
-		// for (i, v) in this.types.iter().enumerate() {
-		// 	println!("{i}: {:?} {} {}", v, this.get_parent(i), this.ty_to_string(i));
-		// }
-		println!("----- env ");
+		for m in modules {
+			println!("[checking {}]", input[m.file_id].path.display());
+			let new_mod = this.eval_module(m);
+			this.modules.insert(m.file_id, new_mod);
+		}
+		println!("[env]");
 		for (i, s) in symbol_table.symbols.iter().enumerate().skip(1) {
 			if let Some(id) = this.lookup(i) {
 				println!("`{}`: {}", s.name, this.ty_to_string(id));
 			}
 		}
 
+		// println!("----- types ");
+		// for (i, v) in this.types.iter().enumerate() {
+		// 	println!("{i}: {:?} {} {}", v, this.get_parent(i), this.ty_to_string(i));
+		// }
+
 		match this.errors.last() {
 			Some(err) => Err(anyhow!("{}", err)),
 			None => Ok(()),
 		}
 	}
-	fn new_struct(&mut self, id: SymbolId, primitive: bool) {
+	fn new_struct(&mut self, id: SymbolId, primitive: bool) -> TyId {
 		self.structs.insert(
 			id,
 			Struct {
@@ -82,7 +89,7 @@ impl<'a> TypeCheck<'a> {
 				primitive,
 			},
 		);
-		self.new_def(id, Ty::TyName(id));
+		self.new_def(id, Ty::TyName(id))
 	}
 	fn ty_to_string(&self, id: TyId) -> String {
 		let id = self.get_parent(id);
@@ -92,6 +99,7 @@ impl<'a> TypeCheck<'a> {
 			Ty::Err => "error".to_string(),
 			Ty::TyVar => format!("T{id}?"),
 			Ty::Free => format!("T{id}"),
+			Ty::Module(id) => format!("Module: {}", &self.input[id].path.display()),
 			Ty::TyName(id) => format!("Type({})", &self.symbol_table.get(id).name),
 			Ty::Named(id) => self.symbol_table.get(id).name.clone(),
 			Ty::Array(ty) => format!("[{}]", self.ty_to_string(ty)),
@@ -183,7 +191,7 @@ impl<'a> TypeCheck<'a> {
 	fn promote_free(&mut self, id: TyId) {
 		let id = self.get_parent(id);
 		match self.get_type(id) {
-			Ty::Any | Ty::Err | Ty::Unit | Ty::Free | Ty::Named(_) | Ty::TyName(_) => (),
+			Ty::Any | Ty::Err | Ty::Unit | Ty::Free | Ty::Named(_) | Ty::TyName(_) | Ty::Module(_) => (),
 			Ty::TyVar => {
 				let parent_id = self.get_parent(id);
 				self.types[parent_id] = TyNode::Ty(Ty::Free);
@@ -206,7 +214,7 @@ impl<'a> TypeCheck<'a> {
 		let ty = self.get_type(id);
 		let parent_id = self.get_parent(id);
 		match ty {
-			Ty::Any | Ty::Err | Ty::Unit | Ty::TyVar | Ty::Named(_) | Ty::TyName(_) => parent_id,
+			Ty::Any | Ty::Err | Ty::Unit | Ty::TyVar | Ty::Named(_) | Ty::TyName(_) | Ty::Module(_) => parent_id,
 			Ty::Free => {
 				// keep track of which variables were already instantiated
 				for &(old, new) in subs.iter() {
@@ -239,7 +247,9 @@ impl<'a> TypeCheck<'a> {
 
 	fn occurs(&mut self, ty: Ty, id: TyId) -> Result<(), ()> {
 		match ty {
-			Ty::Any | Ty::Err | Ty::Unit | Ty::TyVar | Ty::TyName(_) | Ty::Named(_) | Ty::Free => Ok(()),
+			Ty::Any | Ty::Err | Ty::Unit | Ty::TyVar | Ty::TyName(_) | Ty::Named(_) | Ty::Module(_) | Ty::Free => {
+				Ok(())
+			},
 			Ty::Array(t_id) | Ty::Maybe(t_id) => {
 				if t_id == id {
 					return Err(());
@@ -327,14 +337,18 @@ impl<'a> TypeCheck<'a> {
 		}
 	}
 
-	fn eval_module(&mut self, node: &mut Module) {
+	fn eval_module(&mut self, node: &mut ast::Module) -> Module {
+		let mut module = Module { fields: FxHashMap::default() };
+
 		for item in &mut node.items {
 			match item {
 				Item::FnDef(s) => {
 					self.hoist_fn_def(s);
 				},
 				Item::StructDef(s) => {
-					self.eval_struct_def(s);
+					let ty = self.eval_struct_def(s);
+					let name = self.symbol_table.get(s.name.id).name.clone();
+					module.fields.insert(name, ty);
 				},
 				Item::Intrinsic(s) => {
 					if let Some(p) = &mut s.property {
@@ -352,9 +366,11 @@ impl<'a> TypeCheck<'a> {
 						self.new_def(s.name.id, new_ty);
 					}
 				},
-				Item::Import(s) => match s.kind {
-					ImportKind::Glob => self.eval_module(s.module.as_mut().unwrap()),
-					_ => todo!(),
+				Item::Import(s) => match &mut s.kind {
+					ImportKind::Glob => (),
+					ImportKind::Alias(name) => {
+						self.new_def(name.id, Ty::Module(s.file_id.unwrap()));
+					},
 				},
 				_ => (),
 			};
@@ -373,12 +389,16 @@ impl<'a> TypeCheck<'a> {
 							.static_fields
 							.insert(p.name.clone(), ty);
 					} else {
-						self.eval_fn_def(s);
+						let ty = self.eval_fn_def(s);
+						let name = self.symbol_table.get(s.name.id).name.clone();
+						module.fields.insert(name, ty);
 					}
 				},
 				Item::InlineLua(_) | Item::Intrinsic(_) | Item::StructDef(_) | Item::Import(_) => (),
 			}
 		}
+
+		module
 	}
 
 	// Returns the type and span of any return statements
@@ -517,7 +537,7 @@ impl<'a> TypeCheck<'a> {
 		}
 	}
 
-	fn eval_fn_def(&mut self, node: &mut FnDef) {
+	fn eval_fn_def(&mut self, node: &mut FnDef) -> TyId {
 		let fn_id = self.lookup(node.name.id).unwrap();
 		let fn_ty = self.get_type(fn_id);
 		let ret_id = if let Ty::Fn(_, ret_id) = fn_ty {
@@ -538,6 +558,7 @@ impl<'a> TypeCheck<'a> {
 		self.promote_free(fn_id);
 
 		// println!("infer fn def: {}", self.ty_to_string(fn_id));
+		fn_id
 	}
 
 	// span should refer to the place where the function is defined
@@ -746,9 +767,9 @@ impl<'a> TypeCheck<'a> {
 		}
 	}
 
-	fn eval_struct_def(&mut self, node: &mut StructDef) {
+	fn eval_struct_def(&mut self, node: &mut StructDef) -> TyId {
 		let id = node.name.id;
-		self.new_struct(id, false);
+		let ty_id = self.new_struct(id, false);
 
 		for f in &mut node.table.fields {
 			let (k, v) = match &mut f.kind {
@@ -796,6 +817,7 @@ impl<'a> TypeCheck<'a> {
 			};
 			self.structs.get_mut(&id).unwrap().fields.insert(k, v);
 		}
+		ty_id
 	}
 
 	fn get_field(&mut self, struct_id: SymbolId, p: &mut Property) -> TyId {
@@ -820,6 +842,17 @@ impl<'a> TypeCheck<'a> {
 		}
 	}
 
+	fn get_module_field(&mut self, file_id: FileId, p: &mut Property) -> TyId {
+		if let Some(p_id) = self.modules[&file_id].fields.get(&p.name) {
+			*p_id
+		} else {
+			let msg = format!("module does not have field `{}`", p.name);
+			format_err_f(&msg, p.span, self.input);
+			self.errors.push(msg);
+			ERR_TY
+		}
+	}
+
 	fn eval_suffix_expr(&mut self, expr: &mut Expr, s: &mut Vec<Suffix>) -> TyId {
 		let mut ty = self.eval_expr(expr);
 		for suffix in s {
@@ -834,8 +867,9 @@ impl<'a> TypeCheck<'a> {
 				Ty::Named(name) => self.get_field(name, p),
 				Ty::TyName(name) => self.get_static(name, p),
 				Ty::Err => ERR_TY,
+				Ty::Module(file_id) => self.get_module_field(file_id, p),
 				_ => {
-					let msg = format!("Type `{}` does not allow indexing with `.`", self.ty_to_string(expr_ty));
+					let msg = format!("type `{}` does not allow indexing with `.`", self.ty_to_string(expr_ty));
 					format_err_f(&msg, expr_span, self.input);
 					self.errors.push(msg);
 					ERR_TY

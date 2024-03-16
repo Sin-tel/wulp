@@ -1,6 +1,5 @@
 use std::cmp;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub type FileId = usize;
 

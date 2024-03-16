@@ -1,4 +1,5 @@
 use crate::ast;
+use crate::span::FileId;
 use crate::symbol::SymbolId;
 
 pub type TyId = usize;
@@ -16,6 +17,7 @@ pub enum Ty {
 	Unit,
 	TyVar,            // type variable
 	Free,             // free type variable
+	Module(FileId),   // imported module
 	TyName(SymbolId), // The type of the name of a type
 	Named(SymbolId),
 	Array(TyId),

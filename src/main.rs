@@ -46,16 +46,16 @@ fn main() -> Result<()> {
 	// let path = Path::new("wulp/tests/ambiguous");
 	let path = Path::new("wulp/test");
 
-	let (mut ast, files) = Parser::parse(path)?;
-	let symbol_table = ScopeCheck::check(&mut ast, &files)?;
+	let (mut modules, files) = Parser::parse(path)?;
+	let symbol_table = ScopeCheck::check(&mut modules, &files)?;
 	// for s in symbol_table.symbols.iter() {
 	// 	dbg!(s);
 	// }
 
-	TypeCheck::check(&mut ast, &files, &symbol_table)?;
+	TypeCheck::check(&mut modules, &files, &symbol_table)?;
 
 	// symbol_table.mangle();
-	let code = EmitLua::emit(&mut ast, symbol_table);
+	let code = EmitLua::emit(&mut modules, symbol_table);
 
 	println!("----- execute:");
 	let lua = load_lua()?;

@@ -16,41 +16,44 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-	pub fn parse(path: &Path) -> Result<(Module, Vec<InputFile>)> {
+	pub fn parse(path: &Path) -> Result<(Vec<Module>, Vec<InputFile>)> {
 		let mut files = Vec::new();
+		let mut modules = Vec::new();
+
 		// load standard library first
-		let mut module = Self::parse_file(Path::new("std/std"), &mut files)?;
-		let mut module_main = Self::parse_file(path, &mut files)?;
+		Self::parse_file(Path::new("std/prelude"), &mut files, &mut modules, true)?;
+		Self::parse_file(path, &mut files, &mut modules, true)?;
 
-		module.items.append(&mut module_main.items);
-
-		Ok((module, files))
+		Ok((modules, files))
 	}
 
-	pub fn parse_file(file_path: &Path, files: &mut Vec<InputFile>) -> Result<Module> {
+	pub fn parse_file(
+		file_path: &Path,
+		files: &mut Vec<InputFile>,
+		modules: &mut Vec<Module>,
+		global: bool,
+	) -> Result<FileId> {
 		// recursively parse imports
 		// TODO: check cycles
+		// TODO: don't parse same file twice
 
-		let mut module = Self::parse_module(file_path, files)?;
-
+		let file_id = files.len();
+		let (mut module, file) = Self::parse_module(file_path, file_id, global)?;
+		files.push(file);
 		for item in &mut module.items {
-			if let Item::Import(Import { path, module, kind }) = item {
-				match kind {
-					ImportKind::Glob => {
-						*module = Some(Self::parse_file(path, files)?);
-					},
-					_ => todo!(),
-				}
+			if let Item::Import(Import { path, file_id, .. }) = item {
+				let i_file_id = Self::parse_file(path, files, modules, false)?;
+				*file_id = Some(i_file_id);
 			}
 		}
-		Ok(module)
+		modules.push(module);
+		Ok(file_id)
 	}
 
-	pub fn parse_module(path: &Path, files: &mut Vec<InputFile>) -> Result<Module> {
+	pub fn parse_module(path: &Path, file_id: FileId, global: bool) -> Result<(Module, InputFile)> {
 		let mut path = path.to_path_buf();
 		path.set_extension("wulp");
-		let input = fs::read_to_string(path.clone()).with_context(|| format!("Could not find {}", path.display()))?;
-		let file_id = files.len();
+		let input = fs::read_to_string(path.clone()).with_context(|| format!("could not find {}", path.display()))?;
 		let mut this =
 			Parser { input: &input, file_id, tokens: Lexer::new(&input, file_id, path.clone()), path: path.clone() };
 		let items = this.parse_item_list();
@@ -61,8 +64,8 @@ impl<'a> Parser<'a> {
 			this.error(format!("Expected end of file but found: {tk}."), tk.span);
 		}
 
-		files.push(InputFile { contents: input, path });
-		Ok(Module { items })
+		let module = Module { items, file_id, global };
+		Ok((module, InputFile { contents: input, path }))
 	}
 
 	fn error(&mut self, msg: String, span: Span) -> ! {
@@ -73,33 +76,46 @@ impl<'a> Parser<'a> {
 	fn parse_import(&mut self) -> Import {
 		match self.tokens.next().kind {
 			TokenKind::Import => {
-				todo!()
+				let (path, span) = self.parse_path();
+
+				if self.tokens.peek().kind == TokenKind::As {
+					self.tokens.next();
+					let name = self.parse_name();
+					Import { path, file_id: None, kind: ImportKind::Alias(name) }
+				} else {
+					assert!(!span.as_str(self.input).contains('.'));
+					let name = Name { id: 0, span };
+					Import { path, file_id: None, kind: ImportKind::Alias(name) }
+				}
 			},
 			TokenKind::From => {
-				// imports are relative, so get path of current file
-				let mut path = self.path.clone();
-				path.pop();
-
-				path.push(self.tokens.next().span.as_str(self.input));
-				while self.tokens.peek().kind == TokenKind::Period {
-					self.tokens.next();
-					path.push(self.tokens.next().span.as_str(self.input));
-				}
+				let (path, _) = self.parse_path();
 
 				self.assert_next(TokenKind::Import);
 				self.assert_next(TokenKind::Mul); // glob
 
-				// let alias = if self.tokens.peek().kind == TokenKind::As {
-				// 	self.tokens.next();
-				// 	self.parse_name()
-				// } else {
-				// 	Name { id: 0, span }
-				// };
-
-				Import { path, module: None, kind: ImportKind::Glob }
+				Import { path, file_id: None, kind: ImportKind::Glob }
 			},
 			_ => unreachable!(),
 		}
+	}
+
+	fn parse_path(&mut self) -> (PathBuf, Span) {
+		// imports are relative, so get path of current file
+		let mut path = self.path.clone();
+		path.pop();
+
+		let mut span = self.tokens.next().span;
+
+		path.push(span.as_str(self.input));
+		while self.tokens.peek().kind == TokenKind::Period {
+			self.tokens.next();
+			let next_span = self.tokens.next().span;
+			span = Span::join(span, next_span);
+			path.push(next_span.as_str(self.input));
+		}
+
+		(path, span)
 	}
 
 	fn parse_directive(&mut self) -> Option<Item> {

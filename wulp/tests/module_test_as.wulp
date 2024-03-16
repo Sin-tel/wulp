@@ -1,0 +1,8 @@
+import module as m
+
+fn main() {
+	assert(m.is_even(8))
+	assert(m.say_hello() == "hello")
+}
+
+

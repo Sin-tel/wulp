@@ -69,6 +69,21 @@ fn test_lists() {
 }
 
 #[test]
+fn test_module() {
+	compile_test("wulp/tests/module_test").unwrap();
+}
+
+#[test]
+fn test_module_as() {
+	compile_test("wulp/tests/module_test_as").unwrap();
+}
+
+#[test]
+fn test_module_glob() {
+	compile_test("wulp/tests/module_test_glob").unwrap();
+}
+
+#[test]
 fn test_mutual_recursion() {
 	compile_test("wulp/tests/mutual_recursion").unwrap();
 }
@@ -96,13 +111,13 @@ fn test_redef() {
 }
 
 #[test]
-#[should_panic(expected = "function `a` already defined")]
+#[should_panic(expected = "`a` already defined")]
 fn test_redef_fail1() {
 	compile_test("wulp/tests/redef_fail1").unwrap();
 }
 
 #[test]
-#[should_panic(expected = "function `b` already defined")]
+#[should_panic(expected = "`b` already defined")]
 fn test_redef_fail2() {
 	compile_test("wulp/tests/redef_fail2").unwrap();
 }

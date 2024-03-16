@@ -5,9 +5,12 @@ print: fn(any) -> ()
 #intrinsic
 error: fn(str) -> !
 
+// #include int
+// import num as _num
+// import int as _int
 from num import *
 from int import *
 from str import *
 
-// import random
+import random as random
 

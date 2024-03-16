@@ -1,17 +1,18 @@
 use crate::ast::*;
-use crate::span::format_err_f;
-use crate::span::InputFile;
-use crate::symbol::SymbolKind;
-use crate::symbol::{Symbol, SymbolId, SymbolTable};
+use crate::span::{format_err_f, FileId, InputFile};
+use crate::symbol::{Symbol, SymbolId, SymbolKind, SymbolTable};
 use crate::visitor::{VisitNode, Visitor};
 use anyhow::{anyhow, Result};
 use rustc_hash::FxHashMap;
 
+type Scope<'a> = FxHashMap<&'a str, SymbolId>;
+
 pub struct ScopeCheck<'a> {
-	scope_stack: Vec<FxHashMap<&'a str, SymbolId>>,
+	scope_stack: Vec<Scope<'a>>,
 	symbol_table: SymbolTable,
 	input: &'a [InputFile],
 	errors: Vec<String>,
+	modules: FxHashMap<FileId, Scope<'a>>,
 }
 
 pub const INT_SYM: SymbolId = 1;
@@ -20,32 +21,49 @@ pub const STR_SYM: SymbolId = 3;
 pub const BOOL_SYM: SymbolId = 4;
 
 impl<'a> ScopeCheck<'a> {
-	pub fn check(ast: &mut Module, input: &'a [InputFile]) -> Result<SymbolTable> {
-		let mut this = Self { scope_stack: Vec::new(), symbol_table: SymbolTable::new(), input, errors: Vec::new() };
-
-		this.scope_stack.push(FxHashMap::default());
-
-		this.new_identifier("int", Symbol::new("int").make_const());
-		assert_eq!(this.lookup("int"), Some(INT_SYM));
-		this.new_identifier("num", Symbol::new("num").make_const());
-		assert_eq!(this.lookup("num"), Some(NUM_SYM));
-		this.new_identifier("str", Symbol::new("str").make_const());
-		assert_eq!(this.lookup("str"), Some(STR_SYM));
-		this.new_identifier("bool", Symbol::new("bool").make_const());
-		assert_eq!(this.lookup("bool"), Some(BOOL_SYM));
-
-		this.visit_module(ast);
-
-		if let Some(f) = this.lookup("main") {
-			if this.symbol_table.get(f).kind != SymbolKind::FnDef {
-				let msg = "`main` should be a function.".to_string();
-				this.errors.push(msg);
-			}
-		} else {
-			let msg = "No `main` function found.".to_string();
-			this.errors.push(msg);
+	pub fn check(modules: &mut [Module], input: &'a [InputFile]) -> Result<SymbolTable> {
+		let mut this = Self {
+			scope_stack: Vec::new(),
+			symbol_table: SymbolTable::new(),
+			input,
+			errors: Vec::new(),
+			modules: FxHashMap::default(),
 		};
+
+		// global scope
+		this.scope_stack.push(FxHashMap::default());
+		{
+			this.new_identifier("int", Symbol::new("int").make_const());
+			assert_eq!(this.lookup("int"), Some(INT_SYM));
+			this.new_identifier("num", Symbol::new("num").make_const());
+			assert_eq!(this.lookup("num"), Some(NUM_SYM));
+			this.new_identifier("str", Symbol::new("str").make_const());
+			assert_eq!(this.lookup("str"), Some(STR_SYM));
+			this.new_identifier("bool", Symbol::new("bool").make_const());
+			assert_eq!(this.lookup("bool"), Some(BOOL_SYM));
+
+			for m in modules {
+				if m.global {
+					this.visit_module(m);
+				} else {
+					this.scope_stack.push(FxHashMap::default());
+					this.visit_module(m);
+					let m_scope = this.scope_stack.pop().unwrap();
+					this.modules.insert(m.file_id, m_scope);
+				}
+			}
+			if let Some(f) = this.lookup("main") {
+				if this.symbol_table.get(f).kind != SymbolKind::FnDef {
+					let msg = "`main` should be a function.".to_string();
+					this.errors.push(msg);
+				}
+			} else {
+				let msg = "No `main` function found.".to_string();
+				this.errors.push(msg);
+			};
+		}
 		this.scope_stack.pop();
+
 		assert!(this.scope_stack.is_empty());
 
 		match this.errors.last() {
@@ -81,7 +99,7 @@ impl<'a> ScopeCheck<'a> {
 
 				if let Some(id) = self.lookup(name) {
 					if self.symbol_table.get(id).kind == SymbolKind::FnDef {
-						let msg = format!("function `{name}` already defined.");
+						let msg = format!("`{name}` already defined.");
 						format_err_f(&msg, n.span, self.input);
 						self.errors.push(msg);
 					} else if self.symbol_table.get(id).is_const {
@@ -115,42 +133,41 @@ impl<'a> ScopeCheck<'a> {
 impl<'a> Visitor for ScopeCheck<'a> {
 	fn visit_module(&mut self, node: &mut Module) {
 		for b in &mut node.items {
-			if let Item::FnDef(f) = b {
-				let name = f.name.span.as_str_f(self.input);
-				if f.property.is_none() {
-					let lookup = self.lookup(name);
-					// plain fn def
-					if lookup.is_some() {
-						let msg = format!("function `{name}` already defined.");
-						format_err_f(&msg, f.name.span, self.input);
-						self.errors.push(msg);
-					} else {
-						// function defs are always const
-						self.new_identifier(name, Symbol::new(name).fn_def());
+			match b {
+				Item::FnDef(f) => {
+					let name = f.name.span.as_str_f(self.input);
+					if f.property.is_none() {
+						let lookup = self.lookup(name);
+						// plain fn def
+						if lookup.is_some() {
+							let msg = format!("`{name}` already defined");
+							format_err_f(&msg, f.name.span, self.input);
+							self.errors.push(msg);
+						} else {
+							// function defs are always const
+							self.new_identifier(name, Symbol::new(name).fn_def());
+						}
 					}
-				}
+				},
+				Item::Import(s) => match &mut s.kind {
+					ImportKind::Glob => {
+						let m_id = s.file_id.unwrap();
+						// TODO: currently everything is public by default!
+						for (k, v) in self.modules.get(&m_id).unwrap() {
+							let scope = self.scope_stack.last_mut().unwrap();
+							scope.insert(k, *v);
+						}
+					},
+					ImportKind::Alias(name) => {
+						let name_str = name.span.as_str_f(self.input);
+						self.new_identifier(name_str, Symbol::new(name_str).make_const());
+						name.visit(self);
+					},
+				},
+				_ => (),
 			}
 		}
 		node.walk(self);
-	}
-
-	fn visit_import(&mut self, node: &mut Import) {
-		// TODO: imported module should not share global scope
-
-		match node.kind {
-			ImportKind::Glob => {
-				self.visit_module(node.module.as_mut().unwrap());
-			},
-			_ => todo!(),
-		}
-
-		// self.scope_stack.push(FxHashMap::default());
-		// self.visit_module(node.module.as_mut().unwrap());
-		// self.scope_stack.pop();
-
-		// let name_str = node.alias.span.as_str_f(self.input);
-		// self.new_identifier(name_str, Symbol::new(name_str).make_const());
-		// node.alias.visit(self);
 	}
 
 	fn visit_block(&mut self, node: &mut Block) {

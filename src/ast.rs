@@ -1,3 +1,4 @@
+use crate::span::FileId;
 use crate::span::Span;
 use crate::symbol::SymbolId;
 use crate::ty::TyAst;
@@ -7,6 +8,8 @@ use std::path::PathBuf;
 #[derive(Debug)]
 pub struct Module {
 	pub items: Vec<Item>,
+	pub file_id: FileId,
+	pub global: bool,
 }
 
 #[derive(Debug)]
@@ -47,7 +50,7 @@ pub struct Intrinsic {
 #[derive(Debug)]
 pub struct Import {
 	pub path: PathBuf,
-	pub module: Option<Module>,
+	pub file_id: Option<FileId>,
 	pub kind: ImportKind,
 }
 

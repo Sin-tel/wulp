@@ -8,9 +8,7 @@ pub trait Visitor: Sized {
 	fn visit_item(&mut self, node: &mut Item) {
 		node.walk(self);
 	}
-	fn visit_import(&mut self, node: &mut Import) {
-		node.walk(self);
-	}
+
 	fn visit_block(&mut self, node: &mut Block) {
 		node.walk(self);
 	}
@@ -103,21 +101,8 @@ impl<V: Visitor> VisitNode<V> for Item {
 		match self {
 			Item::FnDef(s) => v.visit_fn_def(s),
 			Item::StructDef(s) => v.visit_struct_def(s),
-			Item::Import(s) => v.visit_import(s),
 			Item::Intrinsic(s) => v.visit_intrinsic(s),
-			Item::InlineLua(_) => (),
-		}
-	}
-}
-
-impl<V: Visitor> VisitNode<V> for Import {
-	fn visit(&mut self, v: &mut V) {
-		v.visit_import(self);
-	}
-	fn walk(&mut self, v: &mut V) {
-		match self.kind {
-			ImportKind::Glob => v.visit_module(self.module.as_mut().unwrap()),
-			_ => todo!(),
+			Item::InlineLua(_) | Item::Import(_) => (),
 		}
 	}
 }

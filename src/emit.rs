@@ -9,20 +9,25 @@ pub struct EmitLua {
 	indent_level: usize,
 	symbol_table: SymbolTable,
 	patch_temp_lvalue: bool,
+	make_module: bool,
 }
 
 impl EmitLua {
-	pub fn emit(ast: &mut Module, symbol_table: SymbolTable) -> String {
+	pub fn emit(modules: &mut [Module], symbol_table: SymbolTable) -> String {
 		let mut this = Self {
 			statement: String::new(),
 			code: String::new(),
 			indent_level: 0,
 			symbol_table,
 			patch_temp_lvalue: false,
+			make_module: false,
 		};
 		this.code.push_str(include_str!("../lua/std_preamble.lua"));
-		this.visit_module(ast);
-		this.code.push_str("\nmain();");
+		for m in modules {
+			this.make_module = !m.global;
+			this.visit_module(m);
+		}
+		this.code.push_str("main();");
 
 		// this.code = this.code.replace("\n", " ");
 		// this.code = this.code.replace(";", "");
@@ -101,6 +106,14 @@ impl EmitLua {
 
 impl Visitor for EmitLua {
 	fn visit_module(&mut self, node: &mut Module) {
+		if self.make_module {
+			let mod_id = node.file_id.to_string();
+			self.statement.push_str(&format!("MODULES[{mod_id}] = (function()\n"));
+			self.indent_level += 1;
+			self.indent();
+			self.statement.push_str("local EXPORTS = {}");
+			self.put_statement();
+		}
 		for b in &mut node.items {
 			match b {
 				Item::FnDef(f) => {
@@ -116,6 +129,7 @@ impl Visitor for EmitLua {
 					self.put_statement();
 				},
 				Item::InlineLua(s) => {
+					self.indent();
 					self.statement.push_str(s);
 					self.put_statement();
 				},
@@ -123,25 +137,50 @@ impl Visitor for EmitLua {
 			}
 		}
 		node.walk(self);
+
+		if self.make_module {
+			self.indent();
+			self.statement.push_str("return EXPORTS");
+			self.put_statement();
+
+			self.indent_level -= 1;
+
+			self.statement.push_str("end) ()");
+			self.put_statement();
+		}
 	}
 	fn visit_item(&mut self, node: &mut Item) {
 		match node {
-			Item::FnDef(_) => node.walk(self),
+			Item::FnDef(s) => {
+				self.visit_fn_def(s);
+
+				if self.make_module && s.property.is_none() {
+					self.indent();
+					self.statement.push_str("EXPORTS.");
+					self.visit_name(&mut s.name);
+					self.statement.push_str(" = ");
+					self.visit_name(&mut s.name);
+					self.put_statement();
+				}
+			},
 			Item::Intrinsic(_) | Item::InlineLua(_) => (),
 			Item::Import(s) => {
-				// TODO: emit this as a block instead of a table
-				// struct and fn defs should be in export table
-
-				match s.kind {
-					ImportKind::Glob => self.visit_module(s.module.as_mut().unwrap()),
-					_ => todo!(),
+				self.indent();
+				let id = s.file_id.unwrap();
+				match &mut s.kind {
+					ImportKind::Alias(n) => {
+						self.statement.push_str("local ");
+						n.visit(self);
+						self.statement.push_str(" = ");
+						self.statement.push_str(&format!("MODULES[{id}]"));
+					},
+					ImportKind::Glob => {
+						// TODO: this is kind of horrible since it makes everything global
+						self.statement.push_str(&format!("import_glob(MODULES[{id}])"));
+						self.put_statement();
+					},
 				}
-				// self.statement.push_str("local ");
-				// s.alias.visit(self);
-				// self.statement.push_str(" = ");
-				// self.statement.push('{');
-				// self.push_list(&mut s.module.fields, ", ");
-				// self.statement.push('}');
+				self.put_statement();
 			},
 			Item::StructDef(t) => {
 				let name_str = self.symbol_table.get(t.name.id).name.clone();
