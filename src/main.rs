@@ -94,7 +94,7 @@ fn display_return<V: std::fmt::Debug>(res: LuaResult<V>, filename: &str) {
 
 fn load_lua() -> Result<mlua::Lua> {
 	Ok(mlua::Lua::new_with(
-		StdLib::PACKAGE | StdLib::STRING | StdLib::MATH | StdLib::IO | StdLib::OS | StdLib::BIT,
+		StdLib::PACKAGE | StdLib::STRING | StdLib::MATH | StdLib::IO | StdLib::OS | StdLib::BIT | StdLib::JIT,
 		LuaOptions::default(),
 	)?)
 }
