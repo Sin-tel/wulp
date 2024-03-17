@@ -3,7 +3,7 @@
 fn main() {
 	let list = [2 3 4 5]
 
-	for i in list {
+	for i in list.iter() {
 		fact(i)
 	}
 

@@ -1,0 +1,33 @@
+#lua #"
+local function range_next(self)
+	local count = self.counter
+	if self.counter >= self.stop then
+		return nil
+	end
+	self.counter = self.counter + 1
+	return count
+end"#
+
+#intrinsic l_range: fn(int) -> iter[int] = #"
+function (stop)
+	return { stop = stop, counter = 0, ["next"] = range_next }
+end"#
+
+fn range(n: int) -> iter[int] {
+	return l_range(n)
+}
+
+#lua #"
+local function array_next(self)
+	local item = self.a[self.counter]
+	if self.counter >= self.a.n then
+		return nil
+	end
+	self.counter = self.counter + 1
+	return item
+end"#
+
+#intrinsic array.iter: fn([T]) -> iter[T] = #"
+function (a)
+	return { a = a, counter = 0, ["next"] = array_next }
+end"#

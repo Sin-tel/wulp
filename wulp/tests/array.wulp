@@ -7,6 +7,12 @@ fn main() {
 	assert(x[1] == 5)
 	assert(x[2] == 6)
 
+	assert(x.first() == 4)
+	assert(x.last() == 6)
+
+	assert(x.len() == 3)
+	assert(x.pop() == 6)
+	assert(x.len() == 2)
 
 	let y = ["hello"]
 	array.push(y, "world")
@@ -14,6 +20,14 @@ fn main() {
 	assert(y[0] == "hello")
 	assert(y[1] == "world")
 	assert(y[2] == "!")
+
+	let a = []
+	assert(a.len() == 0)
+
+	a.push(1)
+	a.push(2)
+	a.pop()
+	assert(a.len() == 1)
 }
 
 

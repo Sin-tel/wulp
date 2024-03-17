@@ -287,9 +287,9 @@ impl Visitor for EmitLua {
 		self.statement.push_str("for ");
 		self.visit_name(&mut node.names[0]);
 
-		self.statement.push_str(" in iter.wrap(iter.array(");
+		self.statement.push_str(" in wrap_iter(");
 		self.visit_expr(&mut node.expr);
-		self.statement.push_str(")) do\n");
+		self.statement.push_str(") do\n");
 
 		self.visit_block(&mut node.block);
 

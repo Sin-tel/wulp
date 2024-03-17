@@ -875,10 +875,24 @@ impl<'a> Parser<'a> {
 				let name = self.parse_ty_name();
 				let name_str = name.span.as_string(self.input);
 				match name_str.as_ref() {
-					"self" => TyAst::SelfTy,
-					"any" => TyAst::Any,
-					_ => TyAst::Named(name),
-				}
+					"self" => return TyAst::SelfTy,
+					"any" => return TyAst::Any,
+					_ => (),
+				};
+				let mut assoc = Vec::new();
+				if self.tokens.peek().kind == TokenKind::LBracket {
+					loop {
+						self.tokens.next();
+						assoc.push(self.parse_type());
+						if self.tokens.peek().kind == TokenKind::RBracket {
+							self.tokens.next();
+							break;
+						}
+						self.assert_next(TokenKind::Comma);
+					}
+				};
+
+				TyAst::Named(name, assoc)
 			},
 			TokenKind::LBracket => {
 				// Array `[ty]`
@@ -909,15 +923,6 @@ impl<'a> Parser<'a> {
 				let ret_ty = self.parse_type();
 
 				TyAst::Fn(arg_ty, Box::new(ret_ty))
-			},
-			TokenKind::Maybe => {
-				// maybe `maybe(ty)`
-
-				self.tokens.next();
-				self.assert_next(TokenKind::LParen);
-				let inner = self.parse_type();
-				self.assert_next(TokenKind::RParen);
-				TyAst::Maybe(Box::new(inner))
 			},
 			TokenKind::LParen => {
 				self.tokens.next();

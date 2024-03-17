@@ -6,3 +6,37 @@ function(arr, e)
 end
 "#
 
+#intrinsic
+array.len: fn([T]) -> int = #"
+function(arr)
+	return arr.n
+end
+"#
+
+#intrinsic
+array.pop: fn([T]) -> T = #"
+function(arr)
+	assert(arr.n > 0, "empty array")
+	arr.n = arr.n - 1
+	local item = arr[arr.n]
+	arr[arr.n] = nil
+	return item
+end
+"#
+
+#intrinsic
+array.first: fn([T]) -> T = #"
+function(arr)
+	assert(arr.n > 0, "empty array")
+	return arr[0]
+end
+"#
+
+#intrinsic
+array.last: fn([T]) -> T = #"
+function(arr)
+	assert(arr.n > 0, "empty array")
+	return arr[arr.n-1]
+end
+"#
+

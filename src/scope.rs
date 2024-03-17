@@ -20,6 +20,7 @@ pub const NUM_SYM: SymbolId = 2;
 pub const STR_SYM: SymbolId = 3;
 pub const BOOL_SYM: SymbolId = 4;
 pub const ARRAY_SYM: SymbolId = 5;
+pub const ITER_SYM: SymbolId = 6;
 
 impl<'a> ScopeCheck<'a> {
 	pub fn check(modules: &mut [Module], input: &'a [InputFile]) -> Result<SymbolTable> {
@@ -45,6 +46,8 @@ impl<'a> ScopeCheck<'a> {
 			assert_eq!(this.lookup("bool"), Some(BOOL_SYM));
 			this.new_identifier("array", Symbol::new("array").ty_def());
 			assert_eq!(this.lookup("array"), Some(ARRAY_SYM));
+			this.new_identifier("iter", Symbol::new("iter").ty_def());
+			assert_eq!(this.lookup("iter"), Some(ITER_SYM));
 
 			for m in modules {
 				if m.global {

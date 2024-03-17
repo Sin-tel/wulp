@@ -4,11 +4,14 @@ assert: fn(bool) -> ()
 print: fn(any) -> ()
 #intrinsic
 error: fn(str) -> !
+#intrinsic
+time: fn() -> num = "os.clock"
 
 from num import *
 from int import *
 from str import *
 from array import *
+from iter import *
 
 import random as random
 

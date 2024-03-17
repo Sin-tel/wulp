@@ -1,6 +1,6 @@
 use crate::ast;
 use crate::ast::*;
-use crate::scope::{ARRAY_SYM, BOOL_SYM, INT_SYM, NUM_SYM, STR_SYM};
+use crate::scope::{ARRAY_SYM, BOOL_SYM, INT_SYM, ITER_SYM, NUM_SYM, STR_SYM};
 use crate::span::{format_err_f, format_note_f, FileId, InputFile, Span};
 use crate::symbol::{SymbolId, SymbolKind, SymbolTable};
 use crate::ty::*;
@@ -58,6 +58,7 @@ impl<'a> TypeCheck<'a> {
 		this.new_struct(STR_SYM, true);
 		this.new_struct(BOOL_SYM, true);
 		this.new_struct(ARRAY_SYM, true);
+		this.new_struct(ITER_SYM, true);
 
 		for m in modules {
 			println!("[checking {}]", input[m.file_id].path.display());
@@ -130,12 +131,20 @@ impl<'a> TypeCheck<'a> {
 	}
 	fn convert_ast_ty(&mut self, ty_ast: &TyAst, self_ty: Option<TyId>) -> TyId {
 		match ty_ast {
-			TyAst::Named(s) => {
+			TyAst::Named(s, s_assoc) => {
 				let symbol = self.symbol_table.get(s.id);
 				// dbg!(symbol);
 				match symbol.kind {
-					SymbolKind::Ty => self.new_ty(Ty::Named(s.id, Vec::new())),
+					SymbolKind::Ty => {
+						let mut assoc = Vec::new();
+						for a in s_assoc {
+							assoc.push(self.convert_ast_ty(a, self_ty));
+						}
+
+						self.new_ty(Ty::Named(s.id, assoc))
+					},
 					SymbolKind::GenericTy => {
+						assert!(s_assoc.is_empty());
 						if let Some(other) = self.lookup(s.id) {
 							other
 						} else {
@@ -167,11 +176,6 @@ impl<'a> TypeCheck<'a> {
 				} else {
 					panic!("can't use self here!");
 				}
-			},
-			TyAst::Maybe(_) => {
-				todo!()
-				// let ty = self.convert_ast_ty(a, self_ty);
-				// self.new_ty(Ty::Maybe(ty))
 			},
 			TyAst::Unit => self.new_ty(Ty::Unit),
 			TyAst::Any => self.new_ty(Ty::Any),
@@ -515,10 +519,13 @@ impl<'a> TypeCheck<'a> {
 					let loop_var = self.new_ty(Ty::TyVar);
 					self.new_def(s.names[0].id, loop_var);
 
-					// unify iter: [T], [U]
-					// for now, only iterate on arrays
-					let loop_ty = self.new_ty(Ty::Named(ARRAY_SYM, vec![loop_var]));
-					assert!(self.unify(ty, loop_ty).is_ok(), "error: currently iteration is only supported on arrays");
+					// unify iter[T] = iter[U]
+					let loop_ty = self.new_ty(Ty::Named(ITER_SYM, vec![loop_var]));
+					if self.unify(ty, loop_ty).is_err() {
+						let msg = format!("expected iterator but found type `{}`", self.ty_to_string(ty),);
+						format_err_f(&msg, s.expr.span, self.input);
+						self.errors.push(msg);
+					}
 
 					let (pair, _) = self.eval_block(&mut s.block);
 					current_pair = self.unify_return(current_pair, pair);
@@ -680,7 +687,9 @@ impl<'a> TypeCheck<'a> {
 		match self.get_type(fn_ty) {
 			Ty::Fn(params, ret_ty) => {
 				// TODO: get rid of hardcoded "print" here
-				if params.len() != c.args.len() && c.expr.span.as_str_f(self.input) != "print" {
+
+				// if params.len() != c.args.len() && c.expr.span.as_str_f(self.input) != "print" {
+				if params.len() != c.args.len() {
 					let msg = format!("function takes {} argument(s), {} supplied", params.len(), c.args.len());
 					format_err_f(&msg, c.expr.span, self.input);
 					self.errors.push(msg);

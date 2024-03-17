@@ -29,8 +29,7 @@ pub enum TyAst {
 	Unit,
 	Never,
 	SelfTy,
-	Named(ast::TyName),
+	Named(ast::TyName, Vec<TyAst>),
 	Array(Box<TyAst>),
-	Maybe(Box<TyAst>),
 	Fn(Vec<TyAst>, Box<TyAst>),
 }

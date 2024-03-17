@@ -72,7 +72,6 @@ pub enum TokenKind {
 	HexNumber,
 	Name,
 	Comment,
-	Maybe,
 	Eof,
 }
 
@@ -188,7 +187,6 @@ impl fmt::Display for TokenKind {
 				BinNumber => "binary number",
 				Name => "identifier",
 				Comment => "comment",
-				Maybe => "maybe",
 				Eof => "end of file",
 			}
 		)
