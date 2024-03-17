@@ -32,7 +32,7 @@ fn main() {
 	assert(0xff == 255)
 	assert(0b111 == 7)
 
-	let u: maybe(int) = nil
+	// let u: maybe(int) = nil
 }
 
 fn fact(n: int) -> int {

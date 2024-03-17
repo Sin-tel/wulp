@@ -33,6 +33,17 @@ fn test_ambiguous_fail() {
 }
 
 #[test]
+fn test_array_push() {
+	compile_test("wulp/tests/array_push").unwrap();
+}
+
+#[test]
+#[should_panic(expected = "Expected argument type `int`, found `str`")]
+fn test_array_push_fail() {
+	compile_test("wulp/tests/array_push_fail").unwrap();
+}
+
+#[test]
 fn test_assign_call() {
 	compile_test("wulp/tests/assign_call").unwrap();
 }

@@ -1,0 +1,8 @@
+fn main() {
+	let x = [4]
+	let y = ["hello"]
+
+	x.push("world")
+}
+
+

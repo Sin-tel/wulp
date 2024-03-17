@@ -105,9 +105,19 @@ impl<'a> TypeCheck<'a> {
 			Ty::Free => format!("T{id}"),
 			Ty::Module(id) => format!("Module: {}", &self.input[id].path.display()),
 			Ty::TyName(id) => format!("Type({})", &self.symbol_table.get(id).name),
-			Ty::Named(id) => self.symbol_table.get(id).name.clone(),
-			Ty::Array(ty) => format!("[{}]", self.ty_to_string(ty)),
-			Ty::Maybe(ty) => format!("maybe({})", self.ty_to_string(ty)),
+			Ty::Named(id, assoc) => {
+				let name = self.symbol_table.get(id).name.clone();
+				if assoc.is_empty() {
+					name
+				} else {
+					let assoc = assoc
+						.iter()
+						.map(|a| self.ty_to_string(*a))
+						.collect::<Vec<String>>()
+						.join(", ");
+					format!("{name}<{assoc}>")
+				}
+			},
 			Ty::Fn(args, ret) => {
 				let args = args
 					.iter()
@@ -122,11 +132,19 @@ impl<'a> TypeCheck<'a> {
 		match ty_ast {
 			TyAst::Named(s) => {
 				let symbol = self.symbol_table.get(s.id);
-				dbg!(symbol);
+				// dbg!(symbol);
 				match symbol.kind {
-					SymbolKind::Ty => self.new_ty(Ty::Named(s.id)),
-					// SymbolKind::GenericTy => self.new_ty(Ty::Free),
-					SymbolKind::GenericTy => todo!(),
+					SymbolKind::Ty => self.new_ty(Ty::Named(s.id, Vec::new())),
+					SymbolKind::GenericTy => {
+						if let Some(other) = self.lookup(s.id) {
+							other
+						} else {
+							// if it's the first time we encounter this generic, we just add it to the env
+							let ty = self.new_ty(Ty::Free);
+							self.new_def(s.id, ty);
+							ty
+						}
+					},
 					_ => todo!(),
 				}
 			},
@@ -140,8 +158,8 @@ impl<'a> TypeCheck<'a> {
 				self.new_ty(Ty::Fn(t_args, ty))
 			},
 			TyAst::Array(a) => {
-				let ty = self.convert_ast_ty(a, self_ty);
-				self.new_ty(Ty::Array(ty))
+				let inner_ty = self.convert_ast_ty(a, self_ty);
+				self.new_ty(Ty::Named(ARRAY_SYM, vec![inner_ty]))
 			},
 			TyAst::SelfTy => {
 				if let Some(ty) = self_ty {
@@ -150,9 +168,10 @@ impl<'a> TypeCheck<'a> {
 					panic!("can't use self here!");
 				}
 			},
-			TyAst::Maybe(a) => {
-				let ty = self.convert_ast_ty(a, self_ty);
-				self.new_ty(Ty::Maybe(ty))
+			TyAst::Maybe(_) => {
+				todo!()
+				// let ty = self.convert_ast_ty(a, self_ty);
+				// self.new_ty(Ty::Maybe(ty))
 			},
 			TyAst::Unit => self.new_ty(Ty::Unit),
 			TyAst::Any => self.new_ty(Ty::Any),
@@ -170,6 +189,11 @@ impl<'a> TypeCheck<'a> {
 		let ty_id = self.types.len();
 		self.types.push(TyNode::Ty(ty));
 		ty_id
+	}
+
+	fn new_named(&mut self, struct_id: SymbolId) -> TyId {
+		// TODO: add associated types here
+		self.new_ty(Ty::Named(struct_id, Vec::new()))
 	}
 
 	// lookup type id in env
@@ -202,12 +226,16 @@ impl<'a> TypeCheck<'a> {
 	fn promote_free(&mut self, id: TyId) {
 		let id = self.get_parent(id);
 		match self.get_type(id) {
-			Ty::Any | Ty::Err | Ty::Unit | Ty::Free | Ty::Named(_) | Ty::TyName(_) | Ty::Module(_) => (),
+			Ty::Any | Ty::Err | Ty::Unit | Ty::Free | Ty::TyName(_) | Ty::Module(_) => (),
 			Ty::TyVar => {
 				let parent_id = self.get_parent(id);
 				self.types[parent_id] = TyNode::Ty(Ty::Free);
 			},
-			Ty::Array(t) | Ty::Maybe(t) => self.promote_free(t),
+			Ty::Named(_, assoc) => {
+				for a in assoc {
+					self.promote_free(a);
+				}
+			},
 			Ty::Fn(args, ret) => {
 				for a in args {
 					self.promote_free(a);
@@ -225,7 +253,7 @@ impl<'a> TypeCheck<'a> {
 		let ty = self.get_type(id);
 		let parent_id = self.get_parent(id);
 		match ty {
-			Ty::Any | Ty::Err | Ty::Unit | Ty::TyVar | Ty::Named(_) | Ty::TyName(_) | Ty::Module(_) => parent_id,
+			Ty::Any | Ty::Err | Ty::Unit | Ty::TyVar | Ty::TyName(_) | Ty::Module(_) => parent_id,
 			Ty::Free => {
 				// keep track of which variables were already instantiated
 				for &(old, new) in subs.iter() {
@@ -237,13 +265,12 @@ impl<'a> TypeCheck<'a> {
 				subs.push((parent_id, t));
 				t
 			},
-			Ty::Array(t) => {
-				let new = self.instantiate_inner(t, subs);
-				self.new_ty(Ty::Array(new))
-			},
-			Ty::Maybe(t) => {
-				let new = self.instantiate_inner(t, subs);
-				self.new_ty(Ty::Maybe(new))
+			Ty::Named(id, assoc) => {
+				let mut new_assoc = Vec::new();
+				for a in assoc {
+					new_assoc.push(self.instantiate_inner(a, subs));
+				}
+				self.new_ty(Ty::Named(id, new_assoc))
 			},
 			Ty::Fn(args, ret) => {
 				let mut new_args = Vec::new();
@@ -258,14 +285,15 @@ impl<'a> TypeCheck<'a> {
 
 	fn occurs(&mut self, ty: Ty, id: TyId) -> Result<(), ()> {
 		match ty {
-			Ty::Any | Ty::Err | Ty::Unit | Ty::TyVar | Ty::TyName(_) | Ty::Named(_) | Ty::Module(_) | Ty::Free => {
-				Ok(())
-			},
-			Ty::Array(t_id) | Ty::Maybe(t_id) => {
-				if t_id == id {
-					return Err(());
+			Ty::Any | Ty::Err | Ty::Unit | Ty::TyVar | Ty::TyName(_) | Ty::Module(_) | Ty::Free => Ok(()),
+			Ty::Named(_, assoc) => {
+				for a in assoc {
+					if a == id {
+						return Err(());
+					}
+					self.occurs(self.get_type(a), id)?;
 				}
-				self.occurs(self.get_type(t_id), id)
+				Ok(())
 			},
 			Ty::Fn(args, ret) => {
 				for a in args {
@@ -301,7 +329,19 @@ impl<'a> TypeCheck<'a> {
 					Ok(())
 				},
 				(a, b) if a == b => Ok(()),
-				(Ty::Array(a), Ty::Array(b)) | (Ty::Maybe(a), Ty::Maybe(b)) => self.unify(a, b),
+
+				(Ty::Named(id_a, assoc_a), Ty::Named(id_b, assoc_b)) => {
+					if id_a != id_b {
+						return Err(());
+					}
+					if assoc_a.len() != assoc_b.len() {
+						return Err(());
+					}
+					for (a, b) in zip(assoc_a, assoc_b) {
+						self.unify(a, b)?;
+					}
+					Ok(())
+				},
 
 				// TODO: only when coercion ok
 				// (_, Ty::Maybe(b)) => self.unify(a_id, b),
@@ -364,7 +404,7 @@ impl<'a> TypeCheck<'a> {
 				Item::Intrinsic(s) => {
 					if let Some(p) = &mut s.property {
 						let struct_id = s.name.id;
-						let self_ty = self.new_ty(Ty::Named(struct_id));
+						let self_ty = self.new_named(struct_id);
 						let new_ty = self.convert_ast_ty(&s.ty, Some(self_ty));
 						self.structs
 							.get_mut(&struct_id)
@@ -392,7 +432,7 @@ impl<'a> TypeCheck<'a> {
 				Item::FnDef(s) => {
 					if let Some(p) = &mut s.property {
 						let struct_id = s.name.id;
-						let self_ty = self.new_ty(Ty::Named(struct_id));
+						let self_ty = self.new_named(struct_id);
 						let ty = self.eval_lambda(&mut s.body, p.span, Some(self_ty));
 						self.structs
 							.get_mut(&struct_id)
@@ -477,7 +517,7 @@ impl<'a> TypeCheck<'a> {
 
 					// unify iter: [T], [U]
 					// for now, only iterate on arrays
-					let loop_ty = self.new_ty(Ty::Array(loop_var));
+					let loop_ty = self.new_ty(Ty::Named(ARRAY_SYM, vec![loop_var]));
 					if self.unify(ty, loop_ty).is_err() {
 						panic!("error: currently iteration is only supported on arrays.");
 					}
@@ -611,7 +651,7 @@ impl<'a> TypeCheck<'a> {
 			for suffix in s.iter_mut() {
 				ty = self.eval_suffix(ty, expr.span, suffix);
 			}
-			if let Ty::Named(id) = self.get_type(ty) {
+			if let Ty::Named(id, _assoc) = self.get_type(ty) {
 				if let Suffix::Property(p) = &last_suffix {
 					if self.structs[&id].fields.get(&p.name).is_none() {
 						let inst_expr = std::mem::replace(
@@ -667,10 +707,10 @@ impl<'a> TypeCheck<'a> {
 				ret_ty
 			},
 			// constructor
-			Ty::TyName(struct_name) => {
+			Ty::TyName(struct_id) => {
 				// TODO: instantiate does not take care of generics on struct
 
-				if self.structs[&struct_name].primitive {
+				if self.structs[&struct_id].primitive {
 					let msg = "primitive type does not have a constructor".to_string();
 					format_err_f(&msg, c.expr.span, self.input);
 					self.errors.push(msg);
@@ -682,7 +722,7 @@ impl<'a> TypeCheck<'a> {
 					self.errors.push(msg);
 					return ERR_TY;
 				}
-				for k in &self.structs[&struct_name].required_fields {
+				for k in &self.structs[&struct_id].required_fields {
 					let mut check = false;
 					for a in &mut c.named_args {
 						if &a.name == k {
@@ -698,7 +738,7 @@ impl<'a> TypeCheck<'a> {
 					}
 				}
 				for a in &mut c.named_args {
-					if let Some(&p) = self.structs[&struct_name].fields.get(&a.name) {
+					if let Some(&p) = self.structs[&struct_id].fields.get(&a.name) {
 						let arg_ty = self.eval_expr(&mut a.expr);
 						if self.unify(arg_ty, p).is_err() {
 							let msg = format!(
@@ -717,7 +757,7 @@ impl<'a> TypeCheck<'a> {
 						return ERR_TY;
 					}
 				}
-				self.new_ty(Ty::Named(struct_name))
+				self.new_named(struct_id)
 			},
 			Ty::Err => ERR_TY,
 			_ => {
@@ -757,7 +797,7 @@ impl<'a> TypeCheck<'a> {
 						return ERR_TY;
 					}
 				}
-				self.new_ty(Ty::Array(ty))
+				self.new_ty(Ty::Named(ARRAY_SYM, vec![ty]))
 			},
 			ExprKind::Name(e) => {
 				let ty_opt = self.lookup(e.id);
@@ -872,10 +912,10 @@ impl<'a> TypeCheck<'a> {
 	fn eval_suffix(&mut self, expr_ty: TyId, expr_span: Span, suffix: &mut Suffix) -> TyId {
 		match suffix {
 			Suffix::Property(p) => match self.get_type(expr_ty) {
-				Ty::Named(name) => self.get_field(name, p),
+				Ty::Named(name, _assoc) => self.get_field(name, p),
 				Ty::TyName(name) => self.get_static(name, p),
-				Ty::Err => ERR_TY,
 				Ty::Module(file_id) => self.get_module_field(file_id, p),
+				Ty::Err => ERR_TY,
 				_ => {
 					let msg = format!("type `{}` does not allow indexing with `.`", self.ty_to_string(expr_ty));
 					format_err_f(&msg, expr_span, self.input);
@@ -885,7 +925,10 @@ impl<'a> TypeCheck<'a> {
 			},
 			Suffix::Index(e) => {
 				let ty = match self.get_type(expr_ty) {
-					Ty::Array(inner_ty) => inner_ty,
+					Ty::Named(id, assoc) if id == ARRAY_SYM => {
+						assert!(assoc.len() == 1);
+						assoc[0]
+					},
 					Ty::Err => ERR_TY,
 					_ => {
 						let msg = format!("can't index type `{}`.", self.ty_to_string(expr_ty));
@@ -895,7 +938,7 @@ impl<'a> TypeCheck<'a> {
 					},
 				};
 				let index_ty = self.eval_expr(e);
-				let ty_int = self.new_ty(Ty::Named(INT_SYM));
+				let ty_int = self.new_ty(Ty::Named(INT_SYM, Vec::new()));
 				if self.unify(index_ty, ty_int).is_err() {
 					let msg = format!("Index must be type `int` but found `{}`.", self.ty_to_string(index_ty));
 					format_err_f(&msg, e.span, self.input);
@@ -978,15 +1021,15 @@ impl<'a> TypeCheck<'a> {
 		let ty = self.get_type(id);
 		match op {
 			UnOp::Minus => {
-				if ty == Ty::Named(INT_SYM) {
+				if ty == Ty::Named(INT_SYM, Vec::new()) {
 					return id;
 				}
-				if ty == Ty::Named(NUM_SYM) {
+				if ty == Ty::Named(NUM_SYM, Vec::new()) {
 					return id;
 				}
 			},
 			UnOp::Not => {
-				if ty == Ty::Named(BOOL_SYM) {
+				if ty == Ty::Named(BOOL_SYM, Vec::new()) {
 					return id;
 				}
 			},
@@ -1011,32 +1054,32 @@ impl<'a> TypeCheck<'a> {
 		let ty = self.get_type(lhs);
 		match op {
 			BinOp::Plus | BinOp::Minus | BinOp::Mul | BinOp::Mod => {
-				if ty == Ty::Named(INT_SYM) || ty == Ty::Named(NUM_SYM) {
+				if matches!(ty, Ty::Named(INT_SYM, _) | Ty::Named(NUM_SYM, _)) {
 					return lhs;
 				}
 			},
 			BinOp::Pow | BinOp::Div => {
-				if ty == Ty::Named(INT_SYM) || ty == Ty::Named(NUM_SYM) {
-					return self.new_ty(Ty::Named(NUM_SYM));
+				if matches!(ty, Ty::Named(INT_SYM, _) | Ty::Named(NUM_SYM, _)) {
+					return self.new_ty(Ty::Named(NUM_SYM, Vec::new()));
 				}
 			},
 			BinOp::Gt | BinOp::Lt | BinOp::Gte | BinOp::Lte => {
-				if ty == Ty::Named(INT_SYM) || ty == Ty::Named(NUM_SYM) || ty == Ty::Named(STR_SYM) {
-					return self.new_ty(Ty::Named(BOOL_SYM));
+				if matches!(ty, Ty::Named(INT_SYM, _) | Ty::Named(NUM_SYM, _) | Ty::Named(STR_SYM, _)) {
+					return self.new_ty(Ty::Named(BOOL_SYM, Vec::new()));
 				}
 			},
 			BinOp::Concat => {
-				if ty == Ty::Named(STR_SYM) {
+				if matches!(ty, Ty::Named(STR_SYM, _)) {
 					return lhs;
 				}
 			},
 			BinOp::And | BinOp::Or => {
-				if ty == Ty::Named(BOOL_SYM) {
+				if matches!(ty, Ty::Named(BOOL_SYM, _)) {
 					return lhs;
 				}
 			},
 			BinOp::Eq | BinOp::Neq => {
-				return self.new_ty(Ty::Named(BOOL_SYM));
+				return self.new_ty(Ty::Named(BOOL_SYM, Vec::new()));
 			},
 		}
 
@@ -1049,13 +1092,14 @@ impl<'a> TypeCheck<'a> {
 	fn eval_literal(&mut self, l: &Literal) -> TyId {
 		match l {
 			Literal::Nil => {
-				let ty = self.new_ty(Ty::TyVar);
-				self.new_ty(Ty::Maybe(ty))
+				// let ty = self.new_ty(Ty::TyVar);
+				// self.new_ty(Ty::Maybe(ty))
+				todo!()
 			},
-			Literal::Num(_) => self.new_ty(Ty::Named(NUM_SYM)),
-			Literal::Int(_) => self.new_ty(Ty::Named(INT_SYM)),
-			Literal::Str(_) => self.new_ty(Ty::Named(STR_SYM)),
-			Literal::Bool(_) => self.new_ty(Ty::Named(BOOL_SYM)),
+			Literal::Num(_) => self.new_ty(Ty::Named(NUM_SYM, Vec::new())),
+			Literal::Int(_) => self.new_ty(Ty::Named(INT_SYM, Vec::new())),
+			Literal::Str(_) => self.new_ty(Ty::Named(STR_SYM, Vec::new())),
+			Literal::Bool(_) => self.new_ty(Ty::Named(BOOL_SYM, Vec::new())),
 		}
 	}
 }

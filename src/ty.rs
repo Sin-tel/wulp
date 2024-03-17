@@ -15,14 +15,12 @@ pub enum Ty {
 	Any,
 	Err,
 	Unit,
-	TyVar,            // type variable
-	Free,             // free type variable
-	Module(FileId),   // imported module
-	TyName(SymbolId), // The type of the name of a type
-	Named(SymbolId),
-	Array(TyId),
-	Maybe(TyId),
-	Fn(Vec<TyId>, TyId), // args, ret
+	TyVar,                      // type variable
+	Free,                       // free type variable
+	Module(FileId),             // imported module
+	TyName(SymbolId),           // The type of the name of a type
+	Named(SymbolId, Vec<TyId>), // A named type with it's associated types
+	Fn(Vec<TyId>, TyId),        // args, ret
 }
 
 #[derive(Debug)]

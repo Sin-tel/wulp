@@ -11,6 +11,7 @@ error: fn(str) -> !
 from num import *
 from int import *
 from str import *
+from array import *
 
 import random as random
 

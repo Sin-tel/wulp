@@ -1,0 +1,8 @@
+#intrinsic
+array.push: fn([T], T) -> ()
+#lua #"
+array.push = function(arr, e)
+	arr[arr.n] = e
+	arr.n = arr.n + 1
+end
+"#

@@ -1,0 +1,19 @@
+fn main() {
+	let x = [4]
+	array.push(x, 5)
+	x.push(6)
+
+	assert(x[0] == 4)
+	assert(x[1] == 5)
+	assert(x[2] == 6)
+
+
+	let y = ["hello"]
+	array.push(y, "world")
+	y.push("!")
+	assert(y[0] == "hello")
+	assert(y[1] == "world")
+	assert(y[2] == "!")
+}
+
+
