@@ -61,7 +61,7 @@ impl<'a> Parser<'a> {
 		// make sure we are done
 		let tk = this.tokens.next();
 		if tk.kind != TokenKind::Eof {
-			this.error(format!("Expected end of file but found: {tk}."), tk.span);
+			this.error(format!("expected end of file but found: {tk}"), tk.span);
 		}
 
 		let module = Module { items, file_id, global };
@@ -140,7 +140,7 @@ impl<'a> Parser<'a> {
 				let puts = self.parse_string_literal(span);
 				Some(Item::InlineLua(puts))
 			},
-			s => self.error(format!("Unknown directive `#{s}`"), span),
+			s => self.error(format!("unknown directive `#{s}`"), span),
 		}
 	}
 
@@ -192,7 +192,7 @@ impl<'a> Parser<'a> {
 			TokenKind::Struct => Item::StructDef(self.parse_struct_def()),
 			TokenKind::Fn => Item::FnDef(self.parse_fn_def()),
 			TokenKind::Hash => unreachable!(),
-			_ => self.error(format!("Expected item but found: `{tk}`."), tk.span),
+			_ => self.error(format!("expected item but found: `{tk}`"), tk.span),
 		}
 	}
 
@@ -256,7 +256,7 @@ impl<'a> Parser<'a> {
 						}
 						// TODO: make this more informative
 						let tk = self.tokens.next();
-						self.error(format!("Expected `=` but found: `{tk}`."), tk.span);
+						self.error(format!("expected `=` but found: `{tk}`"), tk.span);
 					},
 				}
 			},
@@ -275,7 +275,7 @@ impl<'a> Parser<'a> {
 		// lhs vars can't be a Call, since those arent lvalues.
 		for var in &vars {
 			if let ExprKind::Call(_) = var.kind {
-				self.error("can't assign to a function call.".to_string(), var.span);
+				self.error("can't assign to a function call".to_string(), var.span);
 			}
 		}
 		self.assert_next(TokenKind::Assign);
@@ -517,7 +517,7 @@ impl<'a> Parser<'a> {
 					if tk.kind == TokenKind::LParen && tk.line != start_line {
 						let msg = "ambiguous syntax";
 						format_warning(msg, tk.span, self.input, &self.path);
-						eprintln!("note: Add a semicolon to the previous statement if this is intentional.");
+						eprintln!("note: Add a semicolon to the previous statement if this is intentional");
 						panic!("{msg}");
 					}
 					let old_suffix = std::mem::take(&mut suffix);
@@ -587,7 +587,7 @@ impl<'a> Parser<'a> {
 			},
 			_ => {
 				let tk = self.tokens.next();
-				self.error(format!("Expected expression but found: `{tk}`."), tk.span);
+				self.error(format!("expected expression but found: `{tk}`"), tk.span);
 			},
 		}
 	}
@@ -663,7 +663,7 @@ impl<'a> Parser<'a> {
 			}
 		} else {
 			let tk = self.tokens.next();
-			self.error(format!("Expected field but found: `{tk}`."), tk.span);
+			self.error(format!("expected field but found: `{tk}`"), tk.span);
 		}
 	}
 
@@ -790,7 +790,7 @@ impl<'a> Parser<'a> {
 			},
 			// TODO: if lexer is working properly, this should be unreachable
 			_ => {
-				self.error(format!("Malformed string: `{}`.", chars.as_str()), span);
+				self.error(format!("malformed string: `{}`", chars.as_str()), span);
 			},
 		};
 
@@ -829,7 +829,7 @@ impl<'a> Parser<'a> {
 			_ => unreachable!(),
 		}
 		// TODO: better error message when literal doesn't fit in i32
-		self.error(format!("Malformed number: `{s}`."), span);
+		self.error(format!("malformed number: `{s}`"), span);
 	}
 
 	fn parse_name(&mut self) -> Name {
@@ -923,7 +923,7 @@ impl<'a> Parser<'a> {
 			},
 
 			_ => {
-				self.error(format!("Expected type but found `{}`.", tk.kind), tk.span);
+				self.error(format!("expected type but found `{}`", tk.kind), tk.span);
 			},
 		}
 	}
@@ -931,7 +931,7 @@ impl<'a> Parser<'a> {
 	fn assert_next(&mut self, expect: TokenKind) -> Token {
 		let tk = self.tokens.next();
 		if tk.kind != expect {
-			self.error(format!("Expected `{}` but found `{}`.", expect, tk.kind), tk.span);
+			self.error(format!("expected `{}` but found `{}`", expect, tk.kind), tk.span);
 		}
 		tk
 	}

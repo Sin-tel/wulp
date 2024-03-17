@@ -58,11 +58,11 @@ impl<'a> ScopeCheck<'a> {
 			}
 			if let Some(f) = this.lookup("main") {
 				if this.symbol_table.get(f).kind != SymbolKind::FnDef {
-					let msg = "`main` should be a function.".to_string();
+					let msg = "`main` should be a function".to_string();
 					this.errors.push(msg);
 				}
 			} else {
-				let msg = "No `main` function found.".to_string();
+				let msg = "no `main` function found".to_string();
 				this.errors.push(msg);
 			};
 		}
@@ -103,11 +103,11 @@ impl<'a> ScopeCheck<'a> {
 
 				if let Some(id) = self.lookup(name) {
 					if self.symbol_table.get(id).kind == SymbolKind::FnDef {
-						let msg = format!("`{name}` already defined.");
+						let msg = format!("`{name}` already defined");
 						format_err_f(&msg, n.span, self.input);
 						self.errors.push(msg);
 					} else if self.symbol_table.get(id).is_const {
-						let msg = format!("can't assign to constant `{name}`.");
+						let msg = format!("can't assign to constant `{name}`");
 						format_err_f(&msg, n.span, self.input);
 						self.errors.push(msg);
 					}
@@ -209,7 +209,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		let name = node.name.span.as_str_f(self.input);
 		let lookup = self.lookup(name);
 		if lookup.is_some() {
-			let msg = format!("Struct `{name}` already defined.");
+			let msg = format!("struct `{name}` already defined");
 			format_err_f(&msg, node.name.span, self.input);
 			self.errors.push(msg);
 		} else {

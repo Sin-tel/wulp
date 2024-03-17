@@ -38,7 +38,7 @@ fn test_array_push() {
 }
 
 #[test]
-#[should_panic(expected = "Expected argument type `int`, found `str`")]
+#[should_panic(expected = "expected argument type `int`, found `str`")]
 fn test_array_push_fail() {
 	compile_test("wulp/tests/array_push_fail").unwrap();
 }

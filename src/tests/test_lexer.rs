@@ -82,53 +82,53 @@ fn assignment() {
 
 #[test]
 fn string_concat() {
+	use TokenKind::*;
 	let p = r#"'foo' .. bar"#;
 
 	let actual: Vec<_> = new_lexer(p).map(|tk| tk.kind).collect();
 
-	use TokenKind::*;
 	assert_eq!(actual, vec![Str, Concat, Name]);
 }
 
 #[test]
 fn not_expressions() {
+	use TokenKind::*;
 	let p = r#"not true"#;
 
 	let actual: Vec<_> = new_lexer(p).map(|tk| tk.kind).collect();
 
-	use TokenKind::*;
 	assert_eq!(actual, vec![Not, True]);
 }
 
 #[test]
 fn empty_table() {
+	use TokenKind::*;
 	let p = r#"x = {}"#;
 
 	let actual: Vec<_> = new_lexer(p).map(|tk| tk.kind).collect();
 
-	use TokenKind::*;
 	assert_eq!(actual, vec![Name, Assign, LCurly, RCurly]);
 }
 
 #[test]
 fn numbers() {
+	use TokenKind::*;
 	let p = r#"1 1.2 1000. .5 -1"#;
 
 	let actual: Vec<_> = new_lexer(p).map(|tk| tk.kind).collect();
 
-	use TokenKind::*;
 	assert_eq!(actual, vec![Number, Number, Number, Number, Minus, Number]);
 }
 
 #[test]
-#[should_panic(expected = "Failed to close string.")]
+#[should_panic(expected = "failed to close string")]
 fn string_fail() {
 	let p = r#"'hello"#;
 	let _: Vec<_> = new_lexer(p).collect();
 }
 
 #[test]
-#[should_panic(expected = "Failed to close string.")]
+#[should_panic(expected = "failed to close string")]
 fn string_fail2() {
 	let p = r#""hello
 	""#;
@@ -136,7 +136,7 @@ fn string_fail2() {
 }
 
 #[test]
-#[should_panic(expected = "Unexpected token: `$`")]
+#[should_panic(expected = "unexpected token: `$`")]
 fn bad_char() {
 	let p = r#"let x = $100"#;
 	let _: Vec<_> = new_lexer(p).collect();
