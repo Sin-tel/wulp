@@ -9,6 +9,7 @@ local int = {}
 local num = {}
 local str = {}
 local bool = {}
+local array = {}
 local iter = {}
 local function array_next(self)
 	local item = self.a[self.counter]

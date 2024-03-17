@@ -12,6 +12,7 @@ pub enum SymbolKind {
 	Var,
 	FnDef,
 	Ty,
+	GenericTy,
 }
 
 impl Symbol {
@@ -37,6 +38,13 @@ impl Symbol {
 	pub fn ty_def(mut self) -> Self {
 		self.is_const = true;
 		self.kind = SymbolKind::Ty;
+		self
+	}
+
+	#[must_use]
+	pub fn generic_ty(mut self) -> Self {
+		self.is_const = true;
+		self.kind = SymbolKind::GenericTy;
 		self
 	}
 }

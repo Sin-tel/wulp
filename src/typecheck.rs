@@ -1,8 +1,8 @@
 use crate::ast;
 use crate::ast::*;
-use crate::scope::{BOOL_SYM, INT_SYM, NUM_SYM, STR_SYM};
+use crate::scope::{ARRAY_SYM, BOOL_SYM, INT_SYM, NUM_SYM, STR_SYM};
 use crate::span::{format_err_f, format_note_f, FileId, InputFile, Span};
-use crate::symbol::{SymbolId, SymbolTable};
+use crate::symbol::{SymbolId, SymbolKind, SymbolTable};
 use crate::ty::*;
 use anyhow::anyhow;
 use anyhow::Result;
@@ -52,10 +52,12 @@ impl<'a> TypeCheck<'a> {
 		this.types.push(TyNode::Ty(Ty::Err));
 		assert!(this.get_type(ERR_TY) == Ty::Err);
 
+		// keep in sync with scope ~55
 		this.new_struct(INT_SYM, true);
 		this.new_struct(NUM_SYM, true);
 		this.new_struct(STR_SYM, true);
 		this.new_struct(BOOL_SYM, true);
+		this.new_struct(ARRAY_SYM, true);
 
 		for m in modules {
 			println!("[checking {}]", input[m.file_id].path.display());
@@ -89,7 +91,9 @@ impl<'a> TypeCheck<'a> {
 				primitive,
 			},
 		);
-		self.new_def(id, Ty::TyName(id))
+		let ty_id = self.new_ty(Ty::TyName(id));
+		self.new_def(id, ty_id);
+		ty_id
 	}
 	fn ty_to_string(&self, id: TyId) -> String {
 		let id = self.get_parent(id);
@@ -114,44 +118,51 @@ impl<'a> TypeCheck<'a> {
 			},
 		}
 	}
-	fn convert_ast_ty(&mut self, ty_ast: &TyAst, self_ty: Option<TyId>) -> Ty {
+	fn convert_ast_ty(&mut self, ty_ast: &TyAst, self_ty: Option<TyId>) -> TyId {
 		match ty_ast {
-			TyAst::Named(s) => Ty::Named(s.id),
+			TyAst::Named(s) => {
+				let symbol = self.symbol_table.get(s.id);
+				dbg!(symbol);
+				match symbol.kind {
+					SymbolKind::Ty => self.new_ty(Ty::Named(s.id)),
+					// SymbolKind::GenericTy => self.new_ty(Ty::Free),
+					SymbolKind::GenericTy => todo!(),
+					_ => todo!(),
+				}
+			},
 			TyAst::Fn(args, ret) => {
 				let mut t_args = Vec::new();
 				for a in args {
 					let ty = self.convert_ast_ty(a, self_ty);
-					t_args.push(self.new_ty(ty));
+					t_args.push(ty);
 				}
 				let ty = self.convert_ast_ty(ret, self_ty);
-				Ty::Fn(t_args, self.new_ty(ty))
+				self.new_ty(Ty::Fn(t_args, ty))
 			},
 			TyAst::Array(a) => {
 				let ty = self.convert_ast_ty(a, self_ty);
-				Ty::Array(self.new_ty(ty))
+				self.new_ty(Ty::Array(ty))
 			},
 			TyAst::SelfTy => {
 				if let Some(ty) = self_ty {
-					self.get_type(ty)
+					ty
 				} else {
 					panic!("can't use self here!");
 				}
 			},
 			TyAst::Maybe(a) => {
 				let ty = self.convert_ast_ty(a, self_ty);
-				Ty::Maybe(self.new_ty(ty))
+				self.new_ty(Ty::Maybe(ty))
 			},
-			TyAst::Unit => Ty::Unit,
-			TyAst::Any => Ty::Any,
-			TyAst::Never => Ty::Err,
+			TyAst::Unit => self.new_ty(Ty::Unit),
+			TyAst::Any => self.new_ty(Ty::Any),
+			TyAst::Never => self.new_ty(Ty::Err),
 		}
 	}
 
 	// add symbol to env with specified type
-	fn new_def(&mut self, id: SymbolId, ty: Ty) -> TyId {
-		let ty_id = self.new_ty(ty);
+	fn new_def(&mut self, id: SymbolId, ty_id: TyId) {
 		self.env.insert(id, ty_id);
-		ty_id
 	}
 
 	// new type variable
@@ -355,7 +366,6 @@ impl<'a> TypeCheck<'a> {
 						let struct_id = s.name.id;
 						let self_ty = self.new_ty(Ty::Named(struct_id));
 						let new_ty = self.convert_ast_ty(&s.ty, Some(self_ty));
-						let new_ty = self.new_ty(new_ty);
 						self.structs
 							.get_mut(&struct_id)
 							.unwrap()
@@ -369,7 +379,8 @@ impl<'a> TypeCheck<'a> {
 				Item::Import(s) => match &mut s.kind {
 					ImportKind::Glob => (),
 					ImportKind::Alias(name) => {
-						self.new_def(name.id, Ty::Module(s.file_id.unwrap()));
+						let ty = self.new_ty(Ty::Module(s.file_id.unwrap()));
+						self.new_def(name.id, ty);
 					},
 				},
 				_ => (),
@@ -461,7 +472,8 @@ impl<'a> TypeCheck<'a> {
 					assert!(s.names.len() == 1);
 
 					// make new i: U
-					let loop_var = self.new_def(s.names[0].id, Ty::TyVar);
+					let loop_var = self.new_ty(Ty::TyVar);
+					self.new_def(s.names[0].id, loop_var);
 
 					// unify iter: [T], [U]
 					// for now, only iterate on arrays
@@ -498,18 +510,18 @@ impl<'a> TypeCheck<'a> {
 				// TODO nicer err messages
 				assert!(i == 0, "self must be first argument!");
 				assert!(p.ty.is_none());
-				self.get_type(self_ty.expect("can't use `self` here"))
+				self_ty.expect("can't use `self` here")
 			} else {
 				match &p.ty {
 					Some(ty) => match ty {
-						TyAst::SelfTy => self.get_type(self_ty.expect("can't use `self` here")),
+						TyAst::SelfTy => self_ty.expect("can't use `self` here"),
 						_ => self.convert_ast_ty(ty, None),
 					},
-					None => Ty::TyVar,
+					None => self.new_ty(Ty::TyVar),
 				}
 			};
-			let id = self.new_def(p.name.id, ty);
-			param_ty.push(id);
+			self.new_def(p.name.id, ty);
+			param_ty.push(ty);
 		}
 		param_ty
 	}
@@ -527,12 +539,11 @@ impl<'a> TypeCheck<'a> {
 	fn hoist_fn_def(&mut self, node: &FnDef) {
 		if node.property.is_none() {
 			let param_ty = self.eval_fn_params(&node.body.params, None);
-			let ty = match &node.body.ty {
+			let ret_id = match &node.body.ty {
 				Some(ty) => self.convert_ast_ty(ty, None),
-				None => Ty::TyVar,
+				None => self.new_ty(Ty::TyVar),
 			};
-			let ret_id = self.new_ty(ty);
-			let fn_ty = Ty::Fn(param_ty, ret_id);
+			let fn_ty = self.new_ty(Ty::Fn(param_ty, ret_id));
 			self.new_def(node.name.id, fn_ty);
 		}
 	}
@@ -569,8 +580,7 @@ impl<'a> TypeCheck<'a> {
 				if let TyAst::SelfTy = ty {
 					self_ty.expect("can't use `self` here")
 				} else {
-					let n_ty = self.convert_ast_ty(ty, None);
-					self.new_ty(n_ty)
+					self.convert_ast_ty(ty, None)
 				}
 			},
 			None => self.new_ty(Ty::TyVar),
@@ -782,8 +792,7 @@ impl<'a> TypeCheck<'a> {
 
 					if let Some(ty) = &f.field.ty {
 						let new_ty = self.convert_ast_ty(ty, None);
-						let ty = self.new_ty(new_ty);
-						(f.field.property.name.clone(), ty)
+						(f.field.property.name.clone(), new_ty)
 					} else {
 						let msg = "Need type annotation here";
 						format_err_f(msg, f.field.property.span, self.input);
@@ -799,8 +808,7 @@ impl<'a> TypeCheck<'a> {
 					}
 					let mut expr_ty = self.eval_expr(a);
 					if let Some(ty) = &f.field.ty {
-						let new_ty = self.convert_ast_ty(ty, None);
-						let ty_id = self.new_ty(new_ty);
+						let ty_id = self.convert_ast_ty(ty, None);
 						if self.unify(ty_id, expr_ty).is_err() {
 							let msg = format!(
 								"Incompatible types `{}` and `{}`",
@@ -908,8 +916,7 @@ impl<'a> TypeCheck<'a> {
 		for (n, rhs_ty) in zip(&node.names, rhs) {
 			// check if annotation fits
 			if let Some(ty) = &n.ty {
-				let new_ty = self.convert_ast_ty(ty, None);
-				let ty_id = self.new_ty(new_ty);
+				let ty_id = self.convert_ast_ty(ty, None);
 				if self.unify(rhs_ty, ty_id).is_err() {
 					let msg = format!(
 						"Type error, assigning `{}` to `{}`.",
@@ -922,7 +929,7 @@ impl<'a> TypeCheck<'a> {
 				let new_ty = self.convert_ast_ty(ty, None);
 				self.new_def(n.name.id, new_ty);
 			} else {
-				self.new_def(n.name.id, self.get_type(rhs_ty));
+				self.new_def(n.name.id, rhs_ty);
 			}
 		}
 	}

@@ -19,6 +19,7 @@ pub const INT_SYM: SymbolId = 1;
 pub const NUM_SYM: SymbolId = 2;
 pub const STR_SYM: SymbolId = 3;
 pub const BOOL_SYM: SymbolId = 4;
+pub const ARRAY_SYM: SymbolId = 5;
 
 impl<'a> ScopeCheck<'a> {
 	pub fn check(modules: &mut [Module], input: &'a [InputFile]) -> Result<SymbolTable> {
@@ -33,14 +34,17 @@ impl<'a> ScopeCheck<'a> {
 		// global scope
 		this.scope_stack.push(FxHashMap::default());
 		{
-			this.new_identifier("int", Symbol::new("int").make_const());
+			// keep in sync with typecheck ~55
+			this.new_identifier("int", Symbol::new("int").ty_def());
 			assert_eq!(this.lookup("int"), Some(INT_SYM));
-			this.new_identifier("num", Symbol::new("num").make_const());
+			this.new_identifier("num", Symbol::new("num").ty_def());
 			assert_eq!(this.lookup("num"), Some(NUM_SYM));
-			this.new_identifier("str", Symbol::new("str").make_const());
+			this.new_identifier("str", Symbol::new("str").ty_def());
 			assert_eq!(this.lookup("str"), Some(STR_SYM));
-			this.new_identifier("bool", Symbol::new("bool").make_const());
+			this.new_identifier("bool", Symbol::new("bool").ty_def());
 			assert_eq!(this.lookup("bool"), Some(BOOL_SYM));
+			this.new_identifier("array", Symbol::new("array").ty_def());
+			assert_eq!(this.lookup("array"), Some(ARRAY_SYM));
 
 			for m in modules {
 				if m.global {
@@ -289,11 +293,10 @@ impl<'a> Visitor for ScopeCheck<'a> {
 		if let Some(id) = self.lookup(name) {
 			node.id = id;
 		} else {
-			let msg = format!("can't find `{name}` in this scope");
-			format_err_f(&msg, node.span, self.input);
-			self.errors.push(msg);
-			// to suppress further errors, we add a new variable anyway
-			self.new_identifier(name, Symbol::new(name));
+			// Currently, generic type variables should be uppercase single characters
+			assert!(name.len() == 1);
+			assert!(name.chars().next().unwrap().is_ascii_uppercase());
+			node.id = self.new_identifier(name, Symbol::new(name).generic_ty());
 		}
 	}
 }

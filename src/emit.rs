@@ -128,11 +128,7 @@ impl Visitor for EmitLua {
 					self.emit_struct_local(s);
 					self.put_statement();
 				},
-				Item::InlineLua(s) => {
-					self.indent();
-					self.statement.push_str(s);
-					self.put_statement();
-				},
+
 				_ => (),
 			}
 		}
@@ -163,7 +159,12 @@ impl Visitor for EmitLua {
 					self.put_statement();
 				}
 			},
-			Item::Intrinsic(_) | Item::InlineLua(_) => (),
+			Item::InlineLua(s) => {
+				self.indent();
+				self.statement.push_str(s);
+				self.put_statement();
+			},
+			Item::Intrinsic(_) => (),
 			Item::Import(s) => {
 				self.indent();
 				let id = s.file_id.unwrap();
@@ -215,6 +216,7 @@ impl Visitor for EmitLua {
 					}
 				}
 				self.statement.push_str("}\n\t\treturn new\n\tend\n})");
+				self.put_statement();
 			},
 		}
 	}
