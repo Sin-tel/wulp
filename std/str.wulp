@@ -1,21 +1,13 @@
 // TODO: basic utf8 support by default
 
-#lua #"
-str.upper = string.upper
-str.lower = string.lower
-str.len	= string.len
-str.rep	= string.rep
-str.reverse = string.reverse
-"#
-
 #intrinsic
-str.upper: fn(self) -> self
+str.upper: fn(self) -> self = "string.upper"
 #intrinsic
-str.lower: fn(self) -> self
+str.lower: fn(self) -> self = "string.lower"
 #intrinsic
-str.reverse: fn(self) -> self
+str.reverse: fn(self) -> self = "string.len"
 #intrinsic
-str.len: fn(self) -> int
+str.len: fn(self) -> int = "string.rep"
 #intrinsic
-str.rep: fn(self, int) -> self
+str.rep: fn(self, int) -> self = "string.reverse"
 

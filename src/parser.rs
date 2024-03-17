@@ -133,11 +133,18 @@ impl<'a> Parser<'a> {
 				}
 				self.assert_next(TokenKind::Colon);
 				let ty = self.parse_type();
-				Some(Item::Intrinsic(Intrinsic { name, property, ty }))
+				let lua_def = if self.tokens.peek().kind == TokenKind::Assign {
+					self.tokens.next();
+					let lua_span = self.assert_next(TokenKind::Str).span;
+					Some(self.parse_string_literal(lua_span))
+				} else {
+					None
+				};
+				Some(Item::Intrinsic(Intrinsic { name, property, ty, lua_def }))
 			},
 			"lua" => {
-				let span = self.assert_next(TokenKind::Str).span;
-				let puts = self.parse_string_literal(span);
+				let lua_span = self.assert_next(TokenKind::Str).span;
+				let puts = self.parse_string_literal(lua_span);
 				Some(Item::InlineLua(puts))
 			},
 			s => self.error(format!("unknown directive `#{s}`"), span),

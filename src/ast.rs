@@ -45,6 +45,7 @@ pub struct Intrinsic {
 	pub name: Name,
 	pub property: Option<Property>,
 	pub ty: TyAst,
+	pub lua_def: Option<String>,
 }
 
 #[derive(Debug)]

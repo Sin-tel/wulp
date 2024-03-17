@@ -1,20 +1,16 @@
 // math
 #intrinsic
-int.abs:   fn(self) -> self
-#lua #"int.abs = math.abs"#
+int.abs: fn(self) -> self = "math.abs"
 
 #intrinsic
-int.max:   fn(self, self) -> self
-#lua #"int.max = math.max"#
+int.max: fn(self, self) -> self = "math.max"
 
 #intrinsic
-int.min:   fn(self, self) -> self
-#lua #"int.min = math.min"#
+int.min: fn(self, self) -> self = "math.min"
 
 #intrinsic
-int.idiv:   fn(self, self) -> self
-#lua #"
-int.idiv = function(self, denom)
+int.idiv: fn(self, self) -> self = #"
+function(self, denom)
 	assert(denum ~= 0, "division by zero")
 	return math.floor(self / denom)
 end
@@ -24,47 +20,36 @@ end
 
 // bitwise ops
 #intrinsic
-int.bit_shl:   fn(self, self) -> self
-#lua #"int.bit_shl = bit.lshift"#
+int.bit_shl:   fn(self, self) -> self = "bit.lshift"
 
 #intrinsic
-int.bit_shr:   fn(self, self) -> self
-#lua #"int.bit_shr = bit.rshift"#
+int.bit_shr:   fn(self, self) -> self = "bit.rshift"
 
 #intrinsic
-int.bit_sar:   fn(self, self) -> self
-#lua #"int.bit_sar = bit.arshift"#
+int.bit_sar:   fn(self, self) -> self = "bit.arshift"
 
 #intrinsic
-int.bit_or:   fn(self, self) -> self
-#lua #"int.bit_or = bit.bor"#
+int.bit_or:   fn(self, self) -> self = "bit.bor"
 
 #intrinsic
-int.bit_and:   fn(self, self) -> self
-#lua #"int.bit_and = bit.band"#
+int.bit_and:   fn(self, self) -> self = "bit.band"
 
 #intrinsic
-int.bit_xor:   fn(self, self) -> self
-#lua #"int.bit_xor = bit.bxor"#
+int.bit_xor:   fn(self, self) -> self = "bit.bxor"
 
 #intrinsic
-int.bit_not:   fn(self) -> self
-#lua #"int.bit_not = bit.bnot"#
+int.bit_not:   fn(self) -> self = "bit.bnot"
 
 #intrinsic
-int.bit_rol:   fn(self, self) -> self
-#lua #"int.bit_rol = bit.rol"#
+int.bit_rol:   fn(self, self) -> self = "bit.rol"
 
 #intrinsic
-int.bit_ror:   fn(self, self) -> self
-#lua #"int.bit_ror = bit.ror"#
+int.bit_ror:   fn(self, self) -> self = "bit.ror"
 
 #intrinsic
-int.bit_swap:   fn(self) -> self
-#lua #"int.bit_swap = bit.bswap"#
+int.bit_swap:   fn(self) -> self = "bit.bswap"
 
 // TODO: optional length argument
 #intrinsic
-int.to_hex: fn(self) -> str
-#lua #"int.to_hex = function(self) return "0x" .. bit.tohex(self) end"#
+int.to_hex: fn(self) -> str = #"function(self) return "0x" .. bit.tohex(self) end"#
 

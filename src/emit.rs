@@ -164,7 +164,24 @@ impl Visitor for EmitLua {
 				self.statement.push_str(s);
 				self.put_statement();
 			},
-			Item::Intrinsic(_) => (),
+			Item::Intrinsic(s) => {
+				if let Some(lua_def) = &s.lua_def {
+					self.indent();
+
+					if let Some(p) = &mut s.property {
+						s.name.visit(self);
+						self.statement.push('.');
+						p.visit(self);
+					} else {
+						self.statement.push_str("local ");
+						s.name.visit(self);
+					}
+					self.statement.push_str(" = ");
+					self.statement.push_str(lua_def);
+
+					self.put_statement();
+				}
+			},
 			Item::Import(s) => {
 				self.indent();
 				let id = s.file_id.unwrap();

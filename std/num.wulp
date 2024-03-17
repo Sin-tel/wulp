@@ -1,81 +1,54 @@
 // Does not include, ldexp, fmod, modf, deg, rad
 
 // constants
-#lua #"
-num.INF = math.huge
-num.NAN = 0 / 0
-num.PI = math.pi
-num.TWO_PI = 6.283185307179586
-"#
 #intrinsic
-num.NAN: num
+num.NAN: num = "math.huge"
 #intrinsic
-num.INF: num
+num.INF: num = "0 / 0"
 #intrinsic
-num.PI: num
+num.PI: num = "math.pi"
 #intrinsic
-num.TWO_PI: num
+num.TWO_PI: num = "6.283185307179586"
 
 // math
-#lua #"
-num.abs = math.abs
-num.acos = math.acos
-num.asin = math.asin
-num.atan = math.atan
-num.atan2 = math.atan2
-num.ceil = math.ceil
-num.cos = math.cos
-num.cosh = math.cosh
-num.exp = math.exp
-num.floor = math.floor
-num.ln = math.log
-num.log10 = math.log10
-num.max = math.max
-num.min = math.min
-num.sin = math.sin
-num.sinh = math.sinh
-num.sqrt = math.sqrt
-num.tan = math.tan
-num.tanh = math.tanh
-"#
 #intrinsic
-num.abs:   fn(self) -> self
+num.abs:   fn(self) -> self = "math.abs"
 #intrinsic
-num.acos:  fn(self) -> self
+num.acos:  fn(self) -> self = "math.acos"
 #intrinsic
-num.asin:  fn(self) -> self
+num.asin:  fn(self) -> self = "math.asin"
 #intrinsic
-num.atan:  fn(self) -> self
+num.atan:  fn(self) -> self = "math.atan"
 #intrinsic
-num.atan2: fn(self, self) -> self
+num.atan2: fn(self, self) -> self = "math.atan2"
 #intrinsic
-num.ceil:  fn(self) -> self
+num.ceil:  fn(self) -> self = "math.ceil"
 #intrinsic
-num.cos:   fn(self) -> self
+num.cos:   fn(self) -> self = "math.cos"
 #intrinsic
-num.cosh:  fn(self) -> self
+num.cosh:  fn(self) -> self = "math.cosh"
 #intrinsic
-num.exp:   fn(self) -> self
+num.exp:   fn(self) -> self = "math.exp"
 #intrinsic
-num.floor: fn(self) -> self
+num.floor: fn(self) -> self = "math.floor"
 #intrinsic
-num.ln:    fn(self) -> self
+num.ln:    fn(self) -> self = "math.log"
 #intrinsic
-num.log10: fn(self) -> self
+num.log10: fn(self) -> self = "math.log10"
 #intrinsic
-num.max:   fn(self, self) -> self
+num.max:   fn(self, self) -> self = "math.max"
 #intrinsic
-num.min:   fn(self, self) -> self
+num.min:   fn(self, self) -> self = "math.min"
 #intrinsic
-num.sin:   fn(self) -> self
+num.sin:   fn(self) -> self = "math.sin"
 #intrinsic
-num.sinh:  fn(self) -> self
+num.sinh:  fn(self) -> self = "math.sinh"
 #intrinsic
-num.sqrt:  fn(self) -> self
+num.sqrt:  fn(self) -> self = "math.sqrt"
 #intrinsic
-num.tan:   fn(self) -> self
+num.tan:   fn(self) -> self = "math.tan"
 #intrinsic
-num.tanh:  fn(self) -> self
+num.tanh:  fn(self) -> self = "math.tanh"
 
 fn num.log2(self) {
 	return self.ln() / num.ln(2.0)

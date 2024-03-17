@@ -1,14 +1,13 @@
-#intrinsic
-l_random_uniform: fn() -> num
-#lua #"local l_random_uniform = math.random"#
+// TODO: allow exporting intrinsics from module
 
 #intrinsic
-l_random_int: fn(int) -> int
-#lua #"local l_random_int = math.random"#
+l_random_uniform: fn() -> num = "math.random"
 
 #intrinsic
-l_random_seed: fn(int) -> ()
-#lua #"local l_random_seed = math.randomseed"#
+l_random_int: fn(int) -> int = "math.random"
+
+#intrinsic
+l_random_seed: fn(int) -> () = "math.randomseed"
 
 fn uniform() {
 	return l_random_uniform()
