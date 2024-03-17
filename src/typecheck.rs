@@ -218,7 +218,7 @@ impl<'a> TypeCheck<'a> {
 		let parent_id = self.get_parent(id);
 		match &self.types[parent_id] {
 			TyNode::Ty(ty) => ty.clone(),
-			_ => unreachable!(),
+			TyNode::Node(_) => unreachable!(),
 		}
 	}
 
@@ -317,7 +317,7 @@ impl<'a> TypeCheck<'a> {
 		} else {
 			match (self.get_type(a_id), self.get_type(b_id)) {
 				(_, Ty::Free) | (Ty::Free, _) => Err(()),
-				(_, Ty::Err) | (Ty::Err, _) | (_, Ty::Any) | (Ty::Any, _) => Ok(()), // bail
+				(_, Ty::Err | Ty::Any) | (Ty::Err | Ty::Any, _) => Ok(()), // bail
 				(ty, Ty::TyVar) => {
 					self.occurs(ty, b_id)?;
 					self.types[b_id] = TyNode::Node(a_id);
@@ -423,7 +423,7 @@ impl<'a> TypeCheck<'a> {
 						self.new_def(name.id, ty);
 					},
 				},
-				_ => (),
+				Item::InlineLua(_) => (),
 			};
 		}
 
@@ -518,9 +518,7 @@ impl<'a> TypeCheck<'a> {
 					// unify iter: [T], [U]
 					// for now, only iterate on arrays
 					let loop_ty = self.new_ty(Ty::Named(ARRAY_SYM, vec![loop_var]));
-					if self.unify(ty, loop_ty).is_err() {
-						panic!("error: currently iteration is only supported on arrays");
-					}
+					assert!(self.unify(ty, loop_ty).is_ok(), "error: currently iteration is only supported on arrays");
 
 					let (pair, _) = self.eval_block(&mut s.block);
 					current_pair = self.unify_return(current_pair, pair);
@@ -591,9 +589,7 @@ impl<'a> TypeCheck<'a> {
 	fn eval_fn_def(&mut self, node: &mut FnDef) -> TyId {
 		let fn_id = self.lookup(node.name.id).unwrap();
 		let fn_ty = self.get_type(fn_id);
-		let ret_id = if let Ty::Fn(_, ret_id) = fn_ty {
-			ret_id
-		} else {
+		let Ty::Fn(_, ret_id) = fn_ty else {
 			panic!("lookup failed");
 		};
 
@@ -1054,23 +1050,26 @@ impl<'a> TypeCheck<'a> {
 		let ty = self.get_type(lhs);
 		match op {
 			BinOp::Plus | BinOp::Minus | BinOp::Mul | BinOp::Mod => {
-				if matches!(ty, Ty::Named(INT_SYM, _) | Ty::Named(NUM_SYM, _)) {
+				if matches!(ty, Ty::Named(INT_SYM | NUM_SYM, _)) {
 					return lhs;
 				}
 			},
 			BinOp::Pow | BinOp::Div => {
-				if matches!(ty, Ty::Named(INT_SYM, _) | Ty::Named(NUM_SYM, _)) {
+				if matches!(ty, Ty::Named(INT_SYM | NUM_SYM, _)) {
 					return self.new_ty(Ty::Named(NUM_SYM, Vec::new()));
 				}
 			},
 			BinOp::Gt | BinOp::Lt | BinOp::Gte | BinOp::Lte => {
-				if matches!(ty, Ty::Named(INT_SYM, _) | Ty::Named(NUM_SYM, _) | Ty::Named(STR_SYM, _)) {
+				if matches!(ty, Ty::Named(INT_SYM | NUM_SYM | STR_SYM, _)) {
 					return self.new_ty(Ty::Named(BOOL_SYM, Vec::new()));
 				}
 			},
 			BinOp::Concat => {
 				if matches!(ty, Ty::Named(STR_SYM, _)) {
 					return lhs;
+				}
+				if matches!(ty, Ty::Named(INT_SYM, _)) {
+					todo!("range operator")
 				}
 			},
 			BinOp::And | BinOp::Or => {

@@ -223,7 +223,7 @@ impl<'a> LexIter<'a> {
 				},
 				'.' => {
 					if let Some(c) = self.peek_char() {
-						if c.is_ascii_alphabetic() {
+						if c.is_ascii_alphabetic() || c == '.' {
 							break;
 						}
 					}

@@ -10,12 +10,21 @@
 #![allow(clippy::match_like_matches_macro)]
 #![allow(clippy::enum_variant_names)]
 #![allow(clippy::new_without_default)]
+#![warn(clippy::unnested_or_patterns)]
+#![warn(clippy::inconsistent_struct_constructor)]
+#![warn(clippy::unused_self)]
+#![warn(clippy::needless_borrow)]
+#![warn(clippy::match_wildcard_for_single_variants)]
+#![warn(clippy::manual_assert)]
+#![warn(clippy::manual_let_else)]
+//
 // #![warn(clippy::pedantic)]
 // #![allow(clippy::similar_names)]
 // #![allow(clippy::enum_glob_use)]
 // #![allow(clippy::wildcard_imports)]
 // #![allow(clippy::too_many_lines)]
 // #![allow(clippy::doc_markdown)]
+// #![allow(clippy::module_name_repetitions)]
 
 use crate::emit::EmitLua;
 use crate::parser::Parser;

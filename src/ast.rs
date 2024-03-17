@@ -303,6 +303,7 @@ impl BinOp {
 }
 
 impl UnOp {
+	#[allow(clippy::unused_self)]
 	pub fn priority(&self) -> i32 {
 		7
 	}
