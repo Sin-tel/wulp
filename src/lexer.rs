@@ -1,4 +1,5 @@
-use crate::span::{format_err, FileId, Span};
+use crate::index::FileId;
+use crate::span::{format_err, Span};
 use crate::token::*;
 use std::iter::zip;
 use std::path::PathBuf;

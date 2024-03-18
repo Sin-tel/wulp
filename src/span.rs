@@ -1,7 +1,6 @@
+use crate::index::FileId;
 use std::cmp;
 use std::path::{Path, PathBuf};
-
-pub type FileId = usize;
 
 #[derive(Debug)]
 pub struct InputFile {

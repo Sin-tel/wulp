@@ -1,7 +1,8 @@
 use crate::ast::*;
 use crate::fs;
+use crate::index::{FileId, SymbolId};
 use crate::lexer::Lexer;
-use crate::span::{format_err, format_warning, FileId, InputFile, Span};
+use crate::span::{format_err, format_warning, InputFile, Span};
 use crate::token::{Token, TokenKind};
 use crate::ty::TyAst;
 use anyhow::{Context, Result};
@@ -37,7 +38,7 @@ impl<'a> Parser<'a> {
 		// TODO: check cycles
 		// TODO: don't parse same file twice
 
-		let file_id = files.len();
+		let file_id = FileId(files.len().try_into().unwrap());
 		let (mut module, file) = Self::parse_module(file_path, file_id, global)?;
 		files.push(file);
 		for item in &mut module.items {
@@ -84,7 +85,7 @@ impl<'a> Parser<'a> {
 					Import { path, file_id: None, kind: ImportKind::Alias(name) }
 				} else {
 					assert!(!span.as_str(self.input).contains('.'));
-					let name = Name { id: 0, span };
+					let name = Name { id: SymbolId(0), span };
 					Import { path, file_id: None, kind: ImportKind::Alias(name) }
 				}
 			},
@@ -92,9 +93,13 @@ impl<'a> Parser<'a> {
 				let (path, _) = self.parse_path();
 
 				self.assert_next(TokenKind::Import);
-				self.assert_next(TokenKind::Mul); // glob
-
-				Import { path, file_id: None, kind: ImportKind::Glob }
+				if self.tokens.peek().kind == TokenKind::Name {
+					todo!("import from")
+				} else {
+					// glob
+					self.assert_next(TokenKind::Mul); // glob
+					Import { path, file_id: None, kind: ImportKind::Glob }
+				}
 			},
 			_ => unreachable!(),
 		}
@@ -842,13 +847,13 @@ impl<'a> Parser<'a> {
 	fn parse_name(&mut self) -> Name {
 		let span = self.tokens.peek().span;
 		self.assert_next(TokenKind::Name);
-		Name { id: 0, span }
+		Name { id: SymbolId(0), span }
 	}
 
 	fn parse_ty_name(&mut self) -> TyName {
 		let span = self.tokens.peek().span;
 		self.assert_next(TokenKind::Name);
-		TyName { id: 0, span }
+		TyName { id: SymbolId(0), span }
 	}
 
 	fn parse_property(&mut self) -> Property {

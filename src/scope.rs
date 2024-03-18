@@ -1,6 +1,7 @@
 use crate::ast::*;
-use crate::span::{format_err_f, FileId, InputFile};
-use crate::symbol::{Symbol, SymbolId, SymbolKind, SymbolTable};
+use crate::index::{FileId, SymbolId};
+use crate::span::{format_err_f, InputFile};
+use crate::symbol::{Symbol, SymbolKind, SymbolTable};
 use crate::visitor::{VisitNode, Visitor};
 use anyhow::{anyhow, Result};
 use rustc_hash::FxHashMap;
@@ -15,12 +16,12 @@ pub struct ScopeCheck<'a> {
 	modules: FxHashMap<FileId, Scope<'a>>,
 }
 
-pub const INT_SYM: SymbolId = 1;
-pub const NUM_SYM: SymbolId = 2;
-pub const STR_SYM: SymbolId = 3;
-pub const BOOL_SYM: SymbolId = 4;
-pub const ARRAY_SYM: SymbolId = 5;
-pub const ITER_SYM: SymbolId = 6;
+pub const INT_SYM: SymbolId = SymbolId(1);
+pub const NUM_SYM: SymbolId = SymbolId(2);
+pub const STR_SYM: SymbolId = SymbolId(3);
+pub const BOOL_SYM: SymbolId = SymbolId(4);
+pub const ARRAY_SYM: SymbolId = SymbolId(5);
+pub const ITER_SYM: SymbolId = SymbolId(6);
 
 impl<'a> ScopeCheck<'a> {
 	pub fn check(modules: &mut [Module], input: &'a [InputFile]) -> Result<SymbolTable> {
@@ -275,7 +276,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 	}
 
 	fn visit_name(&mut self, node: &mut Name) {
-		assert_eq!(node.id, 0); // make sure we don't visit twice
+		assert_eq!(node.id, SymbolId(0)); // make sure we don't visit twice
 
 		let name = node.span.as_str_f(self.input);
 		if let Some(id) = self.lookup(name) {
@@ -290,7 +291,7 @@ impl<'a> Visitor for ScopeCheck<'a> {
 	}
 
 	fn visit_ty_name(&mut self, node: &mut TyName) {
-		assert_eq!(node.id, 0); // make sure we don't visit twice
+		assert_eq!(node.id, SymbolId(0)); // make sure we don't visit twice
 
 		let name = node.span.as_str_f(self.input);
 		if let Some(id) = self.lookup(name) {

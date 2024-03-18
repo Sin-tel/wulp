@@ -1,4 +1,4 @@
-pub type SymbolId = usize;
+use crate::index::SymbolId;
 
 #[derive(Debug)]
 pub struct Symbol {
@@ -65,7 +65,7 @@ impl SymbolTable {
 	}
 
 	pub fn push(&mut self, symbol: Symbol) -> SymbolId {
-		let id = self.symbols.len();
+		let id = SymbolId(self.symbols.len().try_into().unwrap());
 		self.symbols.push(symbol);
 		id
 	}
@@ -80,7 +80,7 @@ impl SymbolTable {
 	}
 
 	pub fn get(&self, id: SymbolId) -> &Symbol {
-		assert!(id != 0, "undefined symbol");
+		assert!(id != SymbolId(0), "undefined symbol");
 		&self.symbols[id]
 	}
 

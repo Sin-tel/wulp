@@ -38,6 +38,7 @@ use std::path::Path;
 
 mod ast;
 mod emit;
+mod index;
 mod lexer;
 mod parser;
 mod scope;

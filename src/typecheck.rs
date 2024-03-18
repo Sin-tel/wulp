@@ -1,8 +1,9 @@
 use crate::ast;
 use crate::ast::*;
+use crate::index::{FileId, SymbolId, TyId};
 use crate::scope::{ARRAY_SYM, BOOL_SYM, INT_SYM, ITER_SYM, NUM_SYM, STR_SYM};
-use crate::span::{format_err_f, format_note_f, FileId, InputFile, Span};
-use crate::symbol::{SymbolId, SymbolKind, SymbolTable};
+use crate::span::{format_err_f, format_note_f, InputFile, Span};
+use crate::symbol::{SymbolKind, SymbolTable};
 use crate::ty::*;
 use anyhow::anyhow;
 use anyhow::Result;
@@ -22,7 +23,7 @@ struct Module {
 	fields: FxHashMap<String, TyId>,
 }
 
-const ERR_TY: TyId = 0;
+const ERR_TY: TyId = TyId(0);
 
 type RetPair = Option<(TyId, Span)>;
 
@@ -67,7 +68,7 @@ impl<'a> TypeCheck<'a> {
 		}
 		println!("[env]");
 		for (i, s) in symbol_table.symbols.iter().enumerate().skip(1) {
-			if let Some(id) = this.lookup(i) {
+			if let Some(id) = this.lookup(SymbolId(i.try_into().unwrap())) {
 				println!("`{}`: {}", s.name, this.ty_to_string(id));
 			}
 		}
@@ -190,7 +191,7 @@ impl<'a> TypeCheck<'a> {
 
 	// new type variable
 	fn new_ty(&mut self, ty: Ty) -> TyId {
-		let ty_id = self.types.len();
+		let ty_id = TyId(self.types.len().try_into().unwrap());
 		self.types.push(TyNode::Ty(ty));
 		ty_id
 	}

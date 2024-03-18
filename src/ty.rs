@@ -1,8 +1,5 @@
 use crate::ast;
-use crate::span::FileId;
-use crate::symbol::SymbolId;
-
-pub type TyId = usize;
+use crate::index::{FileId, SymbolId, TyId};
 
 #[derive(Debug)]
 pub enum TyNode {
@@ -10,26 +7,28 @@ pub enum TyNode {
 	Ty(Ty),
 }
 
+// type representation in typechecker
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Ty {
-	Any,
-	Err,
-	Unit,
-	TyVar,                      // type variable
-	Free,                       // free type variable
+	Any,                        // Any
+	Unit,                       // ()
+	Err,                        // !
+	TyVar,                      // type inference variable
+	Free,                       // free type variable (generic)
 	Module(FileId),             // imported module
-	TyName(SymbolId),           // The type of the name of a type
-	Named(SymbolId, Vec<TyId>), // A named type with it's associated types
-	Fn(Vec<TyId>, TyId),        // args, ret
+	TyName(SymbolId),           // The type of a type literal (e.g. `int`)
+	Named(SymbolId, Vec<TyId>), // A named type with its generic parameters
+	Fn(Vec<TyId>, TyId),        // function (args, return)
 }
 
+// type representation in AST
 #[derive(Debug)]
 pub enum TyAst {
-	Any,
-	Unit,
-	Never,
-	SelfTy,
-	Named(ast::TyName, Vec<TyAst>),
-	Array(Box<TyAst>),
-	Fn(Vec<TyAst>, Box<TyAst>),
+	Any,                            // `Any`
+	Unit,                           // `()`
+	Never,                          // `!`
+	SelfTy,                         // `self`
+	Named(ast::TyName, Vec<TyAst>), // named type with generic parameters
+	Array(Box<TyAst>),              // `[Ty]`
+	Fn(Vec<TyAst>, Box<TyAst>),     // `fn(args) -> ret`
 }

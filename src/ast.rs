@@ -1,6 +1,5 @@
-use crate::span::FileId;
+use crate::index::{FileId, SymbolId};
 use crate::span::Span;
-use crate::symbol::SymbolId;
 use crate::ty::TyAst;
 use std::fmt;
 use std::path::PathBuf;
