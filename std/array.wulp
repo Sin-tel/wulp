@@ -40,3 +40,18 @@ function(arr)
 end
 "#
 
+from iter import range
+
+fn array.__eq(a: [T], b: [T]) -> bool {
+	let eq = true
+	if a.len() != b.len() {
+		return false
+	}
+	// TODO: zip(a, b)
+	for i in range(a.len()) {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return eq
+}

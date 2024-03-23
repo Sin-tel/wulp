@@ -62,16 +62,16 @@ impl<'a> TypeCheck<'a> {
 		this.new_struct(ITER_SYM, true);
 
 		for m in modules {
-			println!("[checking {}]", input[m.file_id].path.display());
+			// println!("[checking {}]", input[m.file_id].path.display());
 			let new_mod = this.eval_module(m);
 			this.modules.insert(m.file_id, new_mod);
 		}
-		println!("[env]");
-		for (i, s) in symbol_table.symbols.iter().enumerate().skip(1) {
-			if let Some(id) = this.lookup(SymbolId(i.try_into().unwrap())) {
-				println!("`{}`: {}", s.name, this.ty_to_string(id));
-			}
-		}
+		// println!("[env]");
+		// for (i, s) in symbol_table.symbols.iter().enumerate().skip(1) {
+		// 	if let Some(id) = this.lookup(SymbolId(i.try_into().unwrap())) {
+		// 		println!("`{}`: {}", s.name, this.ty_to_string(id));
+		// 	}
+		// }
 
 		// println!("----- types ");
 		// for (i, v) in this.types.iter().enumerate() {
@@ -134,8 +134,7 @@ impl<'a> TypeCheck<'a> {
 		match ty_ast {
 			TyAst::Named(s, s_assoc) => {
 				let symbol = self.symbol_table.get(s.id);
-				// dbg!(symbol);
-				match symbol.kind {
+				match &symbol.kind {
 					SymbolKind::Ty => {
 						let mut assoc = Vec::new();
 						for a in s_assoc {
@@ -155,7 +154,7 @@ impl<'a> TypeCheck<'a> {
 							ty
 						}
 					},
-					_ => todo!(),
+					s => unimplemented!("{s:?}"),
 				}
 			},
 			TyAst::Fn(args, ret) => {
@@ -321,7 +320,7 @@ impl<'a> TypeCheck<'a> {
 			Ok(())
 		} else {
 			match (self.get_type(a_id), self.get_type(b_id)) {
-				(_, Ty::Free) | (Ty::Free, _) => Err(()),
+				// (_, Ty::Free) | (Ty::Free, _) => Err(()),
 				(_, Ty::Err | Ty::Any) | (Ty::Err | Ty::Any, _) => Ok(()), // bail
 				(ty, Ty::TyVar) => {
 					self.occurs(ty, b_id)?;
@@ -347,9 +346,6 @@ impl<'a> TypeCheck<'a> {
 					}
 					Ok(())
 				},
-
-				// TODO: only when coercion ok
-				// (_, Ty::Maybe(b)) => self.unify(a_id, b),
 				(Ty::Fn(a_args, a_ret), Ty::Fn(b_args, b_ret)) => {
 					if a_args.len() != b_args.len() {
 						return Err(());
@@ -423,6 +419,7 @@ impl<'a> TypeCheck<'a> {
 				},
 				Item::Import(s) => match &mut s.kind {
 					ImportKind::Glob => (),
+					ImportKind::From(_) => (),
 					ImportKind::Alias(name) => {
 						let ty = self.new_ty(Ty::Module(s.file_id.unwrap()));
 						self.new_def(name.id, ty);
@@ -687,9 +684,6 @@ impl<'a> TypeCheck<'a> {
 		let fn_ty = self.instantiate(fn_ty_id);
 		match self.get_type(fn_ty) {
 			Ty::Fn(params, ret_ty) => {
-				// TODO: get rid of hardcoded "print" here
-
-				// if params.len() != c.args.len() && c.expr.span.as_str_f(self.input) != "print" {
 				if params.len() != c.args.len() {
 					let msg = format!("function takes {} argument(s), {} supplied", params.len(), c.args.len());
 					format_err_f(&msg, c.expr.span, self.input);
@@ -1010,7 +1004,6 @@ impl<'a> TypeCheck<'a> {
 	}
 
 	fn eval_assign_op(&mut self, node: &mut AssignOp) {
-		// TODO: refactor to use binop code
 		let rhs = self.eval_expr(&mut node.expr);
 		let lhs = self.eval_lvalue(&mut node.var);
 
@@ -1024,20 +1017,25 @@ impl<'a> TypeCheck<'a> {
 	}
 
 	fn eval_un_op(&mut self, op: &UnOp, id: TyId, span: Span) -> TyId {
-		let ty = self.get_type(id);
 		match op {
-			UnOp::Minus => {
-				if ty == Ty::Named(INT_SYM, Vec::new()) {
-					return id;
-				}
-				if ty == Ty::Named(NUM_SYM, Vec::new()) {
-					return id;
-				}
+			UnOp::Neg => {
+				if let Ty::Named(name, _) = self.get_type(id) {
+					if let Some(&op_impl) = self.structs[&name].static_fields.get("__neg") {
+						let ret = self.new_ty(Ty::TyVar);
+						let expect = self.new_ty(Ty::Fn(vec![id], ret));
+						assert!(self.unify(op_impl, expect).is_ok());
+						return ret;
+					}
+				};
 			},
 			UnOp::Not => {
-				if ty == Ty::Named(BOOL_SYM, Vec::new()) {
-					return id;
+				let ty_bool = self.new_ty(Ty::Named(BOOL_SYM, Vec::new()));
+				if self.unify(id, ty_bool).is_err() {
+					let msg = format!("expected `bool` but found `{}`", self.ty_to_string(id));
+					format_err_f(&msg, span, self.input);
+					self.errors.push(msg);
 				}
+				return ty_bool;
 			},
 		}
 		let msg = format!("operator `{op}` cannot by applied to `{}`", self.ty_to_string(id));
@@ -1057,38 +1055,33 @@ impl<'a> TypeCheck<'a> {
 			self.errors.push(msg);
 			return ERR_TY;
 		}
-		let ty = self.get_type(lhs);
 		match op {
-			BinOp::Plus | BinOp::Minus | BinOp::Mul | BinOp::Mod => {
-				if matches!(ty, Ty::Named(INT_SYM | NUM_SYM, _)) {
-					return lhs;
-				}
-			},
-			BinOp::Pow | BinOp::Div => {
-				if matches!(ty, Ty::Named(INT_SYM | NUM_SYM, _)) {
-					return self.new_ty(Ty::Named(NUM_SYM, Vec::new()));
-				}
-			},
-			BinOp::Gt | BinOp::Lt | BinOp::Gte | BinOp::Lte => {
-				if matches!(ty, Ty::Named(INT_SYM | NUM_SYM | STR_SYM, _)) {
-					return self.new_ty(Ty::Named(BOOL_SYM, Vec::new()));
-				}
-			},
-			BinOp::Concat => {
-				if matches!(ty, Ty::Named(STR_SYM, _)) {
-					return lhs;
-				}
-				if matches!(ty, Ty::Named(INT_SYM, _)) {
-					todo!("range operator")
-				}
-			},
 			BinOp::And | BinOp::Or => {
-				if matches!(ty, Ty::Named(BOOL_SYM, _)) {
-					return lhs;
+				// boolean ops are not overloadable
+				let ty_bool = self.new_ty(Ty::Named(BOOL_SYM, Vec::new()));
+				if self.unify(lhs, ty_bool).is_err() {
+					let msg = format!("expected `bool` but found `{}`", self.ty_to_string(lhs));
+					format_err_f(&msg, span, self.input);
+					self.errors.push(msg);
 				}
+				return ty_bool;
 			},
 			BinOp::Eq | BinOp::Neq => {
+				// eq always works, regardless of overloading
+				// TODO: if we do overload, we need to check that the signature is ok!
 				return self.new_ty(Ty::Named(BOOL_SYM, Vec::new()));
+			},
+			op => {
+				if let Some(op_impl_name) = op.overload_name() {
+					if let Ty::Named(name, _) = self.get_type(lhs) {
+						if let Some(&op_impl) = self.structs[&name].static_fields.get(op_impl_name) {
+							let ret = self.new_ty(Ty::TyVar);
+							let expect = self.new_ty(Ty::Fn(vec![lhs, rhs], ret));
+							assert!(self.unify(op_impl, expect).is_ok());
+							return ret;
+						}
+					};
+				}
 			},
 		}
 

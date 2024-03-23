@@ -1,4 +1,29 @@
-// Does not include, ldexp, fmod, modf, deg, rad
+// operators
+#intrinsic
+num.__neg: fn(self) -> self = "function(self) return -self end"
+
+#intrinsic
+num.__add: fn(self, self) -> self = "function(a, b) return a+b end"
+#intrinsic
+num.__sub: fn(self, self) -> self = "function(a, b) return a-b end"
+#intrinsic
+num.__mul: fn(self, self) -> self = "function(a, b) return a*b end"
+#intrinsic
+num.__mod: fn(self, self) -> self = "function(a, b) return a%b end"
+#intrinsic
+num.__div: fn(self, self) -> self = "function(a, b) return a/b end"
+#intrinsic
+num.__pow: fn(self, self) -> self = "function(a, b) return a^b end"
+
+#intrinsic
+num.__eq: fn(self, self) -> bool = "function(a, b) return a==b end"
+#intrinsic
+num.__lt: fn(self, self) -> bool = "function(a, b) return a<b end"
+#intrinsic
+num.__lte: fn(self, self) -> bool = "function(a, b) return a<=b end"
+
+#intrinsic
+num.to_str: fn(self) -> str = "function(a) return tostring(a) end"
 
 // constants
 #intrinsic
@@ -11,6 +36,7 @@ num.PI: num = "math.pi"
 num.TWO_PI: num = "6.283185307179586"
 
 // math
+// Does not include, ldexp, fmod, modf, deg, rad
 #intrinsic
 num.abs:   fn(self) -> self = "math.abs"
 #intrinsic

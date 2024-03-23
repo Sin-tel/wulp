@@ -1,5 +1,11 @@
 // TODO: basic utf8 support by default
 
+// operators
+#intrinsic
+str.__eq: fn(self, self) -> bool = "function(a, b) return a==b end"
+#intrinsic
+str.__concat: fn(self, self) -> self = "function(a, b) return a..b end"
+
 #intrinsic
 str.upper: fn(self) -> self = "string.upper"
 #intrinsic

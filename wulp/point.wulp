@@ -4,14 +4,14 @@ struct Point {
 fn Point.new(x, y) {
 	return Point(x=x, y=y)
 }
-fn Point.add(self, other: self) {
+fn Point.__add(self, other: self) {
 	return Point.new(self.x + other.x, self.y + other.y)
 }
 
 fn main() {
 	let a, b = Point.new(1.5, 2.5), Point.new(3.25, 4.75)
 
-	a = a.add(b).add(b)
-	print(a.x, a.y)
+	a = a + b + b
+	print((a.x).to_str() .. ", " .. a.y.to_str())
 }
 

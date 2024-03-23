@@ -1,3 +1,31 @@
+// operators
+#intrinsic
+int.__neg: fn(self) -> self = "function(self) return -self end"
+
+#intrinsic
+int.__add: fn(self, self) -> self = "function(a, b) return a+b end"
+#intrinsic
+int.__sub: fn(self, self) -> self = "function(a, b) return a-b end"
+#intrinsic
+int.__mul: fn(self, self) -> self = "function(a, b) return a*b end"
+#intrinsic
+int.__mod: fn(self, self) -> self = "function(a, b) return a%b end"
+#intrinsic
+int.__div: fn(self, self) -> num = "function(a, b) return a/b end"
+#intrinsic
+int.__pow: fn(self, self) -> num = "function(a, b) return a^b end"
+
+#intrinsic
+int.__eq: fn(self, self) -> bool = "function(a, b) return a==b end"
+
+#intrinsic
+int.__lt: fn(self, self) -> bool = "function(a, b) return a<b end"
+#intrinsic
+int.__lte: fn(self, self) -> bool = "function(a, b) return a<=b end"
+
+#intrinsic
+int.to_str: fn(self) -> str = "function(a) return tostring(a) end"
+
 // math
 #intrinsic
 int.abs: fn(self) -> self = "math.abs"

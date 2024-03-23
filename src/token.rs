@@ -50,8 +50,8 @@ pub enum TokenKind {
 	Pow,
 	Concat,
 	Assign,
-	AssignPlus,
-	AssignMinus,
+	AssignAdd,
+	AssignSub,
 	AssignMul,
 	AssignDiv,
 	AssignMod,
@@ -78,8 +78,8 @@ pub enum TokenKind {
 impl Token {
 	pub fn as_bin_op(&self) -> Option<BinOp> {
 		match self.kind {
-			TokenKind::Plus => Some(BinOp::Plus),
-			TokenKind::Minus => Some(BinOp::Minus),
+			TokenKind::Plus => Some(BinOp::Add),
+			TokenKind::Minus => Some(BinOp::Sub),
 			TokenKind::Mul => Some(BinOp::Mul),
 			TokenKind::Div => Some(BinOp::Div),
 			TokenKind::Pow => Some(BinOp::Pow),
@@ -99,8 +99,8 @@ impl Token {
 
 	pub fn assign_to_bin(&self) -> Option<BinOp> {
 		match self.kind {
-			TokenKind::AssignPlus => Some(BinOp::Plus),
-			TokenKind::AssignMinus => Some(BinOp::Minus),
+			TokenKind::AssignAdd => Some(BinOp::Add),
+			TokenKind::AssignSub => Some(BinOp::Sub),
 			TokenKind::AssignMul => Some(BinOp::Mul),
 			TokenKind::AssignDiv => Some(BinOp::Div),
 			TokenKind::AssignPow => Some(BinOp::Pow),
@@ -112,7 +112,7 @@ impl Token {
 
 	pub fn as_un_op(&self) -> Option<UnOp> {
 		match self.kind {
-			TokenKind::Minus => Some(UnOp::Minus),
+			TokenKind::Minus => Some(UnOp::Neg),
 			TokenKind::Not => Some(UnOp::Not),
 			_ => None,
 		}
@@ -165,8 +165,8 @@ impl fmt::Display for TokenKind {
 				Pow => "^",
 				Concat => "..",
 				Assign => "=",
-				AssignPlus => "+=",
-				AssignMinus => "-=",
+				AssignAdd => "+=",
+				AssignSub => "-=",
 				AssignMul => "*=",
 				AssignDiv => "/=",
 				AssignMod => "%=",

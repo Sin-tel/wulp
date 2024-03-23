@@ -158,11 +158,23 @@ impl<'a> Visitor for ScopeCheck<'a> {
 					}
 				},
 				Item::Import(s) => match &mut s.kind {
+					// TODO: currently everything is public by default!
 					ImportKind::Glob => {
 						let m_id = s.file_id.unwrap();
-						// TODO: currently everything is public by default!
 						for (k, v) in self.modules.get(&m_id).unwrap() {
 							let scope = self.scope_stack.last_mut().unwrap();
+							scope.insert(k, *v);
+						}
+					},
+					ImportKind::From(names) => {
+						let m_id = s.file_id.unwrap();
+
+						let module = self.modules.get(&m_id).unwrap();
+						for name in names {
+							let k = name.span.as_str_f(self.input);
+							let scope = self.scope_stack.last_mut().unwrap();
+							let v = module.get(k).unwrap();
+							name.id = *v;
 							scope.insert(k, *v);
 						}
 					},

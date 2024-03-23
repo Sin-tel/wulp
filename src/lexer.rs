@@ -341,7 +341,7 @@ impl Iterator for LexIter<'_> {
 				'-' if next == Some('=') => {
 					self.eat_chars(2);
 					let end = self.cursor;
-					Some(self.newtoken(AssignMinus, start, end))
+					Some(self.newtoken(AssignSub, start, end))
 				},
 				'-' => {
 					self.eat_char();
@@ -417,7 +417,7 @@ impl Iterator for LexIter<'_> {
 				'+' if next == Some('=') => {
 					self.eat_chars(2);
 					let end = self.cursor;
-					Some(self.newtoken(AssignPlus, start, end))
+					Some(self.newtoken(AssignAdd, start, end))
 				},
 				'+' => {
 					self.eat_char();

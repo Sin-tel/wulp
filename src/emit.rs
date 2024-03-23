@@ -183,22 +183,34 @@ impl Visitor for EmitLua {
 				}
 			},
 			Item::Import(s) => {
-				self.indent();
 				let id = s.file_id.unwrap();
 				match &mut s.kind {
 					ImportKind::Alias(n) => {
+						self.indent();
 						self.statement.push_str("local ");
 						n.visit(self);
 						self.statement.push_str(" = ");
 						self.statement.push_str(&format!("MODULES[{id}]"));
+						self.put_statement();
+					},
+					ImportKind::From(names) => {
+						for n in names {
+							self.indent();
+							self.statement.push_str("local ");
+							n.visit(self);
+							self.statement.push_str(" = ");
+							self.statement.push_str(&format!("MODULES[{id}]."));
+							n.visit(self);
+							self.put_statement();
+						}
 					},
 					ImportKind::Glob => {
+						self.indent();
 						// TODO: this is kind of horrible since it makes everything global
 						self.statement.push_str(&format!("import_glob(MODULES[{id}])"));
 						self.put_statement();
 					},
 				}
-				self.put_statement();
 			},
 			Item::StructDef(t) => {
 				let name_str = self.symbol_table.get(t.name.id).name.clone();
@@ -211,7 +223,7 @@ impl Visitor for EmitLua {
 					"setmetatable({0}, {{\n\
 					\t__call = function(_, args)\n\
 					\t\targs = args or {{}};\n\
-					\t\tlocal new = {{",
+					\t\tlocal new = setmetatable({{",
 					&name_str
 				));
 				for f in &mut t.table.fields {
@@ -232,7 +244,10 @@ impl Visitor for EmitLua {
 						},
 					}
 				}
-				self.statement.push_str("}\n\t\treturn new\n\tend\n})");
+				self.statement.push_str("}, ");
+				self.statement.push_str(&name_str);
+
+				self.statement.push_str(")\n\t\treturn new\n\tend\n})");
 				self.put_statement();
 			},
 		}
@@ -405,7 +420,7 @@ impl Visitor for EmitLua {
 				self.statement.push(')');
 			},
 			ExprKind::Array(t) => {
-				self.statement.push('{');
+				self.statement.push_str("setmetatable({");
 				if !t.is_empty() {
 					self.statement.push_str("[0]=");
 					self.push_list(t, ", ");
@@ -413,7 +428,7 @@ impl Visitor for EmitLua {
 				}
 				self.statement.push_str("n=");
 				self.statement.push_str(&t.len().to_string());
-				self.statement.push('}');
+				self.statement.push_str("}, array)");
 			},
 			ExprKind::Literal(_) | ExprKind::Name(_) | ExprKind::Call(_) | ExprKind::SuffixExpr(_, _) => {
 				node.walk(self);
@@ -488,8 +503,8 @@ fn emit_binop(op: &BinOp) -> &'static str {
 		BinOp::Mul => "*",
 		BinOp::Div => "/",
 		BinOp::Mod => "%",
-		BinOp::Plus => "+",
-		BinOp::Minus => "-",
+		BinOp::Add => "+",
+		BinOp::Sub => "-",
 		BinOp::Concat => "..",
 		BinOp::Lt => "<",
 		BinOp::Gt => ">",
@@ -504,7 +519,7 @@ fn emit_binop(op: &BinOp) -> &'static str {
 
 fn emit_unop(op: &UnOp) -> &'static str {
 	match op {
-		UnOp::Minus => "-",
+		UnOp::Neg => "-",
 		UnOp::Not => "not",
 	}
 }

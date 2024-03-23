@@ -58,7 +58,7 @@ pub struct Import {
 pub enum ImportKind {
 	Glob,
 	Alias(Name),
-	// From(Vec<Name>),
+	From(Vec<Name>),
 }
 
 #[derive(Debug)]
@@ -246,8 +246,8 @@ pub enum Literal {
 
 #[derive(Debug)]
 pub enum BinOp {
-	Plus,
-	Minus,
+	Add,
+	Sub,
 	Mul,
 	Div,
 	Pow,
@@ -265,7 +265,7 @@ pub enum BinOp {
 
 #[derive(Debug)]
 pub enum UnOp {
-	Minus,
+	Neg,
 	Not,
 }
 
@@ -292,11 +292,27 @@ impl BinOp {
 		match self {
 			BinOp::Pow => 8,
 			BinOp::Mul | BinOp::Div | BinOp::Mod => 6,
-			BinOp::Plus | BinOp::Minus => 5,
+			BinOp::Add | BinOp::Sub => 5,
 			BinOp::Concat => 4,
 			BinOp::Lt | BinOp::Gt | BinOp::Lte | BinOp::Gte | BinOp::Eq | BinOp::Neq => 3,
 			BinOp::And => 2,
 			BinOp::Or => 1,
+		}
+	}
+
+	pub fn overload_name(&self) -> Option<&'static str> {
+		match self {
+			BinOp::Add => Some("__add"),
+			BinOp::Sub => Some("__sub"),
+			BinOp::Mul => Some("__mul"),
+			BinOp::Div => Some("__div"),
+			BinOp::Mod => Some("__mod"),
+			BinOp::Pow => Some("__pow"),
+			BinOp::Concat => Some("__concat"),
+			BinOp::Eq | BinOp::Neq => Some("__eq"),
+			BinOp::Lt | BinOp::Gt => Some("__lt"),
+			BinOp::Lte | BinOp::Gte => Some("__lte"),
+			_ => None,
 		}
 	}
 }
@@ -318,8 +334,8 @@ impl fmt::Display for BinOp {
 				BinOp::Mul => "*",
 				BinOp::Div => "/",
 				BinOp::Mod => "%",
-				BinOp::Plus => "+",
-				BinOp::Minus => "-",
+				BinOp::Add => "+",
+				BinOp::Sub => "-",
 				BinOp::Concat => "..",
 				BinOp::Lt => "<",
 				BinOp::Gt => ">",
@@ -340,7 +356,7 @@ impl fmt::Display for UnOp {
 			f,
 			"{}",
 			match self {
-				UnOp::Minus => "-",
+				UnOp::Neg => "-",
 				UnOp::Not => "not",
 			}
 		)

@@ -94,9 +94,20 @@ impl<'a> Parser<'a> {
 
 				self.assert_next(TokenKind::Import);
 				if self.tokens.peek().kind == TokenKind::Name {
-					todo!("import from")
+					// from <path> import <names>
+					let mut names = Vec::new();
+					loop {
+						names.push(self.parse_name());
+
+						if self.tokens.peek().kind == TokenKind::Comma {
+							self.tokens.next();
+						} else {
+							break;
+						}
+					}
+					Import { path, file_id: None, kind: ImportKind::From(names) }
 				} else {
-					// glob
+					// from <path> import *
 					self.assert_next(TokenKind::Mul); // glob
 					Import { path, file_id: None, kind: ImportKind::Glob }
 				}
@@ -123,7 +134,7 @@ impl<'a> Parser<'a> {
 		(path, span)
 	}
 
-	fn parse_directive(&mut self) -> Option<Item> {
+	fn parse_directive(&mut self) -> Item {
 		self.assert_next(TokenKind::Hash);
 		let span = self.assert_next(TokenKind::Name).span;
 
@@ -145,42 +156,23 @@ impl<'a> Parser<'a> {
 				} else {
 					None
 				};
-				Some(Item::Intrinsic(Intrinsic { name, property, ty, lua_def }))
+				Item::Intrinsic(Intrinsic { name, property, ty, lua_def })
 			},
 			"lua" => {
 				let lua_span = self.assert_next(TokenKind::Str).span;
 				let puts = self.parse_string_literal(lua_span);
-				Some(Item::InlineLua(puts))
+				Item::InlineLua(puts)
 			},
 			s => self.error(&format!("unknown directive `#{s}`"), span),
 		}
 	}
 
-	// Block and statement rules
-
-	/// `{` block `}` | statement
-	fn parse_block(&mut self) -> Block {
-		match self.tokens.peek().kind {
-			TokenKind::LCurly => {
-				self.tokens.next();
-				let stats = self.parse_stat_list();
-				self.assert_next(TokenKind::RCurly);
-				Block { stats }
-			},
-			_ => Block { stats: vec![self.parse_statement()] },
-		}
-	}
+	// Items
 
 	fn parse_item_list(&mut self) -> Vec<Item> {
 		let mut items = Vec::new();
 		loop {
 			match self.tokens.peek().kind {
-				TokenKind::Hash => {
-					let s = self.parse_directive();
-					if let Some(s) = s {
-						items.push(s);
-					}
-				},
 				TokenKind::Eof => break,
 				_ => items.push(self.parse_item()),
 			}
@@ -203,8 +195,23 @@ impl<'a> Parser<'a> {
 			TokenKind::Import | TokenKind::From => Item::Import(self.parse_import()),
 			TokenKind::Struct => Item::StructDef(self.parse_struct_def()),
 			TokenKind::Fn => Item::FnDef(self.parse_fn_def()),
-			TokenKind::Hash => unreachable!(),
+			TokenKind::Hash => self.parse_directive(),
 			_ => self.error(&format!("expected item but found: `{tk}`"), tk.span),
+		}
+	}
+
+	// Block and statement rules
+
+	/// `{` block `}` | statement
+	fn parse_block(&mut self) -> Block {
+		match self.tokens.peek().kind {
+			TokenKind::LCurly => {
+				self.tokens.next();
+				let stats = self.parse_stat_list();
+				self.assert_next(TokenKind::RCurly);
+				Block { stats }
+			},
+			_ => Block { stats: vec![self.parse_statement()] },
 		}
 	}
 
@@ -255,8 +262,8 @@ impl<'a> Parser<'a> {
 					TokenKind::Assign | TokenKind::Comma | TokenKind::Colon => {
 						Stat::Assignment(self.parse_assignment(suffix_expr))
 					},
-					TokenKind::AssignPlus
-					| TokenKind::AssignMinus
+					TokenKind::AssignAdd
+					| TokenKind::AssignSub
 					| TokenKind::AssignMul
 					| TokenKind::AssignDiv
 					| TokenKind::AssignMod
