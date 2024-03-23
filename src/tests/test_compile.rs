@@ -111,6 +111,11 @@ fn test_overload_ops() {
 }
 
 #[test]
+fn test_overload_ops2() {
+	compile_test("wulp/tests/overload_ops2").unwrap();
+}
+
+#[test]
 fn test_recurse() {
 	compile_test("wulp/tests/recurse").unwrap();
 }

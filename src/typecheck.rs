@@ -1020,7 +1020,7 @@ impl<'a> TypeCheck<'a> {
 		match op {
 			UnOp::Neg => {
 				if let Ty::Named(name, _) = self.get_type(id) {
-					if let Some(&op_impl) = self.structs[&name].static_fields.get("__neg") {
+					if let Some(&op_impl) = self.structs[&name].static_fields.get("__unm") {
 						let ret = self.new_ty(Ty::TyVar);
 						let expect = self.new_ty(Ty::Fn(vec![id], ret));
 						assert!(self.unify(op_impl, expect).is_ok());

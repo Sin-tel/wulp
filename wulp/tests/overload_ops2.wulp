@@ -1,0 +1,74 @@
+struct Number {
+	x: num
+}
+
+fn Number.__eq(self, other: self) -> bool {
+	return self.x == other.x
+}
+
+fn Number.__lt(self, other: self) -> bool {
+	return self.x < other.x
+}
+
+fn Number.__le(self, other: self) -> bool {
+	return self.x <= other.x
+}
+
+fn Number.__unm(self) -> self {
+	return Number(x = -self.x)
+}
+
+fn Number.__add(self, other: self) -> self {
+	return Number(x = self.x + other.x)
+}
+
+fn Number.__sub(self, other: self) -> self {
+	return Number(x = self.x - other.x)
+}
+
+fn Number.__mul(self, other: self) -> self {
+	return Number(x = self.x * other.x)
+}
+
+fn Number.__div(self, other: self) -> self {
+	return Number(x = self.x / other.x)
+}
+
+fn Number.__mod(self, other: self) -> self {
+	return Number(x = self.x % other.x)
+}
+
+fn Number.__pow(self, other: self) -> self {
+	return Number(x = self.x ^ other.x)
+}
+
+fn Number.__concat(self, other: self) -> self {
+	return Number(x = self.x * other.x)
+}
+
+
+fn main() {
+	let a = Number(x = 3.0)
+	let b = Number(x = 5.0)
+
+	assert(a + b == Number(x = 8.0))
+	assert(a - b == Number(x = -2.0))
+	assert(a / b == Number(x = 3.0/5.0))
+	assert(a * b == Number(x = 15.0))
+	assert(a .. b == Number(x = 15.0))
+	assert(a % b == Number(x = 3.0))
+	assert(a ^ b == Number(x = 243.0))
+	assert(-a  == Number(x = -3.0))
+
+	assert(a != b)
+	assert(a == a)
+	assert(b == b)
+	assert(a < b)
+	assert(b > a)
+	assert(b >= a)
+	assert(a <= b)
+	assert(a <= a)
+	assert(a >= a)
+}
+
+

@@ -1,6 +1,6 @@
 // operators
 #intrinsic
-int.__neg: fn(self) -> self = "function(self) return -self end"
+int.__unm: fn(self) -> self = "function(self) return -self end"
 
 #intrinsic
 int.__add: fn(self, self) -> self = "function(a, b) return a+b end"
@@ -21,7 +21,7 @@ int.__eq: fn(self, self) -> bool = "function(a, b) return a==b end"
 #intrinsic
 int.__lt: fn(self, self) -> bool = "function(a, b) return a<b end"
 #intrinsic
-int.__lte: fn(self, self) -> bool = "function(a, b) return a<=b end"
+int.__le: fn(self, self) -> bool = "function(a, b) return a<=b end"
 
 #intrinsic
 int.to_str: fn(self) -> str = "function(a) return tostring(a) end"

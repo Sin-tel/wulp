@@ -1,18 +1,28 @@
 ## operator overloading
 Binary operators
-* `+`  `__add`
-* `-`  `__sub`
-* `*`  `__mul`
-* `/`  `__div`
-* `%`  `__mod`
-* `^`  `__pow`
-* `..` `__concat`
-Binary comparison operators (-> bool)
-* `==` `__eq`
-* `<`  `__lt`
-* `<=` `__le`
+| Operator | Function |
+|----------|----------|
+| `+`  | `__add`    |
+| `-`  | `__sub`    |
+| `*`  | `__mul`    |
+| `/`  | `__div`    |
+| `%`  | `__mod`    |
+| `^`  | `__pow`    |
+| `..` | `__concat` |
+
+Binary comparison operators: (T, T) -> bool
+
+| Operator | Function |
+|----------|----------|
+| `==` | `__eq` |
+| `<`  | `__lt` |
+| `<=` | `__le` |
+
 Unary operator
-* `-`  `__unm` (unary minus)
+
+| Operator | Function |
+|----------|----------|
+| `-`  | `__unm` |
 
 notes:
 * all binary operators currently assume that the two operands are of the same type

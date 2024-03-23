@@ -1,6 +1,6 @@
 // operators
 #intrinsic
-num.__neg: fn(self) -> self = "function(self) return -self end"
+num.__unm: fn(self) -> self = "function(self) return -self end"
 
 #intrinsic
 num.__add: fn(self, self) -> self = "function(a, b) return a+b end"
@@ -20,10 +20,17 @@ num.__eq: fn(self, self) -> bool = "function(a, b) return a==b end"
 #intrinsic
 num.__lt: fn(self, self) -> bool = "function(a, b) return a<b end"
 #intrinsic
-num.__lte: fn(self, self) -> bool = "function(a, b) return a<=b end"
+num.__le: fn(self, self) -> bool = "function(a, b) return a<=b end"
 
 #intrinsic
 num.to_str: fn(self) -> str = "function(a) return tostring(a) end"
+#intrinsic
+num.from_str: fn(str) -> self =
+#"function(a)
+	local a = tonumber(a)
+	assert(a ~= nil, "str to num conversion failed")
+	return a
+end"#
 
 // constants
 #intrinsic

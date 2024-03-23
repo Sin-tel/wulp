@@ -311,7 +311,7 @@ impl BinOp {
 			BinOp::Concat => Some("__concat"),
 			BinOp::Eq | BinOp::Neq => Some("__eq"),
 			BinOp::Lt | BinOp::Gt => Some("__lt"),
-			BinOp::Lte | BinOp::Gte => Some("__lte"),
+			BinOp::Lte | BinOp::Gte => Some("__le"),
 			_ => None,
 		}
 	}

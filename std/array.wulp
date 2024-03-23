@@ -55,3 +55,12 @@ fn array.__eq(a: [T], b: [T]) -> bool {
 	}
 	return eq
 }
+
+// fn array.to_str(a: [T]) -> str {
+// 	let s = "["
+// 	for k in a.iter() {
+// 		s ..= k as str .. ", "
+// 	}
+// 	s ..= "]"
+// 	return s
+// }
