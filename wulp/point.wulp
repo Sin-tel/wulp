@@ -1,17 +1,29 @@
+// this only takes ~ 400ms even though we are creating lots of temporary objects
+// the equivalent python program takes 2 minutes to run
+// see luajit "allocation sinking optimization"
+
 struct Point {
 	x: num, y: num
 }
+
 fn Point.new(x, y) {
 	return Point(x=x, y=y)
 }
+
 fn Point.__add(self, other: self) {
 	return Point.new(self.x + other.x, self.y + other.y)
 }
 
 fn main() {
-	let a, b = Point.new(1.5, 2.5), Point.new(3.25, 4.75)
+	let a = Point.new(1.5, 2.5)
+	let b = Point.new(3.25, 4.75)
 
-	a = a + b + b
-	print((a.x).to_str() .. ", " .. a.y.to_str())
+
+	for i in range(100_000_000) {
+		a = (a + b) + b
+	}
+
+	print("x = " .. (a.x).to_str())
+	print("y = " .. (a.y).to_str())
 }
 

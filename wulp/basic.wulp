@@ -2,13 +2,13 @@
 fn main() {
 	let list = [2 3 4 5]
 
-	for i in list {
-		print(i, fact(i))
+	for i in list.iter() {
+		print(fact(i))
 	}
 
 	let i = 4
 	while true {
-		print(i, fact(i))
+		print(fact(i))
 		i -= 1
 		if i <= 0 break
 	}
