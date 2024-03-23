@@ -28,6 +28,26 @@ fn main() {
 	a.push(2)
 	a.pop()
 	assert(a.len() == 1)
+
+
+	let a = [1,2,3]
+
+	a.insert(1, 4)
+	assert(a == [1,4,2,3])
+	a.insert(4, 5)
+	assert(a == [1,4,2,3,5])
+	let e = a.remove(2)
+	assert(e == 2)
+	assert(a == [1,4,3,5])
+	e = a.remove(0)
+	assert(e == 1)
+	assert(a == [4,3,5])
+
+	assert(not a.is_empty())
+	a.pop()
+	a.pop()
+	a.pop()
+	assert(a.is_empty())
 }
 
 

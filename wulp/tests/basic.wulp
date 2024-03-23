@@ -17,6 +17,11 @@ fn main() {
 	let a: str = "str"
 	let b = a
 
+
+	{
+		a, b = b, a
+	}
+
 	if a == b {
 		assert(true)
 	} elseif a != b {

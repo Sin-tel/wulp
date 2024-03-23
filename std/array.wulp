@@ -1,15 +1,15 @@
 #intrinsic
-array.push: fn([T], T) -> () = #"
-function(arr, e)
-	arr[arr.n] = e
-	arr.n = arr.n + 1
+array.len: fn([T]) -> int = #"
+function(arr)
+	return arr.n
 end
 "#
 
 #intrinsic
-array.len: fn([T]) -> int = #"
-function(arr)
-	return arr.n
+array.push: fn([T], T) -> () = #"
+function(arr, e)
+	arr[arr.n] = e
+	arr.n = arr.n + 1
 end
 "#
 
@@ -19,6 +19,36 @@ function(arr)
 	assert(arr.n > 0, "empty array")
 	arr.n = arr.n - 1
 	local item = arr[arr.n]
+	arr[arr.n] = nil
+	return item
+end
+"#
+
+#intrinsic
+array.insert: fn([T], int, T) -> () = #"
+function(arr, k, e)
+	assert(k>=0,     "index out of bounds")
+	assert(k<=arr.n, "index out of bounds")
+
+	arr.n = arr.n + 1
+	for i = arr.n, k, -1 do
+		arr[i+1] = arr[i]
+	end
+	arr[k] = e
+end
+"#
+
+#intrinsic
+array.remove: fn([T], int) -> T = #"
+function(arr, k)
+	assert(k>=0,    "index out of bounds")
+	assert(k<arr.n, "index out of bounds")
+
+	local item = arr[k]
+	for i = k, arr.n do
+		arr[i] = arr[i+1]
+	end
+	arr.n = arr.n - 1
 	arr[arr.n] = nil
 	return item
 end
@@ -40,6 +70,10 @@ function(arr)
 end
 "#
 
+fn array.is_empty(a: [T]) -> bool {
+	return a.len() == 0
+}
+
 from iter import range
 
 fn array.__eq(a: [T], b: [T]) -> bool {
@@ -54,6 +88,17 @@ fn array.__eq(a: [T], b: [T]) -> bool {
 		}
 	}
 	return eq
+}
+
+fn array.__concat(a: [T], b: [T]) -> [T] {
+	let new = []
+	for i in a.iter() {
+		new.push(i)
+	}
+	for i in b.iter() {
+		new.push(i)
+	}
+	return new
 }
 
 // fn array.to_str(a: [T]) -> str {

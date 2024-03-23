@@ -24,6 +24,8 @@ num.__le: fn(self, self) -> bool = "function(a, b) return a<=b end"
 
 #intrinsic
 num.to_str: fn(self) -> str = "function(a) return tostring(a) end"
+
+// this should return optional, as it can fail
 #intrinsic
 num.from_str: fn(str) -> self =
 #"function(a)

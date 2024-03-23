@@ -418,8 +418,7 @@ impl<'a> TypeCheck<'a> {
 					}
 				},
 				Item::Import(s) => match &mut s.kind {
-					ImportKind::Glob => (),
-					ImportKind::From(_) => (),
+					ImportKind::From(_) | ImportKind::Glob => (),
 					ImportKind::Alias(name) => {
 						let ty = self.new_ty(Ty::Module(s.file_id.unwrap()));
 						self.new_def(name.id, ty);
@@ -1077,6 +1076,7 @@ impl<'a> TypeCheck<'a> {
 						if let Some(&op_impl) = self.structs[&name].static_fields.get(op_impl_name) {
 							let ret = self.new_ty(Ty::TyVar);
 							let expect = self.new_ty(Ty::Fn(vec![lhs, rhs], ret));
+							let op_impl = self.instantiate(op_impl);
 							assert!(self.unify(op_impl, expect).is_ok());
 							return ret;
 						}

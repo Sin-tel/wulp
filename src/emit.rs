@@ -477,17 +477,6 @@ impl Visitor for EmitLua {
 		self.statement.push_str("end");
 	}
 
-	fn visit_field(&mut self, node: &mut Field) {
-		self.visit_property(&mut node.field.property);
-		match &mut node.kind {
-			FieldKind::Empty => (),
-			FieldKind::Assign(e) => {
-				self.statement.push_str(" = ");
-				self.visit_expr(e);
-			},
-		}
-	}
-
 	fn visit_name(&mut self, node: &mut Name) {
 		self.statement.push_str(&self.symbol_table.get(node.id).name);
 	}
