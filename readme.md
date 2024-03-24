@@ -3,6 +3,9 @@
 Scripting language that compiles to lua.
 
 ### Syntax
+
+![screenshot](syntax.png)
+
 Some notable changes from lua:
 
 * Use `{}` instead of `do`, `then`, `end` etc
@@ -11,7 +14,7 @@ Some notable changes from lua:
 * Arrays are zero indexed
 * No metatables. The current syntax aims to codify a few common idioms, giving you only one way of doing things.
 
-See the examples for more.
+See the [examples](wulp) for more.
 
 ### Lua backend 
 * Using luajit as a backend is a viable strategy for quickly iterating on a language
@@ -33,4 +36,3 @@ It would not be too hard to add some implicit coercions where it makes sense.
 * Some way to deal with optional types
 * I want to add a trait/typeclass system eventually
 * IDE integration, autoformatting etc
-* Eventual goal is to integrate nicely with love2d

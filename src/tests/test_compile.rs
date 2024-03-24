@@ -75,6 +75,11 @@ fn test_fail() {
 }
 
 #[test]
+fn test_iter() {
+	compile_test("wulp/tests/iter").unwrap();
+}
+
+#[test]
 fn test_lists() {
 	compile_test("wulp/tests/lists").unwrap();
 }

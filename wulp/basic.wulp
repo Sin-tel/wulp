@@ -1,9 +1,11 @@
 // basic syntax examples
+
+
 fn main() {
 	let list = [2 3 4 5]
 
 	for i in list.iter() {
-		print(fact(i))
+		print(i)
 	}
 
 	let i = 4
@@ -13,8 +15,7 @@ fn main() {
 		if i <= 0 break
 	}
 
-	let add = fn(a: int, b: int) {return a + b}
-	print(add(1, 2))
+	// working with iterators
 }
 
 // defining a function
