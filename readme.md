@@ -4,7 +4,7 @@ Scripting language that compiles to lua.
 
 ### Syntax
 
-![screenshot](syntax.png)
+<img src="syntax.png" alt="syntax" style="width:763px;"/>
 
 Some notable changes from lua:
 

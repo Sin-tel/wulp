@@ -1,23 +1,5 @@
 // basic syntax examples
 
-
-fn main() {
-	let list = [2 3 4 5]
-
-	for i in list.iter() {
-		print(i)
-	}
-
-	let i = 4
-	while true {
-		print(fact(i))
-		i -= 1
-		if i <= 0 break
-	}
-
-	// working with iterators
-}
-
 // defining a function
 fn fact(n: int) -> int {
 	assert(n >= 0)
@@ -25,4 +7,21 @@ fn fact(n: int) -> int {
 	else return 1
 }
 
-
+// entry point
+fn main() {
+	// iterating over arrays
+	let list = [2 3 4 5]
+	for i in list.iter() {
+		print(i)
+	}
+	// control flow
+	let i = 4
+	while true {
+		print(fact(i))
+		i -= 1
+		if i <= 0 break
+	}
+	// working with iterators, anonymous functions
+	let squares = list.iter().map(fn(x: int) {return x*x}).collect()
+	assert(squares == [4, 9, 16, 25])
+}
