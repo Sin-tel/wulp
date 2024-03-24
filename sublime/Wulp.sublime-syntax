@@ -1,0 +1,185 @@
+%YAML 1.2
+---
+# See http://www.sublimetext.com/docs/3/syntax.html
+file_extensions:
+  - wulp
+scope: source.wulp
+
+variables:
+  ident: '[A-Za-z_][A-Za-z_0-9]*'
+
+contexts:
+  # The prototype context is prepended to all contexts but those setting
+  # meta_include_prototype: false.
+  prototype:
+    - include: comments
+
+  main:
+    - include: function
+    - include: directive
+    - include: keywords
+    - include: number
+    - include: string
+    - include: operator
+    - include: variable
+    - include: illegal
+    - include: punctuation
+
+  constants:
+    - match: \b(true|false|nil)\b
+      scope: constant.language.wulp
+
+
+  punctuation:
+    - match: '\.|,|:|;'
+      scope: punctuation.separator.wulp
+
+  variable:
+    - match: '\b({{ident}})(?=\s*(?:\())'
+      scope: variable.function.wulp
+    - match: '\b({{ident}})'
+      scope: variable.other.wulp
+
+  directive:
+    - match: '(#)\s*({{ident}})'
+      captures:
+        1: keyword.operator.wulp
+        2: variable.annotation.wulp
+
+  operator:
+    - match: '->'
+      scope: punctuation.separator.wulp
+    - match: '\+|-|%|\*|\/|\^|=|==|!=|<|>|<=|>=|\.\.'
+      scope: keyword.operator.wulp
+    - match: '\b(and|or|not)\b'
+      scope: keyword.operator.wulp
+
+  types:
+    - match: '\b(str|num|int|bool|maybe)\b'
+      scope: storage.type.wulp
+    - match: '!(?!=)'
+      scope: constant.language.wulp
+
+  keywords:
+    - include: constants
+    - include: types
+
+    - match: '\b(if|else|for|while|break|elseif|return|in|as)\b'
+      scope: keyword.control.wulp
+
+    - match: '\b(import|from)\b'
+      scope: keyword.import.wulp
+
+    - match: '\b(let|struct)\b'
+      scope: storage.type.wulp
+
+    - match: '\b(self)\b'
+      scope: constant.language.wulp
+
+  function:
+    - match: '\b(fn)\s+(?:{{ident}}(\.))*({{ident}})\s*'
+      scope: meta.function.wulp
+      captures:
+        1: keyword.declaration.function.wulp
+        2: punctuation.separator.wulp
+        3: entity.name.function.wulp
+      push:
+        - function-parameters
+    - match: '\b(fn)'
+      scope: meta.function.wulp
+      captures:
+        1: keyword.declaration.function.wulp
+      push:
+        - function-parameters
+
+  function-parameters:
+    - match: '\('
+      scope: punctuation.section.group.begin.wulp
+      set:
+        - meta_scope: meta.group.wulp
+        - match: '\)'
+          scope: punctuation.section.group.end.wulp
+          pop: true
+        - match: '\('
+          scope: variable.parameter.function.wulp
+          push:
+            - match: '\)'
+              scope: variable.parameter.function.wulp
+              pop: true
+            - match: '.'
+              scope: variable.parameter.function.wulp
+        - match: ','
+          scope: punctuation.separator.wulp
+        - match: '([^\),:])'
+          scope: meta.function.parameters.wulp
+          captures:
+            1: variable.parameter.function.wulp
+        - match: ':'
+          # Type annotation
+          scope: punctuation.separator.wulp
+          push:
+            - include: types
+            - match: 'self'
+              scope: storage.type.wulp
+            - match: '(?=,|\))'
+              pop: true
+
+  number:
+    - match: '0x[0-9a-fA-F_]+'
+      scope: constant.numeric.wulp
+    - match: '0b[01_]+'
+      scope: constant.numeric.wulp
+    - match: '\b[0-9][0-9_]*(?:\.(?![a-zA-Z\.])[0-9_]*)?'
+      scope: constant.numeric.wulp
+
+  string:
+    - match: '"'
+      scope: punctuation.definition.string.begin.wulp
+      push: double_quoted_string
+    - match: ''''
+      scope: punctuation.definition.string.begin.wulp
+      push: single_quoted_string
+    - match: '#"'
+      scope: punctuation.definition.string.begin.wulp
+      push: raw_string
+
+  raw_string:
+    - meta_include_prototype: false
+    - meta_scope: string.quoted.double.wulp
+    - match: '"#'
+      scope: punctuation.definition.string.end.wulp
+      pop: true
+
+  double_quoted_string:
+    - meta_include_prototype: false
+    - meta_scope: string.quoted.double.wulp
+    - match: '\\.'
+      scope: constant.character.escape.wulp
+    - match: '"'
+      scope: punctuation.definition.string.end.wulp
+      pop: true
+
+  single_quoted_string:
+    - meta_include_prototype: false
+    - meta_scope: string.quoted.double.wulp
+    - match: '\.'
+      scope: constant.character.escape.wulp
+    - match: ''''
+      scope: punctuation.definition.string.end.wulp
+      pop: true
+
+  illegal:
+    - match: '[&\|@\$`~\\?]'
+      scope: invalid.illegal.wulp
+    - match: '::|\*\*|\.\.\.|<<|>>|==='
+      scope: invalid.illegal.wulp
+
+  comments:
+    # Comments begin with a '//' and finish at the end of the line.
+    - match: '//'
+      scope: punctuation.definition.comment.wulp
+      push:
+        # This is an anonymous context push for brevity.
+        - meta_scope: comment.line.wulp
+        - match: $\n?
+          pop: true

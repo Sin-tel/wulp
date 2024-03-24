@@ -1,0 +1,129 @@
+{
+	"scope": "source.wulp",
+
+	"completions":
+	[
+		{
+			"trigger": "return",
+			"annotation": "",
+			"contents": "return",
+			"kind": "keyword",
+			"details": ""
+		},
+		{
+			"trigger": "break",
+			"annotation": "",
+			"contents": "break",
+			"kind": "keyword",
+			"details": ""
+		},
+		{
+			"trigger": "true",
+			"annotation": "",
+			"contents": "true",
+			"kind": "keyword",
+			"details": ""
+		},
+		{
+			"trigger": "false",
+			"annotation": "",
+			"contents": "false",
+			"kind": "keyword",
+			"details": ""
+		},
+		{
+			"trigger": "nil",
+			"annotation": "",
+			"contents": "nil",
+			"kind": "keyword",
+			"details": ""
+		},
+		{
+			"trigger": "and",
+			"annotation": "",
+			"contents": "and",
+			"kind": "keyword",
+			"details": ""
+		},
+		{
+			"trigger": "or",
+			"annotation": "",
+			"contents": "or",
+			"kind": "keyword",
+			"details": ""
+		},
+		{
+			"trigger": "not",
+			"annotation": "",
+			"contents": "not",
+			"kind": "keyword",
+			"details": ""
+		},
+		{
+            "trigger": "print",
+            "annotation": "print()",
+            "contents": "print($1)\n$0",
+            "kind": "snippet"
+        },
+        {
+            "trigger": "assert",
+            "annotation": "assert()",
+            "contents": "assert(${1:condition})\n$0",
+            "kind": "snippet"
+        },
+        {
+            "trigger": "let",
+            "annotation": "let … = …",
+            "contents": "let ${1:var} = ${2:expr}\n$0",
+            "kind": "snippet"
+        },
+	    {
+            "trigger": "fn",
+            "annotation": "fn …(…) { … }",
+            "contents": "fn ${1:name}(${2:arg}) {\n\t$3\n}$0",
+            "kind": "snippet"
+        },
+        {
+            "trigger": "for",
+            "annotation": "for … in … { … }",
+            "contents": "for ${1:i} in ${2:expr} {\n\t$3\n}$0",
+            "kind": "snippet"
+        },
+        {
+            "trigger": "if",
+            "annotation": "if … { … }",
+            "contents": "if ${1:cond} {\n\t$2\n}$0",
+            "kind": "snippet"
+        },
+        {
+            "trigger": "if",
+            "annotation": "if … { … } else { … }",
+            "contents": "if ${1:cond} {\n\t$2\n} else {\n\t$3\n}$0",
+            "kind": "snippet"
+        },
+        {
+            "trigger": "else",
+            "annotation": "else { … }",
+            "contents": "else {\n\t$1\n}$0",
+            "kind": "snippet"
+        },
+        {
+            "trigger": "elseif",
+            "annotation": "elseif … { … }",
+            "contents": "elseif ${1:cond} {\n\t$2\n}$0",
+            "kind": "snippet"
+        },
+        {
+            "trigger": "while",
+            "annotation": "while … { … }",
+            "contents": "while ${1:cond} {\n\t$2\n}$0",
+            "kind": "snippet"
+        },
+        {
+            "trigger": "struct",
+            "annotation": "struct … { … }",
+            "contents": "struct ${1:Name} {\n\t${2:field}: ${3:Type}\n}$0",
+            "kind": "snippet"
+        }
+	]
+}

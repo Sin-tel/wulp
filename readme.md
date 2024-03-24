@@ -16,6 +16,8 @@ Some notable changes from lua:
 
 See the [examples](wulp) for more.
 
+There is syntax highlighting and completions package for Sublime text in the [sublime](sublime) folder.
+
 ### Lua backend 
 * Using luajit as a backend is a viable strategy for quickly iterating on a language
 * Lua code is easy to generate
